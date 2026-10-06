@@ -1,0 +1,11 @@
+.git
+.next
+node_modules
+tests
+reports
+SPEC.md
+worker.js
+scripts
+.env*
+!.env.example
+.wrangler

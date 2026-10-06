@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.next/
+coverage/
+.vercel/
+.wrangler/
+.dev.vars*
+wrangler.jsonc
+.tmp/
+reports/*.jpg
+reports/*.png
+*.tsbuildinfo
+.env*
+!.env.example
+tests/fixtures/ovr-dataset.json
+tests/fixtures/squad-sample.json

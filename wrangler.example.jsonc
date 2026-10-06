@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gmc-companion-index",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-06",
+  "keep_vars": true,
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "REPLACE_WITH_EXISTING_COMPANION_DATABASE_NAME",
+    "database_id": "REPLACE_WITH_EXISTING_COMPANION_DATABASE_ID"
+  }],
+  "ratelimits": [{
+    "name": "SITE_RATE_LIMITER",
+    "namespace_id": "1001",
+    "simple": { "limit": 60, "period": 60 }
+  }]
+}

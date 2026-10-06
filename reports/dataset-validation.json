@@ -1,0 +1,1068 @@
+{
+  "total": 4184,
+  "totalStats": 25104,
+  "exactStats": 25091,
+  "summaryStatsAccuracy": 0.9994821542383684,
+  "statMismatches": [
+    {
+      "row": 713,
+      "position": "CM",
+      "stat": "pas",
+      "game": 88,
+      "calculated": 89,
+      "subs": {
+        "acceleration": 97,
+        "sprintSpeed": 92,
+        "finishing": 90,
+        "shotPower": 86,
+        "longShots": 88,
+        "volleys": 81,
+        "penalties": 86,
+        "attackingPositioning": 97,
+        "vision": 92,
+        "crossing": 92,
+        "fkAccuracy": 79,
+        "shortPassing": 98,
+        "longPassing": 92,
+        "curve": 78,
+        "agility": 99,
+        "balance": 92,
+        "reactions": 99,
+        "ballControl": 92,
+        "dribblingSub": 92,
+        "composure": 92,
+        "firstTouch": 90,
+        "interceptions": 80,
+        "headingAccuracy": 80,
+        "defensiveAwareness": 92,
+        "standingTackle": 92,
+        "slidingTackle": 86,
+        "jumping": 90,
+        "stamina": 99,
+        "strength": 81,
+        "aggression": 80,
+        "gkDiving": 88,
+        "gkHandling": 92,
+        "gkKicking": 88,
+        "gkReflexes": 92,
+        "gkPositioningSub": 92,
+        "gkSprintSpeed": 69,
+        "gkAcceleration": 70
+      }
+    },
+    {
+      "row": 796,
+      "position": "CM",
+      "stat": "def",
+      "game": 54,
+      "calculated": 53,
+      "subs": {
+        "acceleration": 60,
+        "sprintSpeed": 53,
+        "finishing": 46,
+        "shotPower": 61,
+        "longShots": 56,
+        "volleys": 45,
+        "penalties": 60,
+        "attackingPositioning": 59,
+        "vision": 45,
+        "crossing": 58,
+        "fkAccuracy": 48,
+        "shortPassing": 59,
+        "longPassing": 56,
+        "curve": 39,
+        "agility": 58,
+        "balance": 57,
+        "reactions": 58,
+        "ballControl": 58,
+        "dribblingSub": 54,
+        "composure": 46,
+        "firstTouch": 48,
+        "interceptions": 58,
+        "headingAccuracy": 47,
+        "defensiveAwareness": 55,
+        "standingTackle": 48,
+        "slidingTackle": 58,
+        "jumping": 46,
+        "stamina": 61,
+        "strength": 43,
+        "aggression": 53,
+        "gkDiving": 61,
+        "gkHandling": 61,
+        "gkKicking": 47,
+        "gkReflexes": 61,
+        "gkPositioningSub": 56,
+        "gkSprintSpeed": 49,
+        "gkAcceleration": 55
+      }
+    },
+    {
+      "row": 796,
+      "position": "CM",
+      "stat": "phy",
+      "game": 52,
+      "calculated": 51,
+      "subs": {
+        "acceleration": 60,
+        "sprintSpeed": 53,
+        "finishing": 46,
+        "shotPower": 61,
+        "longShots": 56,
+        "volleys": 45,
+        "penalties": 60,
+        "attackingPositioning": 59,
+        "vision": 45,
+        "crossing": 58,
+        "fkAccuracy": 48,
+        "shortPassing": 59,
+        "longPassing": 56,
+        "curve": 39,
+        "agility": 58,
+        "balance": 57,
+        "reactions": 58,
+        "ballControl": 58,
+        "dribblingSub": 54,
+        "composure": 46,
+        "firstTouch": 48,
+        "interceptions": 58,
+        "headingAccuracy": 47,
+        "defensiveAwareness": 55,
+        "standingTackle": 48,
+        "slidingTackle": 58,
+        "jumping": 46,
+        "stamina": 61,
+        "strength": 43,
+        "aggression": 53,
+        "gkDiving": 61,
+        "gkHandling": 61,
+        "gkKicking": 47,
+        "gkReflexes": 61,
+        "gkPositioningSub": 56,
+        "gkSprintSpeed": 49,
+        "gkAcceleration": 55
+      }
+    },
+    {
+      "row": 810,
+      "position": "CM",
+      "stat": "phy",
+      "game": 54,
+      "calculated": 55,
+      "subs": {
+        "acceleration": 54,
+        "sprintSpeed": 63,
+        "finishing": 49,
+        "shotPower": 56,
+        "longShots": 54,
+        "volleys": 50,
+        "penalties": 55,
+        "attackingPositioning": 47,
+        "vision": 64,
+        "crossing": 47,
+        "fkAccuracy": 37,
+        "shortPassing": 63,
+        "longPassing": 43,
+        "curve": 39,
+        "agility": 60,
+        "balance": 49,
+        "reactions": 58,
+        "ballControl": 54,
+        "dribblingSub": 58,
+        "composure": 64,
+        "firstTouch": 64,
+        "interceptions": 49,
+        "headingAccuracy": 54,
+        "defensiveAwareness": 60,
+        "standingTackle": 61,
+        "slidingTackle": 60,
+        "jumping": 45,
+        "stamina": 62,
+        "strength": 57,
+        "aggression": 54,
+        "gkDiving": 64,
+        "gkHandling": 52,
+        "gkKicking": 59,
+        "gkReflexes": 54,
+        "gkPositioningSub": 61,
+        "gkSprintSpeed": 38,
+        "gkAcceleration": 47
+      }
+    },
+    {
+      "row": 1919,
+      "position": "CM",
+      "stat": "dri",
+      "game": 88,
+      "calculated": 87,
+      "subs": {
+        "acceleration": 87,
+        "sprintSpeed": 83,
+        "finishing": 91,
+        "shotPower": 80,
+        "longShots": 88,
+        "volleys": 77,
+        "penalties": 74,
+        "attackingPositioning": 82,
+        "vision": 90,
+        "crossing": 81,
+        "fkAccuracy": 68,
+        "shortPassing": 90,
+        "longPassing": 88,
+        "curve": 88,
+        "agility": 89,
+        "balance": 88,
+        "reactions": 85,
+        "ballControl": 91,
+        "dribblingSub": 90,
+        "composure": 80,
+        "firstTouch": 84,
+        "interceptions": 83,
+        "headingAccuracy": 71,
+        "defensiveAwareness": 79,
+        "standingTackle": 77,
+        "slidingTackle": 86,
+        "jumping": 85,
+        "stamina": 88,
+        "strength": 83,
+        "aggression": 85,
+        "gkDiving": 90,
+        "gkHandling": 85,
+        "gkKicking": 71,
+        "gkReflexes": 85,
+        "gkPositioningSub": 90,
+        "gkSprintSpeed": 73,
+        "gkAcceleration": 68
+      }
+    },
+    {
+      "row": 1982,
+      "position": "CM",
+      "stat": "pac",
+      "game": 82,
+      "calculated": 83,
+      "subs": {
+        "acceleration": 83,
+        "sprintSpeed": 83,
+        "finishing": 72,
+        "shotPower": 70,
+        "longShots": 74,
+        "volleys": 74,
+        "penalties": 74,
+        "attackingPositioning": 76,
+        "vision": 74,
+        "crossing": 61,
+        "fkAccuracy": 70,
+        "shortPassing": 77,
+        "longPassing": 73,
+        "curve": 63,
+        "agility": 75,
+        "balance": 60,
+        "reactions": 78,
+        "ballControl": 82,
+        "dribblingSub": 79,
+        "composure": 82,
+        "firstTouch": 71,
+        "interceptions": 61,
+        "headingAccuracy": 68,
+        "defensiveAwareness": 78,
+        "standingTackle": 77,
+        "slidingTackle": 66,
+        "jumping": 56,
+        "stamina": 81,
+        "strength": 65,
+        "aggression": 66,
+        "gkDiving": 80,
+        "gkHandling": 72,
+        "gkKicking": 74,
+        "gkReflexes": 81,
+        "gkPositioningSub": 75,
+        "gkSprintSpeed": 61,
+        "gkAcceleration": 56
+      }
+    },
+    {
+      "row": 1982,
+      "position": "CM",
+      "stat": "sho",
+      "game": 74,
+      "calculated": 73,
+      "subs": {
+        "acceleration": 83,
+        "sprintSpeed": 83,
+        "finishing": 72,
+        "shotPower": 70,
+        "longShots": 74,
+        "volleys": 74,
+        "penalties": 74,
+        "attackingPositioning": 76,
+        "vision": 74,
+        "crossing": 61,
+        "fkAccuracy": 70,
+        "shortPassing": 77,
+        "longPassing": 73,
+        "curve": 63,
+        "agility": 75,
+        "balance": 60,
+        "reactions": 78,
+        "ballControl": 82,
+        "dribblingSub": 79,
+        "composure": 82,
+        "firstTouch": 71,
+        "interceptions": 61,
+        "headingAccuracy": 68,
+        "defensiveAwareness": 78,
+        "standingTackle": 77,
+        "slidingTackle": 66,
+        "jumping": 56,
+        "stamina": 81,
+        "strength": 65,
+        "aggression": 66,
+        "gkDiving": 80,
+        "gkHandling": 72,
+        "gkKicking": 74,
+        "gkReflexes": 81,
+        "gkPositioningSub": 75,
+        "gkSprintSpeed": 61,
+        "gkAcceleration": 56
+      }
+    },
+    {
+      "row": 1982,
+      "position": "CM",
+      "stat": "dri",
+      "game": 75,
+      "calculated": 76,
+      "subs": {
+        "acceleration": 83,
+        "sprintSpeed": 83,
+        "finishing": 72,
+        "shotPower": 70,
+        "longShots": 74,
+        "volleys": 74,
+        "penalties": 74,
+        "attackingPositioning": 76,
+        "vision": 74,
+        "crossing": 61,
+        "fkAccuracy": 70,
+        "shortPassing": 77,
+        "longPassing": 73,
+        "curve": 63,
+        "agility": 75,
+        "balance": 60,
+        "reactions": 78,
+        "ballControl": 82,
+        "dribblingSub": 79,
+        "composure": 82,
+        "firstTouch": 71,
+        "interceptions": 61,
+        "headingAccuracy": 68,
+        "defensiveAwareness": 78,
+        "standingTackle": 77,
+        "slidingTackle": 66,
+        "jumping": 56,
+        "stamina": 81,
+        "strength": 65,
+        "aggression": 66,
+        "gkDiving": 80,
+        "gkHandling": 72,
+        "gkKicking": 74,
+        "gkReflexes": 81,
+        "gkPositioningSub": 75,
+        "gkSprintSpeed": 61,
+        "gkAcceleration": 56
+      }
+    },
+    {
+      "row": 3167,
+      "position": "CM",
+      "stat": "pac",
+      "game": 76,
+      "calculated": 75,
+      "subs": {
+        "acceleration": 68,
+        "sprintSpeed": 82,
+        "finishing": 66,
+        "shotPower": 64,
+        "longShots": 67,
+        "volleys": 65,
+        "penalties": 60,
+        "attackingPositioning": 63,
+        "vision": 64,
+        "crossing": 57,
+        "fkAccuracy": 57,
+        "shortPassing": 69,
+        "longPassing": 55,
+        "curve": 59,
+        "agility": 61,
+        "balance": 68,
+        "reactions": 70,
+        "ballControl": 78,
+        "dribblingSub": 63,
+        "composure": 56,
+        "firstTouch": 70,
+        "interceptions": 65,
+        "headingAccuracy": 63,
+        "defensiveAwareness": 74,
+        "standingTackle": 60,
+        "slidingTackle": 50,
+        "jumping": 60,
+        "stamina": 63,
+        "strength": 70,
+        "aggression": 50,
+        "gkDiving": 69,
+        "gkHandling": 64,
+        "gkKicking": 63,
+        "gkReflexes": 74,
+        "gkPositioningSub": 62,
+        "gkSprintSpeed": 58,
+        "gkAcceleration": 59
+      }
+    },
+    {
+      "row": 3167,
+      "position": "CM",
+      "stat": "def",
+      "game": 63,
+      "calculated": 62,
+      "subs": {
+        "acceleration": 68,
+        "sprintSpeed": 82,
+        "finishing": 66,
+        "shotPower": 64,
+        "longShots": 67,
+        "volleys": 65,
+        "penalties": 60,
+        "attackingPositioning": 63,
+        "vision": 64,
+        "crossing": 57,
+        "fkAccuracy": 57,
+        "shortPassing": 69,
+        "longPassing": 55,
+        "curve": 59,
+        "agility": 61,
+        "balance": 68,
+        "reactions": 70,
+        "ballControl": 78,
+        "dribblingSub": 63,
+        "composure": 56,
+        "firstTouch": 70,
+        "interceptions": 65,
+        "headingAccuracy": 63,
+        "defensiveAwareness": 74,
+        "standingTackle": 60,
+        "slidingTackle": 50,
+        "jumping": 60,
+        "stamina": 63,
+        "strength": 70,
+        "aggression": 50,
+        "gkDiving": 69,
+        "gkHandling": 64,
+        "gkKicking": 63,
+        "gkReflexes": 74,
+        "gkPositioningSub": 62,
+        "gkSprintSpeed": 58,
+        "gkAcceleration": 59
+      }
+    },
+    {
+      "row": 709,
+      "position": "GK",
+      "stat": "ref",
+      "game": 95,
+      "calculated": 94,
+      "subs": {
+        "acceleration": 97,
+        "sprintSpeed": 98,
+        "finishing": 98,
+        "shotPower": 95,
+        "longShots": 96,
+        "volleys": 86,
+        "penalties": 86,
+        "attackingPositioning": 95,
+        "vision": 99,
+        "crossing": 95,
+        "fkAccuracy": 84,
+        "shortPassing": 99,
+        "longPassing": 99,
+        "curve": 84,
+        "agility": 98,
+        "balance": 92,
+        "reactions": 99,
+        "ballControl": 98,
+        "dribblingSub": 99,
+        "composure": 91,
+        "firstTouch": 99,
+        "interceptions": 84,
+        "headingAccuracy": 84,
+        "defensiveAwareness": 99,
+        "standingTackle": 93,
+        "slidingTackle": 83,
+        "jumping": 88,
+        "stamina": 98,
+        "strength": 98,
+        "aggression": 87,
+        "gkDiving": 99,
+        "gkHandling": 99,
+        "gkKicking": 89,
+        "gkReflexes": 94,
+        "gkPositioningSub": 96,
+        "gkSprintSpeed": 78,
+        "gkAcceleration": 76
+      }
+    },
+    {
+      "row": 709,
+      "position": "GK",
+      "stat": "spe",
+      "game": 78,
+      "calculated": 77,
+      "subs": {
+        "acceleration": 97,
+        "sprintSpeed": 98,
+        "finishing": 98,
+        "shotPower": 95,
+        "longShots": 96,
+        "volleys": 86,
+        "penalties": 86,
+        "attackingPositioning": 95,
+        "vision": 99,
+        "crossing": 95,
+        "fkAccuracy": 84,
+        "shortPassing": 99,
+        "longPassing": 99,
+        "curve": 84,
+        "agility": 98,
+        "balance": 92,
+        "reactions": 99,
+        "ballControl": 98,
+        "dribblingSub": 99,
+        "composure": 91,
+        "firstTouch": 99,
+        "interceptions": 84,
+        "headingAccuracy": 84,
+        "defensiveAwareness": 99,
+        "standingTackle": 93,
+        "slidingTackle": 83,
+        "jumping": 88,
+        "stamina": 98,
+        "strength": 98,
+        "aggression": 87,
+        "gkDiving": 99,
+        "gkHandling": 99,
+        "gkKicking": 89,
+        "gkReflexes": 94,
+        "gkPositioningSub": 96,
+        "gkSprintSpeed": 78,
+        "gkAcceleration": 76
+      }
+    },
+    {
+      "row": 2350,
+      "position": "GK",
+      "stat": "div",
+      "game": 71,
+      "calculated": 70,
+      "subs": {
+        "acceleration": 67,
+        "sprintSpeed": 70,
+        "finishing": 71,
+        "shotPower": 62,
+        "longShots": 51,
+        "volleys": 55,
+        "penalties": 54,
+        "attackingPositioning": 63,
+        "vision": 58,
+        "crossing": 56,
+        "fkAccuracy": 59,
+        "shortPassing": 72,
+        "longPassing": 59,
+        "curve": 61,
+        "agility": 61,
+        "balance": 68,
+        "reactions": 65,
+        "ballControl": 70,
+        "dribblingSub": 70,
+        "composure": 68,
+        "firstTouch": 64,
+        "interceptions": 51,
+        "headingAccuracy": 49,
+        "defensiveAwareness": 65,
+        "standingTackle": 61,
+        "slidingTackle": 66,
+        "jumping": 55,
+        "stamina": 71,
+        "strength": 55,
+        "aggression": 61,
+        "gkDiving": 70,
+        "gkHandling": 66,
+        "gkKicking": 57,
+        "gkReflexes": 72,
+        "gkPositioningSub": 72,
+        "gkSprintSpeed": 42,
+        "gkAcceleration": 48
+      }
+    }
+  ],
+  "groups": [
+    {
+      "group": "champ",
+      "count": 3761,
+      "exact": 3692,
+      "accuracy": 0.9816538154746078,
+      "mismatches": [
+        {
+          "row": 103,
+          "position": "RM",
+          "game": 92,
+          "calculated": 91
+        },
+        {
+          "row": 139,
+          "position": "LM",
+          "game": 92,
+          "calculated": 91
+        },
+        {
+          "row": 149,
+          "position": "ST",
+          "game": 78,
+          "calculated": 77
+        },
+        {
+          "row": 150,
+          "position": "CM",
+          "game": 66,
+          "calculated": 65
+        },
+        {
+          "row": 157,
+          "position": "CB",
+          "game": 65,
+          "calculated": 64
+        },
+        {
+          "row": 160,
+          "position": "CB",
+          "game": 65,
+          "calculated": 64
+        },
+        {
+          "row": 212,
+          "position": "RM",
+          "game": 73,
+          "calculated": 74
+        },
+        {
+          "row": 306,
+          "position": "LWB",
+          "game": 63,
+          "calculated": 62
+        },
+        {
+          "row": 375,
+          "position": "LW",
+          "game": 75,
+          "calculated": 74
+        },
+        {
+          "row": 401,
+          "position": "RM",
+          "game": 73,
+          "calculated": 74
+        },
+        {
+          "row": 560,
+          "position": "CM",
+          "game": 81,
+          "calculated": 80
+        },
+        {
+          "row": 650,
+          "position": "CAM",
+          "game": 90,
+          "calculated": 89
+        },
+        {
+          "row": 663,
+          "position": "RB",
+          "game": 91,
+          "calculated": 89
+        },
+        {
+          "row": 666,
+          "position": "RB",
+          "game": 94,
+          "calculated": 90
+        },
+        {
+          "row": 672,
+          "position": "LW",
+          "game": 92,
+          "calculated": 90
+        },
+        {
+          "row": 698,
+          "position": "RW",
+          "game": 95,
+          "calculated": 94
+        },
+        {
+          "row": 701,
+          "position": "LB",
+          "game": 96,
+          "calculated": 95
+        },
+        {
+          "row": 703,
+          "position": "RB",
+          "game": 90,
+          "calculated": 91
+        },
+        {
+          "row": 723,
+          "position": "ST",
+          "game": 94,
+          "calculated": 95
+        },
+        {
+          "row": 770,
+          "position": "LM",
+          "game": 73,
+          "calculated": 72
+        },
+        {
+          "row": 793,
+          "position": "LM",
+          "game": 54,
+          "calculated": 55
+        },
+        {
+          "row": 795,
+          "position": "LB",
+          "game": 53,
+          "calculated": 54
+        },
+        {
+          "row": 796,
+          "position": "CM",
+          "game": 54,
+          "calculated": 53
+        },
+        {
+          "row": 823,
+          "position": "CM",
+          "game": 72,
+          "calculated": 71
+        },
+        {
+          "row": 945,
+          "position": "CB",
+          "game": 74,
+          "calculated": 72
+        },
+        {
+          "row": 964,
+          "position": "CAM",
+          "game": 73,
+          "calculated": 72
+        },
+        {
+          "row": 994,
+          "position": "CAM",
+          "game": 65,
+          "calculated": 64
+        },
+        {
+          "row": 1072,
+          "position": "CM",
+          "game": 61,
+          "calculated": 60
+        },
+        {
+          "row": 1083,
+          "position": "RW",
+          "game": 66,
+          "calculated": 64
+        },
+        {
+          "row": 1280,
+          "position": "CAM",
+          "game": 91,
+          "calculated": 93
+        },
+        {
+          "row": 1385,
+          "position": "CM",
+          "game": 50,
+          "calculated": 51
+        },
+        {
+          "row": 1431,
+          "position": "ST",
+          "game": 64,
+          "calculated": 63
+        },
+        {
+          "row": 1510,
+          "position": "CM",
+          "game": 62,
+          "calculated": 61
+        },
+        {
+          "row": 1620,
+          "position": "LM",
+          "game": 56,
+          "calculated": 55
+        },
+        {
+          "row": 1690,
+          "position": "CDM",
+          "game": 54,
+          "calculated": 53
+        },
+        {
+          "row": 1853,
+          "position": "CB",
+          "game": 70,
+          "calculated": 71
+        },
+        {
+          "row": 1869,
+          "position": "LM",
+          "game": 76,
+          "calculated": 75
+        },
+        {
+          "row": 1883,
+          "position": "CM",
+          "game": 91,
+          "calculated": 92
+        },
+        {
+          "row": 1911,
+          "position": "LB",
+          "game": 91,
+          "calculated": 92
+        },
+        {
+          "row": 1913,
+          "position": "RB",
+          "game": 92,
+          "calculated": 93
+        },
+        {
+          "row": 1914,
+          "position": "CB",
+          "game": 71,
+          "calculated": 70
+        },
+        {
+          "row": 1924,
+          "position": "LW",
+          "game": 91,
+          "calculated": 93
+        },
+        {
+          "row": 1935,
+          "position": "ST",
+          "game": 84,
+          "calculated": 83
+        },
+        {
+          "row": 1947,
+          "position": "LB",
+          "game": 93,
+          "calculated": 90
+        },
+        {
+          "row": 2041,
+          "position": "LW",
+          "game": 83,
+          "calculated": 82
+        },
+        {
+          "row": 2068,
+          "position": "RM",
+          "game": 74,
+          "calculated": 73
+        },
+        {
+          "row": 2082,
+          "position": "CDM",
+          "game": 75,
+          "calculated": 73
+        },
+        {
+          "row": 2319,
+          "position": "RW",
+          "game": 53,
+          "calculated": 52
+        },
+        {
+          "row": 2365,
+          "position": "CDM",
+          "game": 73,
+          "calculated": 72
+        },
+        {
+          "row": 2391,
+          "position": "LWB",
+          "game": 65,
+          "calculated": 66
+        },
+        {
+          "row": 2419,
+          "position": "ST",
+          "game": 85,
+          "calculated": 87
+        },
+        {
+          "row": 2424,
+          "position": "LM",
+          "game": 66,
+          "calculated": 67
+        },
+        {
+          "row": 2543,
+          "position": "RW",
+          "game": 94,
+          "calculated": 91
+        },
+        {
+          "row": 2550,
+          "position": "RB",
+          "game": 91,
+          "calculated": 90
+        },
+        {
+          "row": 2558,
+          "position": "LW",
+          "game": 91,
+          "calculated": 90
+        },
+        {
+          "row": 2626,
+          "position": "CB",
+          "game": 55,
+          "calculated": 54
+        },
+        {
+          "row": 2643,
+          "position": "CAM",
+          "game": 86,
+          "calculated": 83
+        },
+        {
+          "row": 2644,
+          "position": "CDM",
+          "game": 77,
+          "calculated": 73
+        },
+        {
+          "row": 2721,
+          "position": "RM",
+          "game": 66,
+          "calculated": 65
+        },
+        {
+          "row": 2808,
+          "position": "RM",
+          "game": 83,
+          "calculated": 84
+        },
+        {
+          "row": 2894,
+          "position": "CB",
+          "game": 82,
+          "calculated": 83
+        },
+        {
+          "row": 2942,
+          "position": "CM",
+          "game": 88,
+          "calculated": 87
+        },
+        {
+          "row": 3543,
+          "position": "CM",
+          "game": 56,
+          "calculated": 55
+        },
+        {
+          "row": 3730,
+          "position": "LM",
+          "game": 73,
+          "calculated": 74
+        },
+        {
+          "row": 3951,
+          "position": "LM",
+          "game": 72,
+          "calculated": 73
+        },
+        {
+          "row": 3963,
+          "position": "RB",
+          "game": 50,
+          "calculated": 51
+        },
+        {
+          "row": 3999,
+          "position": "CM",
+          "game": 55,
+          "calculated": 54
+        },
+        {
+          "row": 4152,
+          "position": "CAM",
+          "game": 52,
+          "calculated": 51
+        },
+        {
+          "row": 4174,
+          "position": "LW",
+          "game": 52,
+          "calculated": 51
+        }
+      ]
+    },
+    {
+      "group": "GK",
+      "count": 423,
+      "exact": 418,
+      "accuracy": 0.9881796690307328,
+      "mismatches": [
+        {
+          "row": 410,
+          "position": "GK",
+          "game": 77,
+          "calculated": 78
+        },
+        {
+          "row": 1393,
+          "position": "GK",
+          "game": 74,
+          "calculated": 73
+        },
+        {
+          "row": 1396,
+          "position": "GK",
+          "game": 73,
+          "calculated": 72
+        },
+        {
+          "row": 1881,
+          "position": "GK",
+          "game": 91,
+          "calculated": 90
+        },
+        {
+          "row": 1891,
+          "position": "GK",
+          "game": 95,
+          "calculated": 97
+        }
+      ]
+    }
+  ]
+}
