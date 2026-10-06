@@ -46,3 +46,19 @@ export const subLabels: Record<string, string> = {
   gkSprintSpeed: "Vitesse gardien",
   gkAcceleration: "Accélération gardien",
 };
+
+/** Les 6 stats en toutes lettres (joueur de champ et gardien). */
+export const statLabels: Record<string, string> = {
+  pac: "Vitesse",
+  sho: "Tir",
+  pas: "Passe",
+  dri: "Dribble",
+  def: "Défense",
+  phy: "Physique",
+  div: "Plongeon",
+  han: "Prise de balle",
+  kic: "Jeu au pied",
+  ref: "Réflexes",
+  pos: "Placement",
+  spe: "Vitesse",
+};

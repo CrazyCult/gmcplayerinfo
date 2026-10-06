@@ -14,9 +14,9 @@ import {
   matchesPerSeries,
   projectMatches,
 } from "@/engine/matchProgression";
-import { money, shortMoney } from "@/lib/format";
-import { TRAIT_EFFECTS } from "@/lib/traits";
-import { subLabels } from "@/lib/i18n";
+import { money, shortAmount } from "@/lib/format";
+import { TRAITS, TRAIT_TIER_LABEL } from "@/lib/traits";
+import { statLabels, subLabels } from "@/lib/i18n";
 import Rating from "./UI/Rating";
 import {
   RARITY_COLOR,
@@ -163,11 +163,11 @@ export default function PlayerView({
             </div>
           </div>
         </div>
-        <div className="statline">
+        <div className="statline player-statline">
           <div>
             <strong>
               <span style={{ color: rarityColor }}>{player.overall}</span>
-              <span className="muted"> → </span>
+              <span className="unit">→</span>
               <span
                 style={{
                   color:
@@ -180,18 +180,23 @@ export default function PlayerView({
             <small>OVR → potentiel</small>
           </div>
           <div>
-            <strong>{player.fitness ?? "—"}/100</strong>
+            <strong>
+              {player.fitness ?? "—"}
+              <span className="unit">/100</span>
+            </strong>
             <small>Forme</small>
           </div>
           <div>
             <strong>
-              {player.value === undefined ? "—" : shortMoney(player.value)}
+              {player.value === undefined ? "—" : shortAmount(player.value)}
+              <span className="unit">GMC2</span>
             </strong>
             <small>Valeur du jeu</small>
           </div>
           <div>
             <strong>
-              {player.wage === undefined ? "—" : shortMoney(player.wage)}
+              {player.wage === undefined ? "—" : shortAmount(player.wage)}
+              <span className="unit">GMC2</span>
             </strong>
             <small>Salaire</small>
           </div>
@@ -211,14 +216,31 @@ export default function PlayerView({
         )}
         {player.traits.length > 0 && (
           <ul className="traits">
-            {player.traits.map((trait) => (
-              <li key={trait}>
-                <span className="pill accent">{trait}</span>
-                <small>
-                  {TRAIT_EFFECTS[trait] ?? "Effet inconnu pour l’instant."}
-                </small>
-              </li>
-            ))}
+            {player.traits.map((trait) => {
+              const info = TRAITS[trait];
+              return (
+                <li key={trait}>
+                  <div className="trait-head">
+                    <span className="pill accent">{trait}</span>
+                    {info && (
+                      <span
+                        className={`trait-tier tier-${info.tier === "-" ? "down" : info.tier}`}
+                      >
+                        {TRAIT_TIER_LABEL[info.tier]}
+                      </span>
+                    )}
+                    {info && <small className="muted">{info.scope}</small>}
+                  </div>
+                  {info ? (
+                    <p>
+                      {info.summary} <strong>{info.effect}</strong>
+                    </p>
+                  ) : (
+                    <p className="muted">Effet inconnu pour l’instant.</p>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
         {player.contractEnd && (
@@ -273,7 +295,7 @@ export default function PlayerView({
                   style={{ ["--stat" as string]: `var(--stat-${index + 1})` }}
                 >
                   <div className="attribute-head">
-                    <small>{stat.toUpperCase()}</small>
+                    <small>{statLabels[stat] ?? stat.toUpperCase()}</small>
                     <Rating
                       value={stats[stat as keyof typeof stats]}
                       color={attributeColor(

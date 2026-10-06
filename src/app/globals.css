@@ -440,6 +440,24 @@ small {
   display: block;
   margin-top: 7px;
 }
+/* Fiche joueur : valeurs centrées, unité plus petite sur la même ligne de base */
+.player-statline > div {
+  text-align: center;
+}
+.player-statline strong {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+  letter-spacing: -0.5px;
+}
+.player-statline .unit {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0;
+}
 .table-wrap {
   overflow: auto;
   max-width: 100%;
@@ -1050,21 +1068,46 @@ details.card[open] > summary {
   white-space: nowrap;
 }
 
-/* Traits : nom + effet en match */
+/* Traits : nom, rang, description et effet en match */
 .traits {
   list-style: none;
   padding: 0;
-  margin: 16px 0 0;
+  margin: 18px 0 0;
   display: grid;
-  gap: 8px;
+  gap: 12px;
 }
 .traits li {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.trait-head {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
 }
-.traits small {
+.traits p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.trait-tier {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid currentColor;
+}
+.tier-S {
+  color: var(--rarity-epic);
+}
+.tier-A {
+  color: var(--stat-1);
+}
+.tier-B {
   color: var(--muted);
-  font-size: 12px;
+}
+.tier-down {
+  color: var(--attr-bad);
 }
