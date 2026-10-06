@@ -116,10 +116,8 @@ export default function PlayerView({
           />
           <div className="mini-id-text">
             <div className="mini-kicker">
-              {player.position}
               {club && (
                 <>
-                  {" · "}
                   {club.freeAgent ? (
                     "Agent libre"
                   ) : club.id ? (
@@ -133,9 +131,9 @@ export default function PlayerView({
                   ) : (
                     club.name
                   )}
+                  {" · "}
                 </>
               )}
-              {" · "}
               <span className="muted">
                 {light
                   ? "fiche légère"
@@ -144,7 +142,12 @@ export default function PlayerView({
                     : "import local"}
               </span>
             </div>
-            <h1>{player.name}</h1>
+            <h1>
+              <span className="pos-badge" title="Poste">
+                {player.position}
+              </span>
+              {player.name}
+            </h1>
             <div className="mini-ovr">
               <span
                 className="rating-chip"
