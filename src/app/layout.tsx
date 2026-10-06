@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { Suspense } from "react";
+import HeaderAccount from "@/components/HeaderAccount";
 import localFont from "next/font/local";
 import { Toaster } from "sonner";
 import { text } from "@/lib/i18n";
@@ -58,6 +60,9 @@ export default function RootLayout({
                 <span className="status-dot" />
                 {indexEnabled() ? "Index GMC Companion" : "Mode import local"}
               </span>
+              <Suspense fallback={null}>
+                <HeaderAccount />
+              </Suspense>
             </nav>
           </header>
           <main className="main">{children}</main>

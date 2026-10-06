@@ -779,8 +779,11 @@ button.pill.accent {
     padding: 0 16px;
   }
   .header {
-    height: 74px;
+    height: auto;
+    min-height: 74px;
+    padding: 12px 0;
     gap: 10px;
+    flex-wrap: wrap;
   }
   .brand-word {
     font-size: 13px;
@@ -791,6 +794,12 @@ button.pill.accent {
   .nav {
     gap: 14px;
     font-size: 12px;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .account,
+  .account-login {
+    margin-left: auto;
   }
   .header .status {
     display: none;
@@ -991,4 +1000,24 @@ details.card > summary {
 }
 details.card[open] > summary {
   margin-bottom: 16px;
+}
+
+/* Compte Google dans l'en-tête */
+.account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.account-name {
+  font-weight: 700;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-login {
+  padding: 7px 12px;
+  font-size: 12px;
+  white-space: nowrap;
 }

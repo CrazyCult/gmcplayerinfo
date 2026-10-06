@@ -94,11 +94,6 @@ export default async function SquadPage({
               : "Retrouvez votre club, ses notes et le plan d’entraînement de chaque joueur."}
           </p>
         </div>
-        <AccountBar
-          enabled={authEnabled() && Boolean(session || !club)}
-          name={session?.name ?? null}
-          next={here}
-        />
       </div>
 
       {loginError && <div className="notice warning">{loginError}</div>}
@@ -228,32 +223,5 @@ export default async function SquadPage({
         <SquadImport embedded />
       </details>
     </>
-  );
-}
-
-function AccountBar({
-  enabled,
-  name,
-  next,
-}: {
-  enabled: boolean;
-  name: string | null;
-  next: string;
-}) {
-  if (!enabled) return null;
-  return name !== null ? (
-    <form action="/api/auth/logout" method="post" className="status">
-      <span>Connecté{name ? ` : ${name}` : ""}</span>
-      <button className="pill" type="submit">
-        Se déconnecter
-      </button>
-    </form>
-  ) : (
-    <a
-      className="button"
-      href={`/api/auth/google?next=${encodeURIComponent(next)}`}
-    >
-      Se connecter avec Google
-    </a>
   );
 }
