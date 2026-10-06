@@ -1249,3 +1249,52 @@ details.fold[open] > summary .fold-chevron {
   font-size: 12px;
   min-height: 0;
 }
+
+/* Attributs compacts, façon jeu : nom · valeur · barre sur une ligne */
+.player-stats .attribute {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0;
+}
+.player-stats .attribute-head {
+  margin-bottom: 4px;
+}
+.player-stats .attribute-head small {
+  font-size: 13px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+.player-stats .attribute-head .rating {
+  transform: scale(0.85);
+  transform-origin: right center;
+}
+.player-stats .sub-list {
+  padding-top: 0;
+}
+.player-stats .sub-list .sub-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px minmax(60px, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+  border-bottom: 0;
+  font-size: 13px;
+}
+.player-stats .sub-list .sub-row > .sub-label {
+  margin: 0;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.player-stats .sub-list .sub-row > strong {
+  text-align: right;
+  font-size: 14px;
+}
+.player-stats .attr-bar {
+  height: 6px;
+}
+.player-hero .player-stats {
+  gap: 18px 28px;
+}

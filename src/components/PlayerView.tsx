@@ -334,19 +334,17 @@ export default function PlayerView({
                     <div className="sub-list">
                       {keys.map((key) => (
                         <div className="sub-row" key={key}>
-                          <span>
-                            {subLabels[key]}{" "}
-                            <strong
-                              style={{
-                                color: attributeColor(
-                                  subs[key],
-                                  player.potential,
-                                ),
-                              }}
-                            >
-                              {subs[key] ?? "—"}
-                            </strong>
-                          </span>
+                          <span className="sub-label">{subLabels[key]}</span>
+                          <strong
+                            style={{
+                              color: attributeColor(
+                                subs[key],
+                                player.potential,
+                              ),
+                            }}
+                          >
+                            {subs[key] ?? "—"}
+                          </strong>
                           <span
                             className="attr-bar"
                             role="meter"
