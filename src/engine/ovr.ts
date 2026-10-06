@@ -44,6 +44,6 @@ export function modelOvr(
 ): number | undefined {
   const family = familyOf(player.position);
   return family === "GK"
-    ? gkOvr(gkStats(subs))
-    : ovrForFamily(family, summaryStats(subs));
+    ? gkOvr(gkStats(subs, player.attributes))
+    : ovrForFamily(family, summaryStats(subs, player.attributes));
 }

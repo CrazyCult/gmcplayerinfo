@@ -28,8 +28,8 @@ export function positionRatings(
   player: Player,
   subs: Subs = player.attributes.subs,
 ) {
-  const field = summaryStats(subs),
-    keeper = gkStats(subs);
+  const field = summaryStats(subs, player.attributes),
+    keeper = gkStats(subs, player.attributes);
   return POSITIONS.map((position) => {
     const family = familyOf(position);
     const raw = family === "GK" ? gkOvr(keeper) : ovrForFamily(family, field);

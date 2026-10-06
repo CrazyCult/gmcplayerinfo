@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useSquad } from "@/lib/local-squad";
-import { summaryStats, gkStats } from "@/engine/stats";
+import { summaryStats, gkStats, isLight } from "@/engine/stats";
 import { FIELD_SUBS, GK_SUBS, POSITIONS, type Player } from "@/types";
 import Search from "./Search";
 import { planTraining } from "@/engine/planner";
@@ -157,8 +157,8 @@ export default function Comparison({
               const stats = selected.map((player) =>
                 (player!.position === "GK") === keeper
                   ? keeper
-                    ? gkStats(player!.attributes.subs)
-                    : summaryStats(player!.attributes.subs)
+                    ? gkStats(player!.attributes.subs, player!.attributes)
+                    : summaryStats(player!.attributes.subs, player!.attributes)
                   : undefined,
               );
               const keys = keeper
@@ -245,6 +245,15 @@ export default function Comparison({
             </h3>
             <div className="page-grid">
               {selected.map((player) => {
+                if (isLight(player!.attributes))
+                  return (
+                    <div className="notice" key={player!.id}>
+                      <strong>{player!.name}</strong>
+                      <br />
+                      Fiche légère : sous-attributs inconnus, plan
+                      d’entraînement indisponible.
+                    </div>
+                  );
                 const plan = planTraining(player!, {
                   coaches: MAX_COACHES,
                   center: 5,

@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Player, Subs } from "@/types";
 import { modelOvr } from "@/engine/ovr";
-import { summaryStats, gkStats } from "@/engine/stats";
+import { summaryStats, gkStats, isLight } from "@/engine/stats";
 import { positionRatings } from "@/engine/positionFit";
 import { FIELD_GROUPS, GK_GROUPS, MAX_COACHES } from "@/engine/tables";
 import { ovrLevers } from "@/engine/planner";
@@ -40,7 +40,11 @@ export default function PlayerView({
     [fit, setFit] = useState(true);
   const [rating, setRating] = useState(7),
     [perWeek, setPerWeek] = useState(7);
-  const stats = player.position === "GK" ? gkStats(subs) : summaryStats(subs);
+  const light = isLight(player.attributes);
+  const stats =
+    player.position === "GK"
+      ? gkStats(subs, player.attributes)
+      : summaryStats(subs, player.attributes);
   const groups = player.position === "GK" ? GK_GROUPS : FIELD_GROUPS;
   const calculated = modelOvr(player, subs);
   const ratings = positionRatings(player, subs)
@@ -79,7 +83,12 @@ export default function PlayerView({
           />
           <div className="player-info">
             <div className="eyebrow">
-              Fiche joueur · {remote ? "GMC Companion" : "import local"}
+              Fiche joueur ·{" "}
+              {light
+                ? "base du jeu (fiche légère)"
+                : remote
+                  ? "GMC Companion"
+                  : "import local"}
             </div>
             <h1>{player.name}</h1>
             <div className="pills">
@@ -106,12 +115,14 @@ export default function PlayerView({
               >
                 Comparer
               </Link>
-              <Link
-                className="button primary"
-                href={`/player/${encodeURIComponent(localId)}${trainingOnly ? "" : "/training"}`}
-              >
-                {trainingOnly ? "Fiche complète" : "Simulateur plein écran"}
-              </Link>
+              {(!light || trainingOnly) && (
+                <Link
+                  className="button primary"
+                  href={`/player/${encodeURIComponent(localId)}${trainingOnly ? "" : "/training"}`}
+                >
+                  {trainingOnly ? "Fiche complète" : "Simulateur plein écran"}
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -187,42 +198,63 @@ export default function PlayerView({
           <section className="card">
             <div className="section-head">
               <h2 style={{ margin: 0 }}>
-                Attributs <small>· simulation en direct</small>
+                Attributs{" "}
+                <small>
+                  {light ? "· 6 stats du jeu" : "· simulation en direct"}
+                </small>
               </h2>
               <span className="pill">Plafond {player.potential}</span>
             </div>
+            {light && (
+              <div className="notice">
+                Fiche légère : la base du jeu ne donne que les 6 stats. OVR et
+                notes par poste sont exacts ; sous-attributs, leviers et
+                simulateur d’entraînement apparaîtront quand un utilisateur de
+                GMC Companion aura ouvert la page du club de ce joueur.
+              </div>
+            )}
             <div className="player-stats">
-              {Object.entries(groups).map(([stat, keys]) => (
-                <details className="attribute" key={stat}>
-                  <summary>
+              {light &&
+                Object.keys(groups).map((stat) => (
+                  <div className="attribute" key={stat}>
                     <small>{stat.toUpperCase()}</small>
                     <Rating value={stats[stat as keyof typeof stats]} />
-                    <small>Voir le détail ↓</small>
-                  </summary>
-                  <div className="sub-list">
-                    {keys.map((key) => (
-                      <div className="sub-row" key={key}>
-                        <span>
-                          {subLabels[key]} <strong>{subs[key] ?? "—"}</strong>
-                        </span>
-                        <progress
-                          max={Math.max(player.potential, subs[key] ?? 0)}
-                          value={subs[key] ?? 0}
-                          aria-label={subLabels[key]}
-                        />
-                      </div>
-                    ))}
                   </div>
-                </details>
-              ))}
+                ))}
+              {!light &&
+                Object.entries(groups).map(([stat, keys]) => (
+                  <details className="attribute" key={stat}>
+                    <summary>
+                      <small>{stat.toUpperCase()}</small>
+                      <Rating value={stats[stat as keyof typeof stats]} />
+                      <small>Voir le détail ↓</small>
+                    </summary>
+                    <div className="sub-list">
+                      {keys.map((key) => (
+                        <div className="sub-row" key={key}>
+                          <span>
+                            {subLabels[key]} <strong>{subs[key] ?? "—"}</strong>
+                          </span>
+                          <progress
+                            max={Math.max(player.potential, subs[key] ?? 0)}
+                            value={subs[key] ?? 0}
+                            aria-label={subLabels[key]}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ))}
             </div>
-            <p
-              className="muted"
-              style={{ fontSize: 12, marginTop: 18, marginBottom: 0 }}
-            >
-              Première touche : {subs.firstTouch ?? "—"} · n’entre dans aucune
-              stat.
-            </p>
+            {!light && (
+              <p
+                className="muted"
+                style={{ fontSize: 12, marginTop: 18, marginBottom: 0 }}
+              >
+                Première touche : {subs.firstTouch ?? "—"} · n’entre dans aucune
+                stat.
+              </p>
+            )}
           </section>
           <section className="card">
             <div className="section-head">
@@ -252,27 +284,38 @@ export default function PlayerView({
               ))}
             </div>
           </section>
-          <details className="card">
-            <summary style={{ cursor: "pointer", fontWeight: 700 }}>
-              Leviers d’OVR · coachs niveau 5
-            </summary>
-            {ovrLevers(
-              { ...player, attributes: { ...player.attributes, subs } },
-              { coaches: MAX_COACHES },
-            )
-              .filter((lever) => lever.progresses)
-              .map((lever) => (
-                <div className="drill-row" key={lever.key}>
-                  <strong>{subLabels[lever.key]}</strong>
-                  <small>
-                    +1 OVR · {lever.sessions} séances · {money(lever.cost)}
-                  </small>
-                </div>
-              ))}
-          </details>
+          {!light && (
+            <details className="card">
+              <summary style={{ cursor: "pointer", fontWeight: 700 }}>
+                Leviers d’OVR · coachs niveau 5
+              </summary>
+              {ovrLevers(
+                { ...player, attributes: { ...player.attributes, subs } },
+                { coaches: MAX_COACHES },
+              )
+                .filter((lever) => lever.progresses)
+                .map((lever) => (
+                  <div className="drill-row" key={lever.key}>
+                    <strong>{subLabels[lever.key]}</strong>
+                    <small>
+                      +1 OVR · {lever.sessions} séances · {money(lever.cost)}
+                    </small>
+                  </div>
+                ))}
+            </details>
+          )}
         </>
       )}
-      <TrainingSimulator player={player} onChange={setSubs} />
+      {light ? (
+        trainingOnly && (
+          <div className="notice">
+            Simulateur indisponible : les sous-attributs de ce joueur ne sont
+            pas encore connus (fiche légère de la base du jeu).
+          </div>
+        )
+      ) : (
+        <TrainingSimulator player={player} onChange={setSubs} />
+      )}
       {!trainingOnly && (
         <section className="card">
           <h2>Progression par les matchs</h2>

@@ -25,6 +25,13 @@ Mis en ligne le 6 octobre 2026 sur Vercel, relié au dépôt public `CrazyCult/g
 - Comparaison locale : stats, sous-attributs, étoiles, notes par famille et coût jusqu’au maximum atteignable.
 - Vérification dans le navigateur : import des 53 joueurs, fiche GK, application du plan, comparaison et suppression du paramètre d’un joueur effacé ; fiche contrôlée à 375 px sans débordement.
 
+## Base des joueurs du jeu (fiches légères et prix)
+
+- GMC Companion 2.30 lit la base des joueurs du jeu (`/api/players/database`, ~50 000 joueurs) : pages ouvertes par l’utilisateur, marché (vente et prêt) relu chaque heure, base complète relue lentement et répartie entre utilisateurs. Le Worker stocke ces fiches dans `db_players` et les prix demandés dans `db_prices` (tables créées automatiquement).
+- Le catalogue fusionne les collectes complètes et la base du jeu, sans doublon : un joueur jamais collecté en entier apparaît en **fiche légère** (6 stats, OVR, POT, traits, prix). OVR et notes par poste y sont exacts (formule appliquée aux stats du jeu) ; sous-attributs, leviers et simulateur sont masqués.
+- Filtres « en vente / en prêt / agents libres / fiches complètes » et tris par prix, potentiel, marge.
+- Fiche : bloc **Marché** (prix demandé, prêt, historique des prix, médiane des prix demandés de joueurs comparables sur 30 jours, même poste, âge et OVR ±2). Ce sont des prix demandés, pas des ventes conclues.
+
 ## Vérification
 
 ```sh
@@ -59,4 +66,4 @@ Les stats incomplètes renvoient `undefined` ; elles ne sont jamais remplacées 
 
 ## Suite de la réalisation
 
-Restent hors de cette livraison : historique quotidien persistant, collecte des ventes et contrats comparables, moteur de valeur MFL, partage PNG/OG et PWA. L’URL officielle du joueur n’est pas affichée tant qu’elle n’est pas vérifiée.
+Restent hors de cette livraison : historique quotidien persistant, ventes conclues et contrats comparables, moteur de valeur MFL complet, partage PNG/OG et PWA. L’URL officielle du joueur n’est pas affichée tant qu’elle n’est pas vérifiée.
