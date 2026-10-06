@@ -21,6 +21,13 @@
   --attr-good: #39d98a;
   --attr-warn: #ffb020;
   --attr-bad: #ff5470;
+  /* Une teinte par attribut (PAC/DIV, SHO/HAN, PAS/KIC, DRI/REF, DEF/POS, PHY/SPE) */
+  --stat-1: #38bdf8;
+  --stat-2: #f472b6;
+  --stat-3: #a78bfa;
+  --stat-4: #fbbf24;
+  --stat-5: #34d399;
+  --stat-6: #fb923c;
 }
 @theme inline {
   --color-background: var(--background);
@@ -553,29 +560,44 @@ button.pill.accent {
 }
 .player-stats {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+@media (max-width: 1000px) {
+  .player-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+/* Une couleur par attribut (--stat posée sur la tuile). */
+.attribute {
+  --stat: var(--stat-1);
+  padding: 14px 14px 10px;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--stat);
+  border-radius: 12px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--stat) 9%, transparent),
+    transparent 70px
+  );
+}
+.attribute-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
 }
-.attribute {
-  padding: 14px 10px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  text-align: center;
-}
-.attribute .rating {
-  margin: 7px 0;
-}
-.attribute summary {
-  cursor: pointer;
-  list-style: none;
+.attribute-head .rating {
+  margin: 0;
 }
 .attribute small {
   display: block;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 1px;
+  color: var(--stat);
 }
 .sub-list {
-  padding-top: 14px;
+  padding-top: 6px;
 }
 .sub-row {
   display: flex;
@@ -859,7 +881,7 @@ button.pill.accent {
     font-size: 26px;
   }
   .player-stats {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: 1fr;
   }
   .settings {
     grid-template-columns: repeat(3, 1fr);
@@ -965,6 +987,12 @@ button.pill.accent {
     --attr-good: #16a34a;
     --attr-warn: #d97706;
     --attr-bad: #dc2626;
+    --stat-1: #0284c7;
+    --stat-2: #db2777;
+    --stat-3: #7c3aed;
+    --stat-4: #b45309;
+    --stat-5: #059669;
+    --stat-6: #ea580c;
     --background: #f5f7fb;
     --card: #fff;
     --secondary: #eef2f8;
@@ -1020,4 +1048,23 @@ details.card[open] > summary {
   padding: 7px 12px;
   font-size: 12px;
   white-space: nowrap;
+}
+
+/* Traits : nom + effet en match */
+.traits {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0;
+  display: grid;
+  gap: 8px;
+}
+.traits li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.traits small {
+  color: var(--muted);
+  font-size: 12px;
 }

@@ -14,7 +14,8 @@ import {
   matchesPerSeries,
   projectMatches,
 } from "@/engine/matchProgression";
-import { money } from "@/lib/format";
+import { money, shortMoney } from "@/lib/format";
+import { TRAIT_EFFECTS } from "@/lib/traits";
 import { subLabels } from "@/lib/i18n";
 import Rating from "./UI/Rating";
 import {
@@ -135,6 +136,16 @@ export default function PlayerView({
               </span>
             </div>
             <div className="player-links">
+              {/^[0-9a-f-]{36}$/i.test(player.id) && (
+                <a
+                  className="button"
+                  href={`https://gamechase.io/gamev2/players/${encodeURIComponent(player.id)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Fiche dans GameChase ↗
+                </a>
+              )}
               <Link
                 className="button"
                 href={`/compare?player1=${encodeURIComponent(localId)}`}
@@ -155,39 +166,34 @@ export default function PlayerView({
         <div className="statline">
           <div>
             <strong>
-              <span style={{ color: rarityColor }}>{player.overall}</span>{" "}
-              <small>
-                →{" "}
-                <span
-                  style={{
-                    color:
-                      RARITY_COLOR[playerRarity({ overall: player.potential })],
-                  }}
-                >
-                  {player.potential}
-                </span>
-              </small>
+              <span style={{ color: rarityColor }}>{player.overall}</span>
+              <span className="muted"> → </span>
+              <span
+                style={{
+                  color:
+                    RARITY_COLOR[playerRarity({ overall: player.potential })],
+                }}
+              >
+                {player.potential}
+              </span>
             </strong>
-            <small>OVR du jeu → potentiel</small>
+            <small>OVR → potentiel</small>
+          </div>
+          <div>
+            <strong>{player.fitness ?? "—"}/100</strong>
+            <small>Forme</small>
           </div>
           <div>
             <strong>
-              {player.fitness ?? "—"}
-              <small> / 100</small>
+              {player.value === undefined ? "—" : shortMoney(player.value)}
             </strong>
-            <small>Forme physique</small>
+            <small>Valeur du jeu</small>
           </div>
           <div>
-            <strong style={{ fontSize: 19 }}>
-              {player.value === undefined ? "—" : money(player.value)}
+            <strong>
+              {player.wage === undefined ? "—" : shortMoney(player.wage)}
             </strong>
-            <small>Valeur du jeu · fourchette ±30 %</small>
-          </div>
-          <div>
-            <strong style={{ fontSize: 19 }}>
-              {player.wage === undefined ? "—" : money(player.wage)}
-            </strong>
-            <small>Salaire · unité non confirmée</small>
+            <small>Salaire</small>
           </div>
         </div>
         {modelOvr(player) !== player.overall && (
@@ -204,13 +210,16 @@ export default function PlayerView({
           </div>
         )}
         {player.traits.length > 0 && (
-          <div className="pills">
+          <ul className="traits">
             {player.traits.map((trait) => (
-              <span className="pill accent" key={trait}>
-                {trait}
-              </span>
+              <li key={trait}>
+                <span className="pill accent">{trait}</span>
+                <small>
+                  {TRAIT_EFFECTS[trait] ?? "Effet inconnu pour l’instant."}
+                </small>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
         {player.contractEnd && (
           <p className="muted" style={{ marginTop: 16, fontSize: 12 }}>
@@ -226,7 +235,7 @@ export default function PlayerView({
           <p className="muted" style={{ fontSize: 12, marginTop: 14 }}>
             {player.matchesPlayed === 0
               ? "Aucun match joué"
-              : `${player.matchesPlayed} matchs · ${player.goals ?? 0} buts · ${player.assists ?? 0} passes${player.position === "GK" ? ` · ${player.cleanSheets ?? 0} clean sheets` : ""}`}
+              : `${player.matchesPlayed} match${player.matchesPlayed > 1 ? "s" : ""} · ${player.goals ?? 0} buts · ${player.assists ?? 0} passes${player.position === "GK" && player.cleanSheets ? ` · ${player.cleanSheets} clean sheets` : ""}`}
           </p>
         )}
       </section>
@@ -235,10 +244,7 @@ export default function PlayerView({
           <section className="card">
             <div className="section-head">
               <h2 style={{ margin: 0 }}>
-                Attributs{" "}
-                <small>
-                  {light ? "· 6 stats du jeu" : "· simulation en direct"}
-                </small>
+                Attributs{light && <small> · 6 stats du jeu</small>}
               </h2>
               <span className="pill">Plafond {player.potential}</span>
             </div>
@@ -260,9 +266,13 @@ export default function PlayerView({
               </div>
             )}
             <div className="player-stats">
-              {light &&
-                Object.keys(groups).map((stat) => (
-                  <div className="attribute" key={stat}>
+              {Object.entries(groups).map(([stat, keys], index) => (
+                <div
+                  className="attribute"
+                  key={stat}
+                  style={{ ["--stat" as string]: `var(--stat-${index + 1})` }}
+                >
+                  <div className="attribute-head">
                     <small>{stat.toUpperCase()}</small>
                     <Rating
                       value={stats[stat as keyof typeof stats]}
@@ -272,21 +282,7 @@ export default function PlayerView({
                       )}
                     />
                   </div>
-                ))}
-              {!light &&
-                Object.entries(groups).map(([stat, keys]) => (
-                  <details className="attribute" key={stat}>
-                    <summary>
-                      <small>{stat.toUpperCase()}</small>
-                      <Rating
-                        value={stats[stat as keyof typeof stats]}
-                        color={attributeColor(
-                          stats[stat as keyof typeof stats],
-                          player.potential,
-                        )}
-                      />
-                      <small>Voir le détail ↓</small>
-                    </summary>
+                  {!light && (
                     <div className="sub-list">
                       {keys.map((key) => (
                         <div className="sub-row" key={key}>
@@ -323,8 +319,9 @@ export default function PlayerView({
                         </div>
                       ))}
                     </div>
-                  </details>
-                ))}
+                  )}
+                </div>
+              ))}
             </div>
             {!light && (
               <p

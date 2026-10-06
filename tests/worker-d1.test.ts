@@ -539,3 +539,27 @@ describe("Mon effectif : clubs et compte du site", () => {
     expect((await call("GET", `/v1/site/me/${key}`)).status).toBe(401);
   });
 });
+
+describe("historique d’OVR seul", () => {
+  it("enregistre l’historique d’un joueur sans toucher à sa fiche", async () => {
+    const { call } = setup();
+    await call("POST", "/v1/clubs", {
+      clubs: [{ teamId: "c1", fetchedAt: Date.now(), players: [full("p1")] }],
+    });
+    const history = [
+      { overall: 70, recorded_at: "2026-09-01" },
+      { overall: 80, recorded_at: "2026-10-01" },
+    ];
+    const r = await call("POST", "/v1/history", {
+      items: [
+        { id: "p1", fetchedAt: Date.now(), history },
+        { id: "", fetchedAt: Date.now(), history },
+        { id: "p2", fetchedAt: Date.now(), history: "x" },
+      ],
+    });
+    expect(r.body).toEqual({ accepted: 1, rejected: 2 });
+    const sheet = await call("GET", "/v1/site/player/p1", undefined, true);
+    expect(sheet.body.history).toEqual(history);
+    expect(sheet.body.player.attributes).toMatchObject({ vision: 81 });
+  });
+});

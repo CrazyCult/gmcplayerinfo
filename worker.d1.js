@@ -39,6 +39,7 @@ const DB_PAGE_SIZE = 24, DB_AVAIL = ['all', 'transfer', 'loan', 'free'];
 const DB_MARKET_MS = 55 * 60e3;      // marché et prêts : relus chaque heure
 const DB_FULL_MS = 24 * 3600e3;      // base complète : un tour par jour au plus
 const DB_LEASE_MS = 10 * 60e3;
+const HISTORY_MAX = 150000; // historique d'OVR brut (caractères JSON)
 const REQUEST_TTL = 24 * 3600e3, REQUEST_MAX_PENDING = 300;
 const STATS_TTL = 10 * 60e3;
 const CATALOG_MAX_PAGES = 20, COUNT_CAP = 1000;
@@ -682,7 +683,7 @@ async function extensionRequest(req, env, url, json) {
   if (req.method === 'POST' && url.pathname === '/v1/players') {
     let body; try { body = await req.json(); } catch (_) { return json({ error: 'JSON invalide' }, 400); }
     const items = (Array.isArray(body.players) ? body.players.slice(0, 20) : [])
-      .filter(x => x && validPlayer(x.player) && isInt(x.fetchedAt, 1.6e12, now + 5 * 60e3) && JSON.stringify(x.player).length < 20000);
+      .filter(x => x && validPlayer(x.player) && isInt(x.fetchedAt, 1.6e12, now + 5 * 60e3) && JSON.stringify(x.player).length < 60000);
     const stmts = [];
     for (const { player: p, fetchedAt } of items) {
       const team = isStr(p.club_id, 64) ? p.club_id : null;
@@ -693,12 +694,29 @@ async function extensionRequest(req, env, url, json) {
       stmts.push(env.DB.prepare('DELETE FROM player_requests WHERE player_id = ?1').bind(p.id));
       const history = items.find(x => x.player === p).history;
       const text = history != null && typeof history === 'object' ? JSON.stringify(history) : null;
-      if (text && text.length <= 30000) stmts.push(env.DB.prepare(`INSERT INTO player_history (player_id, fetched_at, data) VALUES (?1, ?2, ?3)
+      if (text && text.length <= HISTORY_MAX) stmts.push(env.DB.prepare(`INSERT INTO player_history (player_id, fetched_at, data) VALUES (?1, ?2, ?3)
         ON CONFLICT(player_id) DO UPDATE SET fetched_at = excluded.fetched_at, data = excluded.data
         WHERE excluded.fetched_at > player_history.fetched_at AND excluded.data IS NOT player_history.data`).bind(p.id, fetchedAt, text));
     }
     if (stmts.length) await runBatch(env, stmts);
     return json({ accepted: items.length, rejected: (Array.isArray(body.players) ? Math.min(20, body.players.length) : 0) - items.length });
+  }
+
+  // Historique d'OVR seul (joueurs de ton effectif, relus une fois par jour).
+  if (req.method === 'POST' && url.pathname === '/v1/history') {
+    let body; try { body = await req.json(); } catch (_) { return json({ error: 'JSON invalide' }, 400); }
+    const raw = Array.isArray(body.items) ? body.items.slice(0, 40) : [];
+    const stmts = [];
+    for (const x of raw) {
+      if (!x || !isStr(x.id, 64) || !isInt(x.fetchedAt, 1.6e12, now + 5 * 60e3) || x.history == null || typeof x.history !== 'object') continue;
+      const text = JSON.stringify(x.history);
+      if (text.length > HISTORY_MAX) continue;
+      stmts.push(env.DB.prepare(`INSERT INTO player_history (player_id, fetched_at, data) VALUES (?1, ?2, ?3)
+        ON CONFLICT(player_id) DO UPDATE SET fetched_at = excluded.fetched_at, data = excluded.data
+        WHERE excluded.fetched_at > player_history.fetched_at AND excluded.data IS NOT player_history.data`).bind(x.id, x.fetchedAt, text));
+    }
+    if (stmts.length) await runBatch(env, stmts);
+    return json({ accepted: stmts.length, rejected: raw.length - stmts.length });
   }
 
   // Liste légère (identifiant + date) pour que chaque extension sache ce

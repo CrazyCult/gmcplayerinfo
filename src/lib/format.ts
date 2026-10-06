@@ -6,3 +6,7 @@ export const compact = (value: number) =>
     notation: "compact",
     maximumFractionDigits: 2,
   }).format(value);
+
+/** Montant court : 4M, 480k, 1,25M (sans espace avant l’unité). */
+export const shortMoney = (value: number) =>
+  `${compact(value).replace(/[\s\u00a0\u202f]+/gu, "")} GMC2`;

@@ -106,4 +106,19 @@ describe("historique d’OVR du jeu (lecture tolérante)", () => {
     expect(parseOverallHistory(null)).toEqual([]);
     expect(parseOverallHistory({ autre: 1 })).toEqual([]);
   });
+  it("tableau imbriqué et noms de champs inconnus", async () => {
+    const { parseOverallHistory } =
+      await import("../../src/engine/progression");
+    expect(
+      parseOverallHistory({
+        player: { id: "x" },
+        result: {
+          rows: [
+            { snapshot_date: "2026-09-01", player_ovr: 90 },
+            { snapshot_date: "2026-10-01", player_ovr: 96 },
+          ],
+        },
+      }).map((p) => p.overall),
+    ).toEqual([90, 96]);
+  });
 });

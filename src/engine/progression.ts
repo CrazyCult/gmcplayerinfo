@@ -55,20 +55,44 @@ function toTime(v: unknown): number {
   }
   return NaN;
 }
+const LIST_KEYS = [
+  "history",
+  "points",
+  "data",
+  "items",
+  "entries",
+  "overallHistory",
+  "overall_history",
+  "snapshots",
+  "records",
+];
+/** Premier tableau plausible : direct, sous une clé connue, ou plus profond. */
+function findList(raw: unknown, depth: number): unknown[] {
+  if (Array.isArray(raw)) return raw;
+  if (!raw || typeof raw !== "object" || depth > 3) return [];
+  const box = raw as Record<string, unknown>;
+  const known = LIST_KEYS.map((k) => box[k]).find(Array.isArray);
+  if (known) return known as unknown[];
+  let best: unknown[] = [];
+  for (const value of Object.values(box)) {
+    const found = findList(value, depth + 1);
+    if (found.length > best.length) best = found;
+  }
+  return best;
+}
+function looseValue(e: Record<string, unknown>, pattern: RegExp) {
+  const key = Object.keys(e).find(
+    (k) => pattern.test(k) && e[k] !== null && e[k] !== undefined,
+  );
+  return key === undefined ? undefined : e[key];
+}
 /**
  * Historique d'OVR renvoyé par le jeu (/api/players/{id}/overall-history).
  * Lecture tolérante : tableau direct ou sous une clé (history, points, data…),
  * points objets ({ date, overall, … }) ou paires [date, overall].
  */
 export function parseOverallHistory(raw: unknown): OvrPoint[] {
-  const box = raw as Record<string, unknown> | null;
-  const list: unknown[] = Array.isArray(raw)
-    ? raw
-    : box && typeof box === "object"
-      ? ((["history", "points", "data", "items", "entries", "overallHistory"]
-          .map((k) => box[k])
-          .find(Array.isArray) as unknown[] | undefined) ?? [])
-      : [];
+  const list = findList(raw, 0);
   const points: OvrPoint[] = [];
   for (const entry of list) {
     let t = NaN,
@@ -81,10 +105,12 @@ export function parseOverallHistory(raw: unknown): OvrPoint[] {
     } else if (entry && typeof entry === "object") {
       const e = entry as Record<string, unknown>;
       t = toTime(
-        DATE_KEYS.map((k) => e[k]).find((v) => v !== undefined && v !== null),
+        DATE_KEYS.map((k) => e[k]).find((v) => v !== undefined && v !== null) ??
+          looseValue(e, /(date|time|_at$|At$|day)/),
       );
       overall = num(
-        OVR_KEYS.map((k) => e[k]).find((v) => v !== undefined && v !== null),
+        OVR_KEYS.map((k) => e[k]).find((v) => v !== undefined && v !== null) ??
+          looseValue(e, /^(ovr|overall|rating)|(_ovr|_overall|Overall)$/),
       );
       const p = num(e.potential ?? e.pot);
       const a = num(e.age);
