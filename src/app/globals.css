@@ -1121,3 +1121,8 @@ details.card[open] > summary {
 a.club-pill:hover {
   color: var(--primary);
 }
+
+/* Revente : meilleur palier */
+tr.best-row td {
+  background: color-mix(in srgb, var(--attr-good) 10%, transparent);
+}
