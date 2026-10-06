@@ -16,9 +16,8 @@ const manrope = localFont({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_SITE_URL || "http://localhost:3000"),
   title: {
-    default:
-      "GameChase Player Info | Notes, potentiel et simulateur d’entraînement",
-    template: "%s | GameChase Player Info",
+    default: "GMC Player Info | Notes, potentiel et simulateur d’entraînement",
+    template: "%s | GMC Player Info",
   },
   description:
     "Fiche complète, notes à chaque poste et coût exact d’entraînement jusqu’au potentiel pour les joueurs GameChase.",
@@ -37,18 +36,18 @@ export default function RootLayout({
             <Link
               href="/"
               className="brand"
-              aria-label="GameChase Player Info, accueil"
+              aria-label="GMC Player Info, accueil"
             >
               <Image
                 className="logo"
-                src="/brand/emblem.png"
+                src="/brand/gmc-player-info.png"
                 alt=""
-                width={40}
-                height={40}
+                width={48}
+                height={48}
                 priority
               />
               <span className="brand-word">
-                GAMECHASE<span>PLAYER INFO</span>
+                GMC<span>PLAYER INFO</span>
               </span>
             </Link>
             <nav className="nav" aria-label="Navigation principale">
@@ -69,7 +68,7 @@ export default function RootLayout({
               {text.community}
             </span>
             <span>
-              GMC COMPANION · PLAYER INFO
+              GMC PLAYER INFO · GMC COMPANION
               <br />
               Par CrazyCult (L’Icaunique)
             </span>

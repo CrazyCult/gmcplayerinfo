@@ -1,4 +1,4 @@
-# GameChase Player Info
+# GMC Player Info
 
 Réalisation suivant [SPEC.md](SPEC.md). Interface française, aucune requête au jeu, aucun secret côté client.
 
