@@ -8,18 +8,21 @@
 4. Déployer avec `pnpm dlx wrangler deploy --config wrangler.jsonc --keep-vars`. `PUBLIC_KEY_JWK`, les autres secrets de licence et les réglages Companion existants doivent être conservés. Ne jamais recopier une clé privée dans ce projet.
 5. Vérifier `/privacy`, une requête site sans token (401), puis `/v1/site/players` avec le token et une fiche de joueur. Vérifier que les routes Companion existantes fonctionnent encore.
 
-Ce `worker.js` est **la seule version à déployer** : il contient les routes de l’extension (dont `/v1/db/*` pour GMC Companion 2.30) et celles du site. Les routes site sont `GET /v1/site/players?q=&position=&avail=&sort=&page=`, `GET /v1/site/search?q=` et `GET /v1/site/player/:id`. Elles passent avant le contrôle de licence, restent en lecture seule et refusent l’accès si `SITE_TOKEN` est absent. Le binding de limitation de débit est configuré dans l’exemple Wrangler ; vérifier que son namespace n’entre pas en conflit avec un binding existant.
+Ce `worker.js` (Supabase) est **la seule version à déployer** : il contient les routes de l’extension (dont `/v1/db/*` pour GMC Companion 2.30) et celles du site. Les routes site sont `GET /v1/site/players?q=&position=&avail=&sort=&page=`, `GET /v1/site/search?q=` et `GET /v1/site/player/:id`. Elles passent avant le contrôle de licence, restent en lecture seule et refusent l’accès si `SITE_TOKEN` est absent. Le binding de limitation de débit est configuré dans l’exemple Wrangler ; vérifier que son namespace n’entre pas en conflit avec un binding existant.
 
-## Quotas D1 (important)
+## Base de données : Supabase
 
-Le plan gratuit de Cloudflare limite D1 à **5 millions de lignes lues et 100 000 écrites par jour** (remise à zéro à minuit UTC). Le Worker est conçu pour tenir dedans :
+Le Worker garde les données dans PostgreSQL (Supabase, plan gratuit : 500 Mo, requêtes illimitées, aucun quota de lignes). 42 000 joueurs occupent environ 30 Mo.
 
-- le site lit la table indexée `site_players` (une ligne par joueur) : une fiche lit quelques lignes, une page de catalogue au plus ~1 000 ;
-- toutes les écritures sont conditionnelles (rien n'est réécrit si rien n'a changé) ;
-- un budget d'écritures journalier (`DAILY_WRITE_BUDGET`, 70 000 par défaut) suspend la lecture de la base complète et le rattrapage quand il est atteint ; le marché continue ;
-- le rattrapage (tâche planifiée toutes les 5 min, `triggers.crons`) remplit `site_players` depuis les clubs et la base déjà collectés.
+1. Créer un projet sur supabase.com (région Europe, par exemple Frankfurt). Noter le mot de passe de la base.
+2. **SQL Editor** → coller tout `supabase/schema.sql` → **Run**. Le script peut être relancé sans risque.
+3. **Project Settings → API Keys** : copier la clé **secret** (`sb_secret_…`), et l'URL du projet (`https://xxxx.supabase.co`, dans **Project Settings → Data API**).
+4. Dans `wrangler.jsonc`, mettre l'URL dans `vars.SUPABASE_URL`, puis `npx wrangler secret put SUPABASE_SECRET_KEY` et coller la clé secrète.
+5. `npx wrangler deploy`.
 
-Un nouveau joueur coûte environ 8 lignes écrites (table + index). Remplir le catalogue la première fois (~90 000 joueurs) prend donc environ **10 jours** sur le plan gratuit. Avec **Workers Paid** (5 $/mois, 25 milliards de lectures et 50 millions d'écritures inclus par mois), ajouter la variable `D1_PAID=1` : le budget est levé et le rattrapage se fait en quelques minutes.
+La tâche planifiée (toutes les 5 min) recopie automatiquement l'ancienne base D1 vers Supabase (40 clubs par passage, puis la base du jeu) tant que le binding `DB` existe. Les extensions renvoient aussi d'elles-mêmes les effectifs manquants. Le projet gratuit est mis en pause après 7 jours sans aucune activité : l'extension l'utilise en continu, ce n'est pas un souci en pratique.
+
+L'ancienne version D1 du Worker reste disponible dans `worker.d1.js` (budget d'écritures, voir l'historique Git).
 
 ## Projet Vercel
 

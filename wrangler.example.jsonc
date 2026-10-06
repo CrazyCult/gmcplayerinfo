@@ -4,6 +4,11 @@
   "main": "worker.js",
   "compatibility_date": "2026-10-06",
   "keep_vars": true,
+  // Supabase : adresse du projet (la clé secrète se met avec
+  // `npx wrangler secret put SUPABASE_SECRET_KEY`, jamais ici).
+  "vars": { "SUPABASE_URL": "https://REMPLACER.supabase.co" },
+  // Ancienne base D1 : gardée le temps de la migration automatique
+  // (tâche planifiée), puis peut être retirée.
   "d1_databases": [{
     "binding": "DB",
     "database_name": "REPLACE_WITH_EXISTING_COMPANION_DATABASE_NAME",
@@ -14,7 +19,5 @@
     "namespace_id": "1001",
     "simple": { "limit": 300, "period": 60 }
   }],
-  // Rattrapage du catalogue (site_players) toutes les 5 minutes, dans la
-  // limite du budget d'écritures du jour (plan gratuit : 70 000 par défaut).
   "triggers": { "crons": ["*/5 * * * *"] }
 }

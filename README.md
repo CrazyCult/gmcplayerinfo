@@ -25,6 +25,10 @@ Mis en ligne le 6 octobre 2026 sur Vercel, relié au dépôt public `CrazyCult/g
 - Comparaison locale : stats, sous-attributs, étoiles, notes par famille et coût jusqu’au maximum atteignable.
 - Vérification dans le navigateur : import des 53 joueurs, fiche GK, application du plan, comparaison et suppression du paramètre d’un joueur effacé ; fiche contrôlée à 375 px sans débordement.
 
+## Serveur
+
+Cloudflare Worker (`worker.js`) + PostgreSQL Supabase (`supabase/schema.sql`) : voir [DEPLOYMENT.md](DEPLOYMENT.md). Les tests du Worker tournent sur PGlite (PostgreSQL en WebAssembly).
+
 ## Base des joueurs du jeu (fiches légères et prix)
 
 - GMC Companion 2.30 lit la base des joueurs du jeu (`/api/players/database`, ~50 000 joueurs) : pages ouvertes par l’utilisateur, marché (vente et prêt) relu chaque heure, base complète relue lentement et répartie entre utilisateurs. Le Worker stocke ces fiches dans `db_players` et les prix demandés dans `db_prices` (tables créées automatiquement).
