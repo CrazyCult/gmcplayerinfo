@@ -89,6 +89,19 @@ export default function PlayerView({
   const rarity = playerRarity(player);
   const rarityColor = RARITY_COLOR[rarity];
 
+  const TIER_ORDER = { S: 0, A: 1, B: 2, "-": 3 } as const;
+  const sortedTraits = [...player.traits].sort(
+    (a, b) =>
+      (TRAITS[a] ? TIER_ORDER[TRAITS[a].tier] : 4) -
+      (TRAITS[b] ? TIER_ORDER[TRAITS[b].tier] : 4),
+  );
+  const bestPositions = ratings
+    .slice(0, 4)
+    .map(
+      (row) =>
+        `${row.position} ${fit ? (row.adjusted ?? "—") : (row.raw ?? "—")}`,
+    )
+    .join(" · ");
   return (
     <div className="stack">
       <section className="card mini-hero">
@@ -166,7 +179,7 @@ export default function PlayerView({
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Fiche dans GameChase ↗
+                  GameChase ↗
                 </a>
               )}
               <Link href={`/compare?player1=${encodeURIComponent(localId)}`}>
@@ -206,14 +219,6 @@ export default function PlayerView({
           <div>
             <dt>Rareté</dt>
             <dd style={{ color: rarityColor }}>{RARITY_LABEL[rarity]}</dd>
-          </div>
-          <div>
-            <dt>Forme</dt>
-            <dd>{player.fitness ?? "—"}/100</dd>
-          </div>
-          <div>
-            <dt>Contrat</dt>
-            <dd>{player.contractEnd ?? "—"}</dd>
           </div>
           <div>
             <dt>Valeur</dt>
@@ -292,10 +297,19 @@ export default function PlayerView({
         </div>
       )}
       {player.traits.length > 0 && (
-        <section className="card mini-card">
-          <h2 className="mini-title">Traits</h2>
+        <Fold
+          title="Traits"
+          summary={sortedTraits
+            .map((trait) => {
+              const tier = TRAITS[trait]?.tier;
+              return tier
+                ? `${trait} (${tier === "-" ? "défaut" : tier})`
+                : trait;
+            })
+            .join(" · ")}
+        >
           <ul className="traits">
-            {player.traits.map((trait) => {
+            {sortedTraits.map((trait) => {
               const info = TRAITS[trait];
               return (
                 <li key={trait}>
@@ -321,17 +335,18 @@ export default function PlayerView({
               );
             })}
           </ul>
-        </section>
+        </Fold>
       )}
       {!trainingOnly && (
-        <div className="mini-mid">
-          <section className="card mini-card">
-            <div className="mini-head">
-              <h2 className="mini-title">
-                Attributs{light && <small> · 6 stats du jeu</small>}
-              </h2>
-              <small className="muted">plafond {player.potential}</small>
-            </div>
+        <>
+          <Fold
+            title="Attributs détaillés"
+            summary={
+              light
+                ? "Fiche légère : 6 stats seulement"
+                : `${Object.values(groups).reduce((n, keys) => n + keys.length, 0)} sous-attributs · plafond ${player.potential}`
+            }
+          >
             {light && (
               <div className="notice">
                 Fiche légère : la base du jeu ne donne que les 6 stats. OVR et
@@ -414,10 +429,9 @@ export default function PlayerView({
                 stat.
               </p>
             )}
-          </section>
-          <section className="card mini-card">
+          </Fold>
+          <Fold title="Notes par poste" summary={bestPositions}>
             <div className="mini-head">
-              <h2 className="mini-title">Notes par poste</h2>
               <div
                 className="pills"
                 role="radiogroup"
@@ -484,8 +498,8 @@ export default function PlayerView({
                 })}
               </tbody>
             </table>
-          </section>
-        </div>
+          </Fold>
+        </>
       )}
       {!trainingOnly && (
         <>
