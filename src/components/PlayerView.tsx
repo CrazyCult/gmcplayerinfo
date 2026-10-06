@@ -17,14 +17,13 @@ import {
 import { money, shortAmount } from "@/lib/format";
 import { TRAITS, TRAIT_TIER_LABEL } from "@/lib/traits";
 import { statLabels, subLabels } from "@/lib/i18n";
-import Rating from "./UI/Rating";
+import Rating, { ratingColors } from "./UI/Rating";
 import {
   RARITY_COLOR,
   RARITY_LABEL,
   attributeColor,
   attributeShare,
   playerRarity,
-  tint,
 } from "@/lib/colors";
 import TrainingSimulator from "./TrainingSimulator";
 import Fold from "./UI/Fold";
@@ -149,24 +148,14 @@ export default function PlayerView({
             <div className="mini-ovr">
               <span
                 className="rating-chip"
-                style={{
-                  color: rarityColor,
-                  background: tint(rarityColor, 16),
-                }}
+                style={ratingColors(player.overall)}
               >
                 {player.overall}
               </span>
               <span className="muted">→</span>
               <span
                 className="rating-chip"
-                style={{
-                  color:
-                    RARITY_COLOR[playerRarity({ overall: player.potential })],
-                  background: tint(
-                    RARITY_COLOR[playerRarity({ overall: player.potential })],
-                    16,
-                  ),
-                }}
+                style={ratingColors(player.potential)}
               >
                 {player.potential}
               </span>
