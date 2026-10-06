@@ -9,16 +9,15 @@ type State = "idle" | "sending" | "waiting" | "error";
 
 /**
  * Fiche légère → complète. Le site ne lit jamais GameChase : il demande aux
- * extensions GMC Companion de lire le club en priorité, ou ouvre la page du
- * club dans le jeu (l'extension de l'utilisateur la lit alors elle-même).
+ * extensions GMC Companion de lire la fiche du joueur en priorité, ou ouvre
+ * cette fiche dans le jeu (l'extension de l'utilisateur la lit alors).
+ * Fonctionne aussi pour les agents libres.
  */
 export default function LoadFullButton({
   playerId,
-  teamId,
   requestedAt,
 }: {
   playerId: string;
-  teamId?: string;
   requestedAt?: number | null;
 }) {
   const router = useRouter();
@@ -76,13 +75,6 @@ export default function LoadFullButton({
       setMessage("Index momentanément indisponible.");
     }
   }
-  if (!teamId)
-    return (
-      <p className="muted" style={{ fontSize: 12 }}>
-        Agent libre : il n’appartient à aucun club, ses sous-attributs ne
-        peuvent pas être lus.
-      </p>
-    );
   return (
     <div className="hero-actions" style={{ alignItems: "center" }}>
       <button
@@ -99,7 +91,7 @@ export default function LoadFullButton({
       </button>
       <a
         className="button"
-        href={`https://gamechase.io/gamev2/club/${encodeURIComponent(teamId)}`}
+        href={`https://gamechase.io/gamev2/players/${encodeURIComponent(playerId)}`}
         target="_blank"
         rel="noopener noreferrer"
         onClick={() => {
@@ -109,13 +101,13 @@ export default function LoadFullButton({
           }
         }}
       >
-        Ouvrir le club dans GameChase ↗
+        Ouvrir sa fiche dans GameChase ↗
       </a>
       <small className="muted" style={{ flexBasis: "100%" }}>
         {state === "waiting"
-          ? `Demandé à ${new Date(since).toLocaleTimeString("fr-CH", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Zurich" })} : la première extension GMC Companion active lit ce club (en général en moins de 20 min). Si tu as l’extension, ouvrir le club dans le jeu suffit : quelques secondes. Cette page se met à jour toute seule.`
+          ? `Demandé à ${new Date(since).toLocaleTimeString("fr-CH", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Zurich" })} : la première extension GMC Companion active lit la fiche de ce joueur (en général en quelques minutes). Si tu as l’extension, ouvrir sa fiche dans le jeu suffit : quelques secondes. Cette page se met à jour toute seule.`
           : message ||
-            "Le site ne lit pas le jeu lui-même : il demande aux extensions GMC Companion de lire ce club en priorité."}
+            "Le site ne lit pas le jeu lui-même : il demande aux extensions GMC Companion de lire la fiche de ce joueur en priorité."}
       </small>
     </div>
   );

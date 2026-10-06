@@ -76,6 +76,10 @@ const SCHEMA = [
   'CREATE TABLE IF NOT EXISTS db_meta (k TEXT PRIMARY KEY, v TEXT)',
   // Demandes du site : « lire ce club en priorité » (fiche légère → complète).
   'CREATE TABLE IF NOT EXISTS site_requests (team_id TEXT PRIMARY KEY, player_id TEXT, requested_at INTEGER NOT NULL)',
+  // Fiches complètes lues joueur par joueur (page /gamev2/players/{id} du jeu),
+  // y compris les agents libres, et demandes du site par joueur.
+  'CREATE TABLE IF NOT EXISTS full_players (id TEXT PRIMARY KEY, team_id TEXT, fetched_at INTEGER NOT NULL, data TEXT NOT NULL)',
+  'CREATE TABLE IF NOT EXISTS player_requests (player_id TEXT PRIMARY KEY, requested_at INTEGER NOT NULL)',
 ];
 const dbReady = new WeakSet();
 async function ensureDb(env) {
@@ -237,13 +241,20 @@ const marketOf = (s) => s ? {
   transferPrice: s.transfer_price ?? null, loanFee: s.loan_fee ?? null, freeAgent: !!s.free_agent, clubName: s.club_name ?? null,
 } : null;
 
-// Joueur complet : une ligne de site_players, puis la ligne du club.
+// Joueur complet : une ligne de site_players, puis la ligne du club et/ou la
+// fiche lue seule (la plus récente des deux).
 async function findPlayer(env, id) {
   const s = await env.DB.prepare('SELECT * FROM site_players WHERE id = ?1').bind(id).first();
-  if (s && !s.light && s.team_id) {
-    const c = await env.DB.prepare('SELECT fetched_at, players FROM clubs WHERE team_id = ?1').bind(s.team_id).first();
-    const raw = c ? JSON.parse(c.players).find(p => p && p.id === id) : null;
-    if (raw) return { s, player: publicPlayer({ data: raw, team_id: s.team_id }), fetchedAt: c.fetched_at, light: false };
+  if (s && !s.light) {
+    let best = null;
+    if (s.team_id) {
+      const c = await env.DB.prepare('SELECT fetched_at, players FROM clubs WHERE team_id = ?1').bind(s.team_id).first();
+      const raw = c ? JSON.parse(c.players).find(p => p && p.id === id) : null;
+      if (raw) best = { raw, at: c.fetched_at, team: s.team_id };
+    }
+    const f = await env.DB.prepare('SELECT team_id, fetched_at, data FROM full_players WHERE id = ?1').bind(id).first();
+    if (f && (!best || f.fetched_at > best.at)) best = { raw: JSON.parse(f.data), at: f.fetched_at, team: f.team_id || s.team_id };
+    if (best) return { s, player: publicPlayer({ data: best.raw, team_id: best.team }), fetchedAt: best.at, light: false };
   }
   const d = await env.DB.prepare('SELECT * FROM db_players WHERE id = ?1').bind(id).first();
   if (d) return { s, d, player: dbPublicPlayer(d), fetchedAt: d.seen_at, light: true };
@@ -306,27 +317,33 @@ async function siteRequest(req, env, url, json) {
   await ensureDb(env);
   const idFrom = (prefix) => { try { const id = decodeURIComponent(url.pathname.slice(prefix.length)); return isStr(id, 128) ? id : null; } catch { return null; } };
 
-  // Demande de fiche complète : le club du joueur passe en tête des clubs
-  // confiés aux extensions (/v1/assign). Seule écriture possible du site.
+  // Demande de fiche complète : le joueur (et son club, pour les anciennes
+  // extensions) passe en tête de ce qui est confié aux extensions (/v1/assign).
+  // Seule écriture possible du site.
   if (isRequest || url.pathname.startsWith(statusPrefix)) {
     const id = idFrom(isRequest ? requestPrefix : statusPrefix);
     if (!id) return json({ error: 'Identifiant invalide' }, 400);
     const s = await env.DB.prepare('SELECT team_id, light, free_agent FROM site_players WHERE id = ?1').bind(id).first();
     if (!s) return json({ error: 'Joueur introuvable' }, 404);
     const full = !s.light;
-    const c = full ? await env.DB.prepare('SELECT fetched_at FROM clubs WHERE team_id = ?1').bind(s.team_id).first() : null;
-    const r = s.team_id ? await env.DB.prepare('SELECT requested_at FROM site_requests WHERE team_id = ?1').bind(s.team_id).first() : null;
     const now = Date.now();
+    const r = await env.DB.prepare('SELECT requested_at FROM player_requests WHERE player_id = ?1').bind(id).first();
     const pending = r && now - r.requested_at < REQUEST_TTL && !full;
-    if (!isRequest) return json({ light: !full, fetchedAt: c ? c.fetched_at : null, requestedAt: pending ? r.requested_at : null });
+    if (!isRequest) {
+      const f = full ? await env.DB.prepare('SELECT fetched_at FROM full_players WHERE id = ?1').bind(id).first() : null;
+      const c = full && !f && s.team_id ? await env.DB.prepare('SELECT fetched_at FROM clubs WHERE team_id = ?1').bind(s.team_id).first() : null;
+      return json({ light: !full, fetchedAt: (f || c || {}).fetched_at ?? null, requestedAt: pending ? r.requested_at : null });
+    }
     if (full) return json({ light: false, status: 'complet' });
-    if (!s.team_id || s.free_agent) return json({ error: 'Agent libre : aucun effectif à lire.' }, 409);
     if (pending) return json({ light: true, status: 'deja-demande', requestedAt: r.requested_at });
-    const n = (await env.DB.prepare(`SELECT COUNT(*) AS n FROM (SELECT 1 FROM site_requests WHERE requested_at > ?1 LIMIT ${REQUEST_MAX_PENDING})`)
+    const n = (await env.DB.prepare(`SELECT COUNT(*) AS n FROM (SELECT 1 FROM player_requests WHERE requested_at > ?1 LIMIT ${REQUEST_MAX_PENDING})`)
       .bind(now - REQUEST_TTL).first()).n;
     if (n >= REQUEST_MAX_PENDING) return json({ error: 'Trop de demandes en attente, réessaie plus tard.' }, 429);
-    await runBatch(env, [env.DB.prepare(`INSERT INTO site_requests (team_id, player_id, requested_at) VALUES (?1, ?2, ?3)
-      ON CONFLICT(team_id) DO UPDATE SET player_id = excluded.player_id, requested_at = excluded.requested_at`).bind(s.team_id, id, now)]);
+    const stmts = [env.DB.prepare(`INSERT INTO player_requests (player_id, requested_at) VALUES (?1, ?2)
+      ON CONFLICT(player_id) DO UPDATE SET requested_at = excluded.requested_at`).bind(id, now)];
+    if (s.team_id && !s.free_agent) stmts.push(env.DB.prepare(`INSERT INTO site_requests (team_id, player_id, requested_at) VALUES (?1, ?2, ?3)
+      ON CONFLICT(team_id) DO UPDATE SET player_id = excluded.player_id, requested_at = excluded.requested_at`).bind(s.team_id, id, now));
+    await runBatch(env, stmts);
     return json({ light: true, status: 'demande', requestedAt: now });
   }
 
@@ -516,14 +533,26 @@ async function extensionRequest(req, env, url, json) {
   // puis les clubs prioritaires de l'extension non réservés et pas trop récents.
   if (req.method === 'POST' && url.pathname === '/v1/assign') {
     let body; try { body = await req.json(); } catch (_) { return json({ error: 'JSON invalide' }, 400); }
-    const limit = Math.max(0, Math.min(20, parseInt(body.limit, 10) || 0));
+    let limit = Math.max(0, Math.min(20, parseInt(body.limit, 10) || 0));
     const freshH = Math.max(1, Math.min(72, parseInt(body.minFreshHours, 10) || 12));
-    const asked = limit ? (await env.DB.prepare(`SELECT r.team_id FROM site_requests r
+    // Extensions 2.31+ : fiches demandées joueur par joueur (une seule page lue).
+    let players = [];
+    if (body.players === true && limit) {
+      players = (await env.DB.prepare(`SELECT r.player_id FROM player_requests r
+          LEFT JOIN site_players s ON s.id = r.player_id LEFT JOIN leases l ON l.team_id = 'p:' || r.player_id
+          WHERE r.requested_at > ?1 AND (s.light IS NULL OR s.light = 1) AND (l.leased_until IS NULL OR l.leased_until < ?2)
+          ORDER BY r.requested_at ASC LIMIT ?3`).bind(now - REQUEST_TTL, now, limit).all()).results.map(x => x.player_id);
+      if (players.length) await runBatch(env, players.map(id => env.DB.prepare(
+        'INSERT INTO leases (team_id, leased_until, leased_by) VALUES (?1, ?2, ?3) ON CONFLICT(team_id) DO UPDATE SET leased_until = excluded.leased_until, leased_by = excluded.leased_by'
+      ).bind('p:' + id, now + 10 * 60e3, installId || null)));
+      limit -= players.length;
+    }
+    const asked = limit && body.players !== true ? (await env.DB.prepare(`SELECT r.team_id FROM site_requests r
         LEFT JOIN clubs c ON c.team_id = r.team_id LEFT JOIN leases l ON l.team_id = r.team_id
         WHERE r.requested_at > ?1 AND (c.fetched_at IS NULL OR c.fetched_at < r.requested_at) AND (l.leased_until IS NULL OR l.leased_until < ?2)
         ORDER BY r.requested_at ASC LIMIT ?3`).bind(now - REQUEST_TTL, now, limit).all()).results.map(x => x.team_id) : [];
     const cands = [...new Set(asked.concat((Array.isArray(body.candidates) ? body.candidates : []).filter(x => isStr(x, 64)).slice(0, 300)))];
-    if (!limit || !cands.length) return json({ assigned: [] });
+    if (!limit || !cands.length) return json({ assigned: [], players });
     const busy = new Set(), fresh = new Set();
     for (let i = 0; i < cands.length; i += 90) {
       const part = cands.slice(i, i + 90), ph = part.map((_, k) => '?' + (k + 2)).join(',');
@@ -538,7 +567,25 @@ async function extensionRequest(req, env, url, json) {
         'INSERT INTO leases (team_id, leased_until, leased_by) VALUES (?1, ?2, ?3) ON CONFLICT(team_id) DO UPDATE SET leased_until = excluded.leased_until, leased_by = excluded.leased_by'
       ).bind(id, now + 30 * 60e3, installId || null)));
     }
-    return json({ assigned });
+    return json({ assigned, players });
+  }
+
+  // Fiches complètes lues joueur par joueur (extensions 2.31+).
+  if (req.method === 'POST' && url.pathname === '/v1/players') {
+    let body; try { body = await req.json(); } catch (_) { return json({ error: 'JSON invalide' }, 400); }
+    const items = (Array.isArray(body.players) ? body.players.slice(0, 20) : [])
+      .filter(x => x && validPlayer(x.player) && isInt(x.fetchedAt, 1.6e12, now + 5 * 60e3) && JSON.stringify(x.player).length < 20000);
+    const stmts = [];
+    for (const { player: p, fetchedAt } of items) {
+      const team = isStr(p.club_id, 64) ? p.club_id : null;
+      stmts.push(env.DB.prepare(`INSERT INTO full_players (id, team_id, fetched_at, data) VALUES (?1, ?2, ?3, ?4)
+        ON CONFLICT(id) DO UPDATE SET team_id = excluded.team_id, fetched_at = excluded.fetched_at, data = excluded.data
+        WHERE excluded.fetched_at > full_players.fetched_at`).bind(p.id, team, fetchedAt, JSON.stringify(p)));
+      stmts.push(upsertFull(env, p, team, fetchedAt));
+      stmts.push(env.DB.prepare('DELETE FROM player_requests WHERE player_id = ?1').bind(p.id));
+    }
+    if (stmts.length) await runBatch(env, stmts);
+    return json({ accepted: items.length, rejected: (Array.isArray(body.players) ? Math.min(20, body.players.length) : 0) - items.length });
   }
 
   // Liste légère (identifiant + date) pour que chaque extension sache ce

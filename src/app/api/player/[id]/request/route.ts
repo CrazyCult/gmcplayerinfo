@@ -2,7 +2,6 @@ import { IndexError, requestFull } from "@/data/gmc-index";
 
 const MESSAGES: Record<number, string> = {
   404: "Joueur introuvable.",
-  409: "Agent libre : il n’appartient à aucun club, il n’y a pas d’effectif à lire.",
   429: "Trop de demandes en attente, réessaie un peu plus tard.",
 };
 export async function POST(

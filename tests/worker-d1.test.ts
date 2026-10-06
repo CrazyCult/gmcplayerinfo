@@ -293,13 +293,10 @@ describe("catalogue indexé (économie de lectures et d’écritures)", () => {
 });
 
 describe("demande de fiche complète depuis le site", () => {
-  it("met le club en tête des clubs confiés aux extensions, une seule fois", async () => {
+  it("anciennes extensions : le club passe en tête, une seule fois", async () => {
     const { call } = setup();
     await call("POST", "/v1/db/players", {
-      players: [
-        light("p1", { club_id: "clubX" }),
-        light("free", { free_agent: true, club_id: "sys" }),
-      ],
+      players: [light("p1", { club_id: "clubX" })],
     });
     expect(
       (await call("GET", "/v1/site/request/p1", undefined, true)).status,
@@ -310,9 +307,6 @@ describe("demande de fiche complète depuis le site", () => {
     expect(
       (await call("POST", "/v1/site/request/p1", undefined, true)).body.status,
     ).toBe("deja-demande");
-    expect(
-      (await call("POST", "/v1/site/request/free", undefined, true)).status,
-    ).toBe(409);
     expect(
       (await call("POST", "/v1/assign", { limit: 5, candidates: ["a"] })).body
         .assigned,
@@ -333,9 +327,76 @@ describe("demande de fiche complète depuis le site", () => {
     expect(
       (await call("GET", "/v1/site/status/p1", undefined, true)).body,
     ).toMatchObject({ light: false, requestedAt: null });
-    const page = (await call("GET", "/v1/site/player/p1", undefined, true))
+    expect(
+      (await call("GET", "/v1/site/player/p1", undefined, true)).body,
+    ).toMatchObject({ light: false, player: { attributes: { vision: 81 } } });
+  });
+  it("extensions 2.31 : fiche lue joueur par joueur, agents libres compris", async () => {
+    const { call } = setup();
+    await call("POST", "/v1/db/players", {
+      players: [light("free", { free_agent: true, club_id: "sys" })],
+    });
+    expect(
+      (await call("POST", "/v1/site/request/free", undefined, true)).body
+        .status,
+    ).toBe("demande");
+    const a = (
+      await call("POST", "/v1/assign", {
+        limit: 5,
+        candidates: ["c1"],
+        players: true,
+      })
+    ).body;
+    expect(a).toEqual({ players: ["free"], assigned: ["c1"] });
+    expect(
+      (
+        await call("POST", "/v1/assign", {
+          limit: 5,
+          candidates: [],
+          players: true,
+        })
+      ).body.players,
+    ).toEqual([]);
+    const r = await call("POST", "/v1/players", {
+      players: [
+        {
+          fetchedAt: Date.now(),
+          player: full("free", 115, { club_id: "sys" }),
+        },
+        { fetchedAt: 1, player: { id: "x" } },
+      ],
+    });
+    expect(r.body).toEqual({ accepted: 1, rejected: 1 });
+    const page = (await call("GET", "/v1/site/player/free", undefined, true))
       .body;
-    expect(page.light).toBe(false);
-    expect(page.player.attributes.vision).toBe(81);
+    expect(page).toMatchObject({
+      light: false,
+      player: { overall: 115, attributes: { vision: 81 } },
+      market: { freeAgent: true },
+    });
+    expect(
+      (await call("GET", "/v1/site/status/free", undefined, true)).body,
+    ).toMatchObject({ light: false, requestedAt: null });
+  });
+  it("garde la version la plus récente entre club et fiche seule", async () => {
+    const { call } = setup();
+    const t = Date.now();
+    await call("POST", "/v1/clubs", {
+      clubs: [{ teamId: "c", fetchedAt: t - 5000, players: [full("p", 80)] }],
+    });
+    await call("POST", "/v1/players", {
+      players: [{ fetchedAt: t, player: full("p", 82, { club_id: "c" }) }],
+    });
+    expect(
+      (await call("GET", "/v1/site/player/p", undefined, true)).body.player
+        .overall,
+    ).toBe(82);
+    await call("POST", "/v1/clubs", {
+      clubs: [{ teamId: "c", fetchedAt: t + 5000, players: [full("p", 83)] }],
+    });
+    expect(
+      (await call("GET", "/v1/site/player/p", undefined, true)).body.player
+        .overall,
+    ).toBe(83);
   });
 });

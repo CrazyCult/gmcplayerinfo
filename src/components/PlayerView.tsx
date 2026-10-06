@@ -38,7 +38,7 @@ export default function PlayerView({
   trainingOnly?: boolean;
   remote?: boolean;
   /** Fiche légère distante : de quoi demander la fiche complète. */
-  full?: { teamId?: string; requestedAt?: number | null };
+  full?: { requestedAt?: number | null };
 }) {
   const [subs, setSubs] = useState<Subs>(player.attributes.subs),
     [fit, setFit] = useState(true);
@@ -214,14 +214,14 @@ export default function PlayerView({
                 Fiche légère : la base du jeu ne donne que les 6 stats. OVR et
                 notes par poste sont exacts ; sous-attributs, leviers et
                 simulateur d’entraînement apparaîtront quand un utilisateur de
-                GMC Companion aura ouvert la page du club de ce joueur.
+                GMC Companion aura ouvert la fiche de ce joueur ou la page de
+                son club.
               </div>
             )}
             {light && remote && full && (
               <div style={{ margin: "14px 0" }}>
                 <LoadFullButton
                   playerId={player.id}
-                  teamId={full.teamId}
                   requestedAt={full.requestedAt}
                 />
               </div>

@@ -80,10 +80,6 @@ export default async function PlayerPage({
           full={
             snapshot.light
               ? {
-                  teamId:
-                    snapshot.market?.freeAgent || !snapshot.teamId
-                      ? undefined
-                      : snapshot.teamId,
                   requestedAt: await getFullStatus(id)
                     .then((status) => status.requestedAt)
                     .catch(() => null),
