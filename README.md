@@ -2,6 +2,10 @@
 
 Réalisation suivant [SPEC.md](SPEC.md). Interface française, aucune requête au jeu, aucun secret côté client.
 
+Site public : **https://gmcplayerinfo.vercel.app** · [Catalogue GMC Companion](https://gmcplayerinfo.vercel.app/players).
+
+Mis en ligne le 6 octobre 2026 sur Vercel, relié au dépôt public `CrazyCult/gmcplayerinfo` et au Worker existant. Vérification de l’index réel : 42 023 joueurs uniques, 841 pages, profils et recherche accessibles ; les nouvelles collectes apparaissent après expiration du cache serveur (15 minutes).
+
 ## Interface et index communautaire
 
 - Stats résumées, OVR entier champ/gardien, adéquation estimée des postes.
@@ -55,4 +59,4 @@ Les stats incomplètes renvoient `undefined` ; elles ne sont jamais remplacées 
 
 ## Suite de la réalisation
 
-Restent hors de cette livraison : historique quotidien persistant, collecte des ventes et contrats comparables, moteur de valeur MFL, partage PNG/OG et PWA. L’URL officielle du joueur n’est pas affichée tant qu’elle n’est pas vérifiée. Le déploiement réel nécessite l’accès aux comptes Cloudflare et Vercel ; sa préparation ne confirme pas sa publication.
+Restent hors de cette livraison : historique quotidien persistant, collecte des ventes et contrats comparables, moteur de valeur MFL, partage PNG/OG et PWA. L’URL officielle du joueur n’est pas affichée tant qu’elle n’est pas vérifiée.

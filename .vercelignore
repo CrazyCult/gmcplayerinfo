@@ -9,3 +9,7 @@ scripts
 .env*
 !.env.example
 .wrangler
+.tmp
+.vercel
+.dev.vars*
+wrangler.jsonc
