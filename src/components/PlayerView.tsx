@@ -201,7 +201,7 @@ export default function PlayerView({
             <dd>{player.age} ans</dd>
           </div>
           <div>
-            <dt>Nationalité</dt>
+            <dt>Pays</dt>
             <dd>{player.nationality ?? "—"}</dd>
           </div>
           <div>
