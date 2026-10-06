@@ -339,15 +339,36 @@ export default function PlayerView({
           <section className="card">
             <div className="section-head">
               <h2 style={{ margin: 0 }}>Notes par poste</h2>
-              <label className="pill">
-                <input
-                  type="checkbox"
-                  checked={fit}
-                  onChange={(event) => setFit(event.target.checked)}
-                />{" "}
-                Adéquation estimée
-              </label>
+              <div
+                className="pills"
+                role="radiogroup"
+                aria-label="Type de note"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={fit}
+                  className={`pill${fit ? " accent" : ""}`}
+                  onClick={() => setFit(true)}
+                >
+                  En match, hors poste
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={!fit}
+                  className={`pill${!fit ? " accent" : ""}`}
+                  onClick={() => setFit(false)}
+                >
+                  Après carte de poste
+                </button>
+              </div>
             </div>
+            <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+              {fit
+                ? "Force s’il joue à ce poste sans le changer : note au poste × adéquation du manuel (100 % son poste, 95 % proche, 90 % voisin, 85 % mauvaise ligne). Estimation : le manuel ne précise pas l’arrondi."
+                : "OVR qu’il aurait s’il changeait de poste avec une carte de poste (formule d’OVR du jeu appliquée à ses stats). Une carte ne fait passer qu’à un poste voisin."}
+            </p>
             <div className="ratings-grid">
               {ratings.map((row) => (
                 <div className="position-row" key={row.position}>

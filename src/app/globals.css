@@ -541,6 +541,15 @@ td a:hover {
   color: var(--primary);
   border-color: #ff914244;
 }
+button.pill {
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+button.pill.accent {
+  border-color: var(--primary);
+  font-weight: 600;
+}
 .player-links {
   display: flex;
   gap: 8px;
