@@ -120,7 +120,10 @@ export default async function PlayersPage({
                 {catalog.players.map(({ player, fetchedAt, light, market }) => (
                   <tr key={player.id}>
                     <td>
-                      <Link href={`/player/${encodeURIComponent(player.id)}`}>
+                      <Link
+                        href={`/player/${encodeURIComponent(player.id)}`}
+                        prefetch={false}
+                      >
                         {player.name}
                       </Link>
                       {light && (

@@ -96,6 +96,7 @@ export default function Search({
           {combined.length ? (
             combined.map(({ player, remote: online }) => (
               <Link
+                prefetch={false}
                 key={player.id}
                 href={
                   online
