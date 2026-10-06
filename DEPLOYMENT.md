@@ -8,21 +8,18 @@
 4. Déployer avec `pnpm dlx wrangler deploy --config wrangler.jsonc --keep-vars`. `PUBLIC_KEY_JWK`, les autres secrets de licence et les réglages Companion existants doivent être conservés. Ne jamais recopier une clé privée dans ce projet.
 5. Vérifier `/privacy`, une requête site sans token (401), puis `/v1/site/players` avec le token et une fiche de joueur. Vérifier que les routes Companion existantes fonctionnent encore.
 
-Ce `worker.js` (Supabase) est **la seule version à déployer** : il contient les routes de l’extension (dont `/v1/db/*` pour GMC Companion 2.30) et celles du site. Les routes site sont `GET /v1/site/players?q=&position=&avail=&sort=&page=`, `GET /v1/site/search?q=` et `GET /v1/site/player/:id`. Elles passent avant le contrôle de licence, restent en lecture seule et refusent l’accès si `SITE_TOKEN` est absent. Le binding de limitation de débit est configuré dans l’exemple Wrangler ; vérifier que son namespace n’entre pas en conflit avec un binding existant.
+`worker.js` + `worker.d1.js` (Turso) sont **la version à déployer** : il contient les routes de l’extension (dont `/v1/db/*` pour GMC Companion 2.30) et celles du site. Les routes site sont `GET /v1/site/players?q=&position=&avail=&sort=&page=`, `GET /v1/site/search?q=` et `GET /v1/site/player/:id`. Elles passent avant le contrôle de licence, restent en lecture seule et refusent l’accès si `SITE_TOKEN` est absent. Le binding de limitation de débit est configuré dans l’exemple Wrangler ; vérifier que son namespace n’entre pas en conflit avec un binding existant.
 
-## Base de données : Supabase
+## Base de données : Turso
 
-Le Worker garde les données dans PostgreSQL (Supabase, plan gratuit : 500 Mo, requêtes illimitées, aucun quota de lignes). 42 000 joueurs occupent environ 30 Mo.
+Le Worker garde les données dans Turso (SQLite hébergé). Offre gratuite : 5 Go, 500 millions de lignes lues et 10 millions écrites par mois. `worker.js` est un adaptateur : il donne à Turso l'interface de Cloudflare D1, et toute la logique reste dans `worker.d1.js` (catalogue indexé, écritures conditionnelles, budget d'écritures journalier `DAILY_WRITE_BUDGET`). Sans `TURSO_URL`, le Worker utilise le binding D1 `DB` comme avant.
 
-1. Créer un projet sur supabase.com (région Europe, par exemple Frankfurt). Noter le mot de passe de la base.
-2. **SQL Editor** → coller tout `supabase/schema.sql` → **Run**. Le script peut être relancé sans risque.
-3. **Project Settings → API Keys** : copier la clé **secret** (`sb_secret_…`), et l'URL du projet (`https://xxxx.supabase.co`, dans **Project Settings → Data API**).
-4. Dans `wrangler.jsonc`, mettre l'URL dans `vars.SUPABASE_URL`, puis `npx wrangler secret put SUPABASE_SECRET_KEY` et coller la clé secrète.
-5. `npx wrangler deploy`.
+1. Créer un compte sur turso.tech, puis une base (région la plus proche, par exemple Frankfurt).
+2. Copier l'URL de la base (`libsql://nom-organisation.turso.io`) et créer un jeton en lecture-écriture, sans expiration.
+3. Dans `wrangler.jsonc`, mettre l'URL dans `vars.TURSO_URL`, puis `npx wrangler secret put TURSO_TOKEN` et coller le jeton.
+4. `npx wrangler deploy`. Le schéma est créé automatiquement au premier appel.
 
-La tâche planifiée (toutes les 5 min) recopie automatiquement l'ancienne base D1 vers Supabase (40 clubs par passage, puis la base du jeu) tant que le binding `DB` existe. Les extensions renvoient aussi d'elles-mêmes les effectifs manquants. Le projet gratuit est mis en pause après 7 jours sans aucune activité : l'extension l'utilise en continu, ce n'est pas un souci en pratique.
-
-L'ancienne version D1 du Worker reste disponible dans `worker.d1.js` (budget d'écritures, voir l'historique Git).
+Les données se remplissent d'elles-mêmes : chaque extension renvoie au serveur les effectifs qu'il n'a pas (contrôle au démarrage puis toutes les heures), et la base du jeu est relue par les extensions 2.30+.
 
 ## Projet Vercel
 

@@ -27,7 +27,7 @@ Mis en ligne le 6 octobre 2026 sur Vercel, relié au dépôt public `CrazyCult/g
 
 ## Serveur
 
-Cloudflare Worker (`worker.js`) + PostgreSQL Supabase (`supabase/schema.sql`) : voir [DEPLOYMENT.md](DEPLOYMENT.md). Les tests du Worker tournent sur PGlite (PostgreSQL en WebAssembly).
+Cloudflare Worker (`worker.js`, adaptateur Turso, et `worker.d1.js`, logique SQLite) + base Turso : voir [DEPLOYMENT.md](DEPLOYMENT.md). Les tests du Worker tournent sur SQLite (`node:sqlite`) avec une API Turso simulée.
 
 ## Base des joueurs du jeu (fiches légères et prix)
 

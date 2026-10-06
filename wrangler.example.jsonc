@@ -4,20 +4,16 @@
   "main": "worker.js",
   "compatibility_date": "2026-10-06",
   "keep_vars": true,
-  // Supabase : adresse du projet (la clé secrète se met avec
-  // `npx wrangler secret put SUPABASE_SECRET_KEY`, jamais ici).
-  "vars": { "SUPABASE_URL": "https://REMPLACER.supabase.co" },
-  // Ancienne base D1 : gardée le temps de la migration automatique
-  // (tâche planifiée), puis peut être retirée.
-  "d1_databases": [{
-    "binding": "DB",
-    "database_name": "REPLACE_WITH_EXISTING_COMPANION_DATABASE_NAME",
-    "database_id": "REPLACE_WITH_EXISTING_COMPANION_DATABASE_ID"
-  }],
+  // Turso : URL de la base (le jeton se met avec
+  // `npx wrangler secret put TURSO_TOKEN`, jamais ici).
+  // Budget d'écritures par jour (offre gratuite Turso : 10 M par mois).
+  "vars": {
+    "TURSO_URL": "libsql://REMPLACER.turso.io",
+    "DAILY_WRITE_BUDGET": "250000"
+  },
   "ratelimits": [{
     "name": "SITE_RATE_LIMITER",
     "namespace_id": "1001",
     "simple": { "limit": 300, "period": 60 }
-  }],
-  "triggers": { "crons": ["*/5 * * * *"] }
+  }]
 }

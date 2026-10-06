@@ -13,7 +13,7 @@ const PRIVACY_HTML = `<!doctype html><html lang="fr"><head><meta charset="utf-8"
 <h2>Données conservées sur ton appareil</h2>
 <p>Réglages des modules, position des panneaux, historique de tes matchs, index des joueurs consultés, code d'activation et identifiant d'installation aléatoire sont enregistrés dans le stockage local de l'extension, sur ton navigateur. Ils ne quittent pas ton appareil, sauf ce qui est décrit ci-dessous.</p>
 <h2>Données envoyées au serveur de l'extension</h2>
-<p>Si le partage d'index est actif, l'extension envoie au serveur de l'extension (Cloudflare Workers) :</p>
+<p>Si le partage d'index est actif, l'extension envoie au serveur de l'extension (Cloudflare Workers ; base de données hébergée par Turso) :</p>
 <ul><li>les effectifs des clubs GameChase que tu consultes dans le jeu (noms des joueurs du jeu, âge, poste, notes, potentiel, valeur, attributs), afin de les partager entre les utilisateurs de l'extension ;</li>
 <li>les pages de la base des joueurs du jeu (scouting) que l'extension lit : joueurs du jeu, notes, potentiel, valeur et prix demandés en vente ou en prêt ;</li>
 <li>l'identifiant d'installation aléatoire et le code d'activation, uniquement pour vérifier que l'accès est autorisé.</li></ul>
