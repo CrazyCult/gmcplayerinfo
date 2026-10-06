@@ -582,9 +582,38 @@ describe("club actuel sur la fiche", () => {
     });
     expect(
       (await call("GET", "/v1/site/player/p1", undefined, true)).body.club,
-    ).toEqual({ id: "c1", name: "L’Icaunique", freeAgent: false });
+    ).toEqual({ id: "c1", name: "L’Icaunique", freeAgent: false, crest: null });
     expect(
       (await call("GET", "/v1/site/player/p2", undefined, true)).body.club,
-    ).toEqual({ id: "", name: null, freeAgent: true });
+    ).toEqual({ id: "", name: null, freeAgent: true, crest: null });
+    const crest =
+      "https://oqax3ftrhi4czkta.public.blob.vercel-storage.com/gamechase/club-crests/c1.png";
+    await call("POST", "/v1/clubs", {
+      clubs: [
+        {
+          teamId: "c1",
+          fetchedAt: Date.now() + 1000,
+          players: [full("p1")],
+          crest,
+        },
+      ],
+    });
+    expect(
+      (await call("GET", "/v1/site/player/p1", undefined, true)).body.club
+        .crest,
+    ).toBe(crest);
+    await call("POST", "/v1/clubs", {
+      clubs: [
+        {
+          teamId: "c1",
+          fetchedAt: Date.now() + 2000,
+          players: [full("p1")],
+          crest: "https://evil.example/x.png",
+        },
+      ],
+    });
+    expect(
+      (await call("GET", "/v1/site/club/c1", undefined, true)).body.crest,
+    ).toBe(crest);
   });
 });

@@ -39,6 +39,7 @@ const DB_PAGE_SIZE = 24, DB_AVAIL = ['all', 'transfer', 'loan', 'free'];
 const DB_MARKET_MS = 55 * 60e3;      // marché et prêts : relus chaque heure
 const DB_FULL_MS = 24 * 3600e3;      // base complète : un tour par jour au plus
 const DB_LEASE_MS = 10 * 60e3;
+const CREST_RE = /^https:\/\/[a-z0-9]+\.public\.blob\.vercel-storage\.com\/[^\s"'<>]{1,250}$/;
 const HISTORY_MAX = 150000; // historique d'OVR brut (caractères JSON)
 const REQUEST_TTL = 24 * 3600e3, REQUEST_MAX_PENDING = 300;
 const STATS_TTL = 10 * 60e3;
@@ -94,6 +95,8 @@ const dbReady = new WeakSet();
 async function ensureDb(env) {
   if (dbReady.has(env.DB)) return;
   await env.DB.batch(SCHEMA.map(q => env.DB.prepare(q)));
+  // Colonnes ajoutées après coup (erreur ignorée si elles existent déjà).
+  try { await env.DB.prepare('ALTER TABLE site_clubs ADD COLUMN crest TEXT').run(); } catch (_) {}
   await env.DB.batch(['all', 'transfer', 'loan'].map(a => env.DB.prepare('INSERT OR IGNORE INTO db_pages (a, p) VALUES (?1, 1)').bind(a)));
   dbReady.add(env.DB);
 }
@@ -385,10 +388,10 @@ async function siteRequest(req, env, url, json) {
     // Club actuel : nom connu par la base du jeu (agent libre : pas de club).
     const teamId = (s && s.team_id) || player.club_id || '';
     const freeAgent = !!((s && s.free_agent) || (found.d && found.d.free_agent));
-    const c = teamId && !freeAgent ? await env.DB.prepare('SELECT name FROM site_clubs WHERE team_id = ?1').bind(teamId).first() : null;
+    const c = teamId && !freeAgent ? await env.DB.prepare('SELECT name, crest FROM site_clubs WHERE team_id = ?1').bind(teamId).first() : null;
     const clubName = freeAgent ? null : (c && c.name) || (s && s.club_name) || (found.d && found.d.club_name) || player.club_name || null;
     return json({ player, fetchedAt: found.fetchedAt, teamId, light: found.light,
-      club: freeAgent ? { id: '', name: null, freeAgent: true } : teamId || clubName ? { id: teamId, name: clubName, freeAgent: false } : null,
+      club: freeAgent ? { id: '', name: null, freeAgent: true, crest: null } : teamId || clubName ? { id: teamId, name: clubName, freeAgent: false, crest: (c && c.crest) || null } : null,
       market: marketOf(s || found.d), prices, comparables, history, historyAt: h ? h.fetched_at : null });
   }
 
@@ -463,7 +466,7 @@ async function siteClubRequest(req, env, url, json) {
   if (!isStr(teamId, 64)) return json({ error: 'Identifiant invalide' }, 400);
   const [c, n] = await Promise.all([
     env.DB.prepare('SELECT fetched_at, players FROM clubs WHERE team_id = ?1').bind(teamId).first(),
-    env.DB.prepare('SELECT name FROM site_clubs WHERE team_id = ?1').bind(teamId).first(),
+    env.DB.prepare('SELECT name, crest FROM site_clubs WHERE team_id = ?1').bind(teamId).first(),
   ]);
   let players = [];
   if (c) { try { players = JSON.parse(c.players).filter(validPlayer).map(raw => ({ player: publicPlayer({ data: raw, team_id: teamId }), light: false })); } catch (_) {} }
@@ -485,7 +488,7 @@ async function siteClubRequest(req, env, url, json) {
       requestedAt = now;
     }
   }
-  return json({ teamId, name: (n && n.name) || null, fetchedAt: c ? c.fetched_at : null, requestedAt, players });
+  return json({ teamId, name: (n && n.name) || null, crest: (n && n.crest) || null, fetchedAt: c ? c.fetched_at : null, requestedAt, players });
 }
 
 // --- Licence -------------------------------------------------------------------
@@ -626,6 +629,9 @@ async function extensionRequest(req, env, url, json) {
          WHERE excluded.fetched_at > clubs.fetched_at`).bind(c.teamId, c.fetchedAt, now, installId || null, text));
       for (const p of c.players) stmts.push(upsertFull(env, p, c.teamId, c.fetchedAt));
     }
+    // Logo du club (n'écrit que s'il change ; le nom vient de la base du jeu).
+    for (const { c } of valid) if (typeof c.crest === 'string' && CREST_RE.test(c.crest))
+      stmts.push(env.DB.prepare('UPDATE site_clubs SET crest = ?2 WHERE team_id = ?1 AND crest IS NOT ?2').bind(c.teamId, c.crest));
     if (stmts.length) await runBatch(env, stmts);
     return json({ accepted, rejected });
   }

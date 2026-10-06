@@ -14,7 +14,7 @@ import {
   matchesPerSeries,
   projectMatches,
 } from "@/engine/matchProgression";
-import { money, shortAmount } from "@/lib/format";
+import { money } from "@/lib/format";
 import { TRAITS, TRAIT_TIER_LABEL } from "@/lib/traits";
 import { statLabels, subLabels } from "@/lib/i18n";
 import Rating, { ratingColors } from "./UI/Rating";
@@ -27,6 +27,8 @@ import {
 } from "@/lib/colors";
 import TrainingSimulator from "./TrainingSimulator";
 import Fold from "./UI/Fold";
+import Gmc2 from "./UI/Gmc2";
+import { countryFr } from "@/lib/countries";
 import LoadFullButton from "./LoadFullButton";
 
 export function portraitUrl(player: Player) {
@@ -50,7 +52,12 @@ export default function PlayerView({
   /** Fiche légère distante : de quoi demander la fiche complète. */
   full?: { requestedAt?: number | null };
   /** Club actuel du joueur (fiche de l’index). */
-  club?: { id: string; name: string | null; freeAgent: boolean } | null;
+  club?: {
+    id: string;
+    name: string | null;
+    freeAgent: boolean;
+    crest?: string | null;
+  } | null;
 }) {
   const [subs, setSubs] = useState<Subs>(player.attributes.subs),
     [fit, setFit] = useState(true);
@@ -126,21 +133,29 @@ export default function PlayerView({
                       prefetch={false}
                       title="Voir l’effectif de ce club"
                     >
+                      {club.crest &&
+                        /^https:\/\/[a-z0-9]+\.public\.blob\.vercel-storage\.com\//.test(
+                          club.crest,
+                        ) && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            className="kicker-crest"
+                            src={club.crest}
+                            alt=""
+                            width={18}
+                            height={18}
+                            referrerPolicy="no-referrer"
+                          />
+                        )}
                       {club.name ?? "Club inconnu"}
                     </Link>
                   ) : (
                     club.name
                   )}
-                  {" · "}
+                  {light && " · "}
                 </>
               )}
-              <span className="muted">
-                {light
-                  ? "fiche légère"
-                  : remote
-                    ? "GMC Companion"
-                    : "import local"}
-              </span>
+              {light && <span className="muted">fiche légère</span>}
             </div>
             <h1>
               <span className="pos-badge" title="Poste">
@@ -177,16 +192,31 @@ export default function PlayerView({
               <Link href={`/compare?player1=${encodeURIComponent(localId)}`}>
                 Comparer
               </Link>
-              {(!light || trainingOnly) && (
-                <Link
-                  href={`/player/${encodeURIComponent(localId)}${trainingOnly ? "" : "/training"}`}
-                >
-                  {trainingOnly ? "Fiche complète" : "Simulateur plein écran"}
+              {trainingOnly && (
+                <Link href={`/player/${encodeURIComponent(localId)}`}>
+                  Fiche complète
                 </Link>
               )}
             </div>
           </div>
         </div>
+        {club?.crest &&
+        /^https:\/\/[a-z0-9]+\.public\.blob\.vercel-storage\.com\//.test(
+          club.crest,
+        ) ? (
+          <div className="mini-crest">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={club.crest}
+              alt={`Logo de ${club.name ?? "son club"}`}
+              width={72}
+              height={72}
+              referrerPolicy="no-referrer"
+            />
+          </div>
+        ) : (
+          <div className="mini-crest mini-crest-empty" aria-hidden="true" />
+        )}
         <dl className="mini-details">
           <div>
             <dt>Âge</dt>
@@ -194,7 +224,7 @@ export default function PlayerView({
           </div>
           <div>
             <dt>Pays</dt>
-            <dd>{player.nationality ?? "—"}</dd>
+            <dd>{countryFr(player.nationality, player.flagCode) ?? "—"}</dd>
           </div>
           <div>
             <dt>Pied</dt>
@@ -215,17 +245,13 @@ export default function PlayerView({
           <div>
             <dt>Valeur</dt>
             <dd>
-              {player.value === undefined
-                ? "—"
-                : `${shortAmount(player.value)} GMC2`}
+              {player.value === undefined ? "—" : <Gmc2 value={player.value} />}
             </dd>
           </div>
           <div>
             <dt>Salaire</dt>
             <dd>
-              {player.wage === undefined
-                ? "—"
-                : `${shortAmount(player.wage)} GMC2`}
+              {player.wage === undefined ? "—" : <Gmc2 value={player.wage} />}
             </dd>
           </div>
           {player.matchesPlayed !== undefined && (
@@ -234,7 +260,7 @@ export default function PlayerView({
               <dd>
                 {player.matchesPlayed} · {player.goals ?? 0} but
                 {(player.goals ?? 0) > 1 ? "s" : ""} · {player.assists ?? 0}{" "}
-                passe{(player.assists ?? 0) > 1 ? "s" : ""}
+                P.D.
               </dd>
             </div>
           )}
@@ -253,9 +279,13 @@ export default function PlayerView({
             >
               <dt>Renouvellement</dt>
               <dd>
-                {player.contractDemand !== undefined
-                  ? `${shortAmount(player.contractDemand)} GMC2`
-                  : `≈ ${shortAmount((player.value ?? 0) * 0.04)} GMC2`}
+                {player.contractDemand !== undefined ? (
+                  <Gmc2 value={player.contractDemand} />
+                ) : (
+                  <>
+                    ≈ <Gmc2 value={(player.value ?? 0) * 0.04} />
+                  </>
+                )}
               </dd>
             </div>
           )}

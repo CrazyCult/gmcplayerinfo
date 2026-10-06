@@ -1587,3 +1587,57 @@ details.fold[open] > summary .fold-chevron {
     min-width: 38px;
   }
 }
+
+/* Montant GMC2 avec le logo de la monnaie */
+.gmc2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.gmc2 img {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+/* Logo du club entre l'identité et les caractéristiques */
+.mini-hero {
+  grid-template-columns: minmax(0, 1.1fr) auto minmax(0, 1fr);
+}
+.mini-crest {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+}
+.mini-crest img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+}
+.mini-crest-empty {
+  width: 0;
+}
+@media (max-width: 1000px) {
+  .mini-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mini-crest {
+    display: none;
+  }
+}
+.kicker-crest {
+  display: none;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  vertical-align: -4px;
+  margin-right: 6px;
+}
+@media (max-width: 1000px) {
+  .kicker-crest {
+    display: inline-block;
+  }
+}

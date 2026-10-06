@@ -44,6 +44,7 @@ const snapshotSchema = z.object({
       id: z.string(),
       name: z.string().nullable(),
       freeAgent: z.boolean(),
+      crest: z.string().url().nullable().optional(),
     })
     .nullable()
     .optional()
@@ -199,6 +200,7 @@ export async function searchClubs(q: string) {
 const clubSchema = z.object({
   teamId: z.string(),
   name: z.string().nullable(),
+  crest: z.string().url().nullable().optional(),
   fetchedAt: z.number().nullable(),
   requestedAt: z.number().nullable(),
   players: z.array(z.object({ player: playerSchema, light: z.boolean() })),
