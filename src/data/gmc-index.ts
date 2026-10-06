@@ -182,7 +182,7 @@ export type ClubHit = z.infer<typeof clubSearchSchema>["clubs"][number];
 export async function searchClubs(q: string) {
   const params = new URLSearchParams({ q: q.slice(0, 60) });
   return clubSearchSchema.parse(
-    await request(`/v1/site/clubs?${params}`, { tags: ["clubs"] }),
+    await request(`/v1/site/clubs?${params}`, { fresh: true }),
   ).clubs;
 }
 const clubSchema = z.object({
