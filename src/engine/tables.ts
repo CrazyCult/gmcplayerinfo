@@ -81,8 +81,11 @@ export const GOOD_PAIRS: readonly (readonly Position[])[] = [
   ["CAM", "ST"],
   ["CF", "ST"],
 ];
+// Manuel du jeu : « a one-step neighbour (a CB at CDM, an LM at CM) at 90 ».
 export const OKAY_PAIRS: readonly (readonly Position[])[] = [
   ["CB", "CDM"],
+  ["LM", "CM"],
+  ["RM", "CM"],
   ["LW", "RW"],
   ["LM", "RM"],
 ];

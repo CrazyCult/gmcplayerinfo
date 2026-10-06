@@ -17,6 +17,14 @@ import {
 import { money } from "@/lib/format";
 import { subLabels } from "@/lib/i18n";
 import Rating from "./UI/Rating";
+import {
+  RARITY_COLOR,
+  RARITY_LABEL,
+  attributeColor,
+  attributeShare,
+  playerRarity,
+  tint,
+} from "@/lib/colors";
 import TrainingSimulator from "./TrainingSimulator";
 import LoadFullButton from "./LoadFullButton";
 
@@ -73,12 +81,18 @@ export default function PlayerView({
     startDay,
   });
   const tiers = { natural: "P", good: "B", okay: "A", poor: "M" };
+  const rarity = playerRarity(player);
+  const rarityColor = RARITY_COLOR[rarity];
   return (
     <div className="stack">
       <section className="card">
         <div className="player-top">
           <Image
             className="portrait"
+            style={{
+              borderColor: rarityColor,
+              boxShadow: `0 0 24px ${tint(rarityColor, 25)}`,
+            }}
             src={portraitUrl(player)}
             alt={`Portrait de ${player.name}`}
             width={150}
@@ -101,7 +115,15 @@ export default function PlayerView({
               {player.nationality && (
                 <span className="pill">{player.nationality}</span>
               )}
-              {player.rarity && <span className="pill">{player.rarity}</span>}
+              <span
+                className="pill"
+                style={{
+                  color: rarityColor,
+                  borderColor: tint(rarityColor, 40),
+                }}
+              >
+                {RARITY_LABEL[rarity]}
+              </span>
               <span className="pill">
                 {player.preferredFoot === "left"
                   ? "Pied gauche"
@@ -133,7 +155,18 @@ export default function PlayerView({
         <div className="statline">
           <div>
             <strong>
-              {player.overall} <small>→ {player.potential}</small>
+              <span style={{ color: rarityColor }}>{player.overall}</span>{" "}
+              <small>
+                →{" "}
+                <span
+                  style={{
+                    color:
+                      RARITY_COLOR[playerRarity({ overall: player.potential })],
+                  }}
+                >
+                  {player.potential}
+                </span>
+              </small>
             </strong>
             <small>OVR du jeu → potentiel</small>
           </div>
@@ -231,7 +264,13 @@ export default function PlayerView({
                 Object.keys(groups).map((stat) => (
                   <div className="attribute" key={stat}>
                     <small>{stat.toUpperCase()}</small>
-                    <Rating value={stats[stat as keyof typeof stats]} />
+                    <Rating
+                      value={stats[stat as keyof typeof stats]}
+                      color={attributeColor(
+                        stats[stat as keyof typeof stats],
+                        player.potential,
+                      )}
+                    />
                   </div>
                 ))}
               {!light &&
@@ -239,20 +278,48 @@ export default function PlayerView({
                   <details className="attribute" key={stat}>
                     <summary>
                       <small>{stat.toUpperCase()}</small>
-                      <Rating value={stats[stat as keyof typeof stats]} />
+                      <Rating
+                        value={stats[stat as keyof typeof stats]}
+                        color={attributeColor(
+                          stats[stat as keyof typeof stats],
+                          player.potential,
+                        )}
+                      />
                       <small>Voir le détail ↓</small>
                     </summary>
                     <div className="sub-list">
                       {keys.map((key) => (
                         <div className="sub-row" key={key}>
                           <span>
-                            {subLabels[key]} <strong>{subs[key] ?? "—"}</strong>
+                            {subLabels[key]}{" "}
+                            <strong
+                              style={{
+                                color: attributeColor(
+                                  subs[key],
+                                  player.potential,
+                                ),
+                              }}
+                            >
+                              {subs[key] ?? "—"}
+                            </strong>
                           </span>
-                          <progress
-                            max={Math.max(player.potential, subs[key] ?? 0)}
-                            value={subs[key] ?? 0}
+                          <span
+                            className="attr-bar"
+                            role="meter"
                             aria-label={subLabels[key]}
-                          />
+                            aria-valuenow={subs[key] ?? 0}
+                            aria-valuemax={player.potential}
+                          >
+                            <span
+                              style={{
+                                width: `${attributeShare(subs[key], player.potential)}%`,
+                                background: attributeColor(
+                                  subs[key],
+                                  player.potential,
+                                ),
+                              }}
+                            />
+                          </span>
                         </div>
                       ))}
                     </div>

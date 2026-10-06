@@ -367,8 +367,24 @@ describe("demande de fiche complète depuis le site", () => {
       ],
     });
     expect(r.body).toEqual({ accepted: 1, rejected: 1 });
+    await call("POST", "/v1/players", {
+      players: [
+        {
+          fetchedAt: Date.now() + 10,
+          player: full("free", 115, { club_id: "sys" }),
+          history: [
+            { date: "2026-10-01", overall: 113 },
+            { date: "2026-10-05", overall: 115 },
+          ],
+        },
+      ],
+    });
     const page = (await call("GET", "/v1/site/player/free", undefined, true))
       .body;
+    expect(page.history).toEqual([
+      { date: "2026-10-01", overall: 113 },
+      { date: "2026-10-05", overall: 115 },
+    ]);
     expect(page).toMatchObject({
       light: false,
       player: { overall: 115, attributes: { vision: 81 } },

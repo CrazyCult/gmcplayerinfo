@@ -80,6 +80,8 @@ const SCHEMA = [
   // y compris les agents libres, et demandes du site par joueur.
   'CREATE TABLE IF NOT EXISTS full_players (id TEXT PRIMARY KEY, team_id TEXT, fetched_at INTEGER NOT NULL, data TEXT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS player_requests (player_id TEXT PRIMARY KEY, requested_at INTEGER NOT NULL)',
+  // Historique d'OVR fourni par le jeu (/api/players/{id}/overall-history), tel quel.
+  'CREATE TABLE IF NOT EXISTS player_history (player_id TEXT PRIMARY KEY, fetched_at INTEGER NOT NULL, data TEXT NOT NULL)',
 ];
 const dbReady = new WeakSet();
 async function ensureDb(env) {
@@ -360,8 +362,10 @@ async function siteRequest(req, env, url, json) {
       FROM db_prices WHERE position = ?1 AND overall BETWEEN ?2 AND ?3 AND age BETWEEN ?4 AND ?5 AND last_seen > ?6 AND player_id != ?7
       ORDER BY last_seen DESC LIMIT 300`).bind(String(player.position), player.overall - 2, player.overall + 2, player.age - 2, player.age + 2,
       Date.now() - 30 * 864e5, id).all()).results : [];
+    const h = await env.DB.prepare('SELECT fetched_at, data FROM player_history WHERE player_id = ?1').bind(id).first();
+    let history = null; try { history = h ? JSON.parse(h.data) : null; } catch (_) {}
     return json({ player, fetchedAt: found.fetchedAt, teamId: (s && s.team_id) || player.club_id || '', light: found.light,
-      market: marketOf(s || found.d), prices, comparables });
+      market: marketOf(s || found.d), prices, comparables, history, historyAt: h ? h.fetched_at : null });
   }
 
   if (!['/v1/site/players', '/v1/site/search'].includes(url.pathname)) return json({ error: 'Introuvable' }, 404);
@@ -583,6 +587,11 @@ async function extensionRequest(req, env, url, json) {
         WHERE excluded.fetched_at > full_players.fetched_at`).bind(p.id, team, fetchedAt, JSON.stringify(p)));
       stmts.push(upsertFull(env, p, team, fetchedAt));
       stmts.push(env.DB.prepare('DELETE FROM player_requests WHERE player_id = ?1').bind(p.id));
+      const history = items.find(x => x.player === p).history;
+      const text = history != null && typeof history === 'object' ? JSON.stringify(history) : null;
+      if (text && text.length <= 30000) stmts.push(env.DB.prepare(`INSERT INTO player_history (player_id, fetched_at, data) VALUES (?1, ?2, ?3)
+        ON CONFLICT(player_id) DO UPDATE SET fetched_at = excluded.fetched_at, data = excluded.data
+        WHERE excluded.fetched_at > player_history.fetched_at AND excluded.data IS NOT player_history.data`).bind(p.id, fetchedAt, text));
     }
     if (stmts.length) await runBatch(env, stmts);
     return json({ accepted: items.length, rejected: (Array.isArray(body.players) ? Math.min(20, body.players.length) : 0) - items.length });

@@ -3,6 +3,8 @@ import LocalPlayer from "@/components/LocalPlayer";
 import Search from "@/components/Search";
 import PlayerView from "@/components/PlayerView";
 import MarketPanel from "@/components/MarketPanel";
+import OvrHistory from "@/components/OvrHistory";
+import { parseOverallHistory } from "@/engine/progression";
 import {
   getFullStatus,
   getPlayer,
@@ -87,6 +89,13 @@ export default async function PlayerPage({
               : undefined
           }
         />
+        <section className="card" style={{ marginTop: 24 }}>
+          <h2>Progression réelle</h2>
+          <OvrHistory
+            points={parseOverallHistory(snapshot.history)}
+            potential={snapshot.player.potential}
+          />
+        </section>
         <div style={{ marginTop: 24 }}>
           <MarketPanel
             market={snapshot.market}

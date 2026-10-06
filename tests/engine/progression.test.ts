@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { aggregateContracts } from "../../src/engine/contracts";
 import {
   matchGain,
@@ -69,4 +69,41 @@ it("projection : plafonnée, sans progression après 31 ans ni division par zér
   expect(projectMatches({ ...options, age: 31 })).toEqual([]);
   expect(projectMatches({ ...options, matchesPerWeek: 0 })).toEqual([]);
   expect(matchesPerSeries(31, 80)).toBeNull();
+});
+
+describe("historique d’OVR du jeu (lecture tolérante)", () => {
+  it("objets datés, sous une clé, un point par jour, tri chronologique", async () => {
+    const { parseOverallHistory } =
+      await import("../../src/engine/progression");
+    expect(
+      parseOverallHistory({
+        history: [
+          { created_at: "2026-10-02T10:00:00Z", overall: 81 },
+          {
+            created_at: "2026-09-30T10:00:00Z",
+            overall: 79,
+            potential: 90,
+            age: 21,
+          },
+          { created_at: "2026-10-02T18:00:00Z", overall: 82 },
+        ],
+      }).map((p) => [new Date(p.t).toISOString().slice(0, 10), p.overall]),
+    ).toEqual([
+      ["2026-09-30", 79],
+      ["2026-10-02", 82],
+    ]);
+  });
+  it("paires [date, ovr], secondes Unix, valeurs invalides ignorées", async () => {
+    const { parseOverallHistory } =
+      await import("../../src/engine/progression");
+    expect(
+      parseOverallHistory([
+        [1790000000, "77"],
+        ["pas une date", 80],
+        [1790100000, null],
+      ]).map((p) => p.overall),
+    ).toEqual([77]);
+    expect(parseOverallHistory(null)).toEqual([]);
+    expect(parseOverallHistory({ autre: 1 })).toEqual([]);
+  });
 });

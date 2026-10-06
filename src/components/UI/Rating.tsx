@@ -1,25 +1,38 @@
+import { RARITY_COLOR, rarityOf, tint } from "@/lib/colors";
+
+/** Couleur de texte, fond et contour d'une note, selon la rareté du jeu. */
 export function ratingColors(value: number) {
-  return value >= 100
-    ? ["#fbbf24", "#000"]
-    : value >= 95
-      ? ["#000", "#facc15"]
-      : value >= 85
-        ? ["#a21caf", "#fdf4ff"]
-        : value >= 75
-          ? ["#3b82f6", "#eff6ff"]
-          : value >= 65
-            ? ["#84cc16", "#1a2e05"]
-            : value >= 55
-              ? ["#facc15", "#422006"]
-              : ["#475569", "#f8fafc"];
+  const rarity = rarityOf(value);
+  const color = RARITY_COLOR[rarity];
+  return {
+    color,
+    background:
+      rarity === "galactico"
+        ? "linear-gradient(135deg, #4c1d95cc, #1e1b4bcc 60%, #831843cc)"
+        : tint(color, 12),
+    outline: `1px solid ${tint(color, 40)}`,
+  };
 }
-export default function Rating({ value }: { value?: number }) {
-  const [background, color] = ratingColors(value ?? 0);
+export default function Rating({
+  value,
+  color,
+}: {
+  value?: number;
+  /** Couleur imposée (ex. part du potentiel pour les attributs). */
+  color?: string;
+}) {
+  const style =
+    value === undefined
+      ? undefined
+      : color
+        ? {
+            color,
+            background: tint(color, 12),
+            outline: `1px solid ${tint(color, 40)}`,
+          }
+        : ratingColors(value);
   return (
-    <span
-      className="rating"
-      style={value === undefined ? undefined : { background, color }}
-    >
+    <span className="rating" style={style}>
       {value ?? "—"}
     </span>
   );

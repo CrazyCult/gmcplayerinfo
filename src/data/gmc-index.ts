@@ -36,6 +36,8 @@ const snapshotSchema = z.object({
   market: marketSchema,
   prices: z.array(priceSchema).default([]),
   comparables: z.array(priceSchema).default([]),
+  /** Historique d'OVR brut du jeu (format lu par parseOverallHistory). */
+  history: z.unknown().optional(),
 });
 const catalogSchema = z.object({
   players: z.array(
