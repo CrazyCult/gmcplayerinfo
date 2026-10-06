@@ -167,3 +167,109 @@ print(json.dumps(rows))`;
     expect(JSON.stringify(player)).not.toContain("secret");
   });
 });
+
+describe("demande de fiche complète depuis le site", () => {
+  it("met le club en tête des clubs confiés aux extensions, une seule fois", async () => {
+    const { DatabaseSync } = await import("node:sqlite");
+    const db = new DatabaseSync(":memory:");
+    db.exec(
+      "CREATE TABLE clubs (team_id TEXT PRIMARY KEY, fetched_at INTEGER, updated_at INTEGER, contributor TEXT, players TEXT)",
+    );
+    const statement = (query: string) => {
+      let args: unknown[] = [];
+      const s = {
+        bind: (...values: unknown[]) => ((args = values), s),
+        run: async () => (db.prepare(query).run(...(args as never[])), {}),
+        all: async () => ({
+          results: db.prepare(query).all(...(args as never[])),
+        }),
+        first: async () => db.prepare(query).get(...(args as never[])) ?? null,
+      };
+      return s;
+    };
+    const env = {
+      SITE_TOKEN: "tok",
+      DB: {
+        prepare: statement,
+        batch: async (list: { run: () => Promise<unknown> }[]) => {
+          for (const item of list) await item.run();
+          return [];
+        },
+      },
+    };
+    const call = async (
+      method: string,
+      path: string,
+      body?: unknown,
+      site = false,
+    ) => {
+      const response = await worker.fetch(
+        new Request(`https://index.test${path}`, {
+          method,
+          body: body ? JSON.stringify(body) : undefined,
+          headers: site ? { Authorization: "Bearer tok" } : {},
+        }),
+        env,
+      );
+      return { status: response.status, body: await response.json() };
+    };
+    const light = (id: string, extra = {}) => ({
+      id,
+      name: `P ${id}`,
+      position: "CM",
+      age: 22,
+      overall: 80,
+      potential: 85,
+      club_id: "clubX",
+      attributes: { pac: 80, sho: 70, pas: 60, dri: 75, def: 40, phy: 65 },
+      ...extra,
+    });
+    await call("POST", "/v1/db/players", {
+      players: [light("p1"), light("free", { free_agent: true })],
+    });
+    expect(
+      (await call("GET", "/v1/site/request/p1", undefined, true)).status,
+    ).toBe(405);
+    expect(
+      (await call("POST", "/v1/site/request/p1", undefined, true)).body.status,
+    ).toBe("demande");
+    expect(
+      (await call("POST", "/v1/site/request/p1", undefined, true)).body.status,
+    ).toBe("deja-demande");
+    expect(
+      (await call("POST", "/v1/site/request/free", undefined, true)).status,
+    ).toBe(409);
+    expect(
+      (await call("POST", "/v1/site/players", undefined, true)).status,
+    ).toBe(405);
+    expect(
+      (await call("POST", "/v1/assign", { limit: 5, candidates: ["a"] })).body
+        .assigned,
+    ).toEqual(["clubX", "a"]);
+    expect(
+      (await call("POST", "/v1/assign", { limit: 5, candidates: ["b"] })).body
+        .assigned,
+    ).toEqual(["b"]);
+    await call("POST", "/v1/clubs", {
+      clubs: [
+        {
+          teamId: "clubX",
+          fetchedAt: Date.now() + 1000,
+          players: [
+            {
+              id: "p1",
+              name: "P p1",
+              position: "CM",
+              age: 22,
+              overall: 80,
+              potential: 85,
+            },
+          ],
+        },
+      ],
+    });
+    expect(
+      (await call("GET", "/v1/site/status/p1", undefined, true)).body,
+    ).toMatchObject({ light: false, requestedAt: null });
+  });
+});

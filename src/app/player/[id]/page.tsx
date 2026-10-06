@@ -3,7 +3,12 @@ import LocalPlayer from "@/components/LocalPlayer";
 import Search from "@/components/Search";
 import PlayerView from "@/components/PlayerView";
 import MarketPanel from "@/components/MarketPanel";
-import { getPlayer, IndexError, indexEnabled } from "@/data/gmc-index";
+import {
+  getFullStatus,
+  getPlayer,
+  IndexError,
+  indexEnabled,
+} from "@/data/gmc-index";
 export async function generateMetadata({
   params,
 }: {
@@ -67,7 +72,23 @@ export default async function PlayerPage({
           })}{" "}
           par GMC Companion.
         </p>
-        <PlayerView player={snapshot.player} remote />
+        <PlayerView
+          player={snapshot.player}
+          remote
+          full={
+            snapshot.light
+              ? {
+                  teamId:
+                    snapshot.market?.freeAgent || !snapshot.teamId
+                      ? undefined
+                      : snapshot.teamId,
+                  requestedAt: await getFullStatus(id)
+                    .then((status) => status.requestedAt)
+                    .catch(() => null),
+                }
+              : undefined
+          }
+        />
         <div style={{ marginTop: 24 }}>
           <MarketPanel
             market={snapshot.market}

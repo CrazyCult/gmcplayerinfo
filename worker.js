@@ -110,12 +110,37 @@ export function dbPublicPlayer(d) {
 async function siteRequest(req, env, url, json) {
   if (!env.SITE_TOKEN || req.headers.get('Authorization') !== `Bearer ${env.SITE_TOKEN}`)
     return json({ error: 'Accès site non autorisé' }, 401);
-  if (req.method !== 'GET') return json({ error: 'Lecture seule' }, 405);
+  const requestPrefix = '/v1/site/request/', statusPrefix = '/v1/site/status/';
+  const isRequest = url.pathname.startsWith(requestPrefix);
+  if (req.method !== (isRequest ? 'POST' : 'GET')) return json({ error: isRequest ? 'POST attendu' : 'Lecture seule' }, 405);
   if (env.SITE_RATE_LIMITER) {
     const { success } = await env.SITE_RATE_LIMITER.limit({ key: req.headers.get('CF-Connecting-IP') || 'site' });
     if (!success) return json({ error: 'Trop de requêtes' }, 429);
   }
   await ensureDb(env);
+  // Demande de fiche complète : le club du joueur passe en tête des clubs
+  // confiés aux extensions (/v1/assign). Seule écriture possible du site.
+  if (isRequest || url.pathname.startsWith(statusPrefix)) {
+    let id;
+    try { id = decodeURIComponent(url.pathname.slice((isRequest ? requestPrefix : statusPrefix).length)); } catch { return json({ error: 'Identifiant invalide' }, 400); }
+    if (!isStr(id, 128)) return json({ error: 'Identifiant invalide' }, 400);
+    const full = await env.DB.prepare(`${SITE_PLAYERS_SQL} SELECT fetched_at, team_id FROM players WHERE id = ?1`).bind(id).first();
+    const d = await env.DB.prepare('SELECT club_id, free_agent FROM db_players WHERE id = ?1').bind(id).first();
+    if (!full && !d) return json({ error: 'Joueur introuvable' }, 404);
+    const teamId = full ? full.team_id : d.club_id;
+    const r = teamId ? await env.DB.prepare('SELECT requested_at FROM site_requests WHERE team_id = ?1').bind(teamId).first() : null;
+    const now = Date.now();
+    const pending = r && now - r.requested_at < REQUEST_TTL && !(full && full.fetched_at > r.requested_at);
+    if (!isRequest) return json({ light: !full, fetchedAt: full ? full.fetched_at : null, requestedAt: pending ? r.requested_at : null });
+    if (full) return json({ light: false, status: 'complet' });
+    if (!teamId || d.free_agent) return json({ error: 'Agent libre : aucun effectif à lire.' }, 409);
+    if (pending) return json({ light: true, status: 'deja-demande', requestedAt: r.requested_at });
+    const n = (await env.DB.prepare('SELECT COUNT(*) AS n FROM site_requests WHERE requested_at > ?1').bind(now - REQUEST_TTL).first()).n;
+    if (n >= REQUEST_MAX_PENDING) return json({ error: 'Trop de demandes en attente, réessaie plus tard.' }, 429);
+    await env.DB.prepare(`INSERT INTO site_requests (team_id, player_id, requested_at) VALUES (?1, ?2, ?3)
+      ON CONFLICT(team_id) DO UPDATE SET player_id = excluded.player_id, requested_at = excluded.requested_at`).bind(teamId, id, now).run();
+    return json({ light: true, status: 'demande', requestedAt: now });
+  }
   const prefix = '/v1/site/player/';
   if (url.pathname.startsWith(prefix)) {
     let id;
@@ -197,7 +222,11 @@ const DB_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS db_pages (a TEXT NOT NULL, p INTEGER NOT NULL, done_at INTEGER NOT NULL DEFAULT 0,
     leased_until INTEGER NOT NULL DEFAULT 0, leased_by TEXT, PRIMARY KEY (a, p))`,
   'CREATE TABLE IF NOT EXISTS db_meta (k TEXT PRIMARY KEY, v TEXT)',
+  'CREATE TABLE IF NOT EXISTS leases (team_id TEXT PRIMARY KEY, leased_until INTEGER NOT NULL, leased_by TEXT)',
+  // Demandes du site : « lire ce club en priorité » (fiche légère → complète).
+  'CREATE TABLE IF NOT EXISTS site_requests (team_id TEXT PRIMARY KEY, player_id TEXT, requested_at INTEGER NOT NULL)',
 ];
+const REQUEST_TTL = 24 * 3600e3, REQUEST_MAX_PENDING = 300;
 async function ensureDb(env) {
   if (dbReady) return;
   await env.DB.batch(DB_SCHEMA.map(q => env.DB.prepare(q)));
@@ -302,9 +331,15 @@ export default {
       // Fenêtre de fraîcheur demandée par le client (1 h à 72 h), défaut 12 h :
       // un club relu dans cette fenêtre n'est pas réattribué.
       const freshH = Math.max(1, Math.min(72, parseInt(body.minFreshHours, 10) || 12));
-      const cands = (Array.isArray(body.candidates) ? body.candidates : []).filter(x => isStr(x, 64)).slice(0, 300);
-      if (!limit || !cands.length) return json({ assigned: [] });
+      await ensureDb(env);
       const now = Date.now();
+      // Clubs demandés depuis le site (fiche complète), pas encore relus ni réservés : en premier.
+      const asked = limit ? (await env.DB.prepare(`SELECT r.team_id FROM site_requests r
+          LEFT JOIN clubs c ON c.team_id = r.team_id LEFT JOIN leases l ON l.team_id = r.team_id
+          WHERE r.requested_at > ?1 AND (c.fetched_at IS NULL OR c.fetched_at < r.requested_at) AND (l.leased_until IS NULL OR l.leased_until < ?2)
+          ORDER BY r.requested_at ASC LIMIT ?3`).bind(now - REQUEST_TTL, now, limit).all()).results.map(x => x.team_id) : [];
+      const cands = [...new Set(asked.concat((Array.isArray(body.candidates) ? body.candidates : []).filter(x => isStr(x, 64)).slice(0, 300)))];
+      if (!limit || !cands.length) return json({ assigned: [] });
       const busy = new Set(), fresh = new Set();
       for (let i = 0; i < cands.length; i += 90) {
         const part = cands.slice(i, i + 90), ph = part.map((_, k) => '?' + (k + 2)).join(',');
@@ -313,7 +348,7 @@ export default {
         const c = await env.DB.prepare(`SELECT team_id FROM clubs WHERE fetched_at > ?1 AND team_id IN (${ph})`).bind(now - freshH * 3600e3, ...part).all();
         c.results.forEach(r => fresh.add(r.team_id));
       }
-      const assigned = cands.filter(id => !busy.has(id) && !fresh.has(id)).slice(0, limit);
+      const assigned = cands.filter(id => asked.includes(id) || (!busy.has(id) && !fresh.has(id))).slice(0, limit);
       if (assigned.length) {
         await env.DB.batch(assigned.map(id => env.DB.prepare(
           'INSERT INTO leases (team_id, leased_until, leased_by) VALUES (?1, ?2, ?3) ON CONFLICT(team_id) DO UPDATE SET leased_until = excluded.leased_until, leased_by = excluded.leased_by'

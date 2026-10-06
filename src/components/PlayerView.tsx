@@ -18,6 +18,7 @@ import { money } from "@/lib/format";
 import { subLabels } from "@/lib/i18n";
 import Rating from "./UI/Rating";
 import TrainingSimulator from "./TrainingSimulator";
+import LoadFullButton from "./LoadFullButton";
 
 export function portraitUrl(player: Player) {
   const url = player.portraitUrl;
@@ -31,10 +32,13 @@ export default function PlayerView({
   player,
   trainingOnly = false,
   remote = false,
+  full,
 }: {
   player: Player;
   trainingOnly?: boolean;
   remote?: boolean;
+  /** Fiche légère distante : de quoi demander la fiche complète. */
+  full?: { teamId?: string; requestedAt?: number | null };
 }) {
   const [subs, setSubs] = useState<Subs>(player.attributes.subs),
     [fit, setFit] = useState(true);
@@ -211,6 +215,15 @@ export default function PlayerView({
                 notes par poste sont exacts ; sous-attributs, leviers et
                 simulateur d’entraînement apparaîtront quand un utilisateur de
                 GMC Companion aura ouvert la page du club de ce joueur.
+              </div>
+            )}
+            {light && remote && full && (
+              <div style={{ margin: "14px 0" }}>
+                <LoadFullButton
+                  playerId={player.id}
+                  teamId={full.teamId}
+                  requestedAt={full.requestedAt}
+                />
               </div>
             )}
             <div className="player-stats">

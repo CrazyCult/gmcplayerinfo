@@ -3,3 +3,4 @@ node_modules/
 reports/dataset-validation.json
 tests/fixtures/*.json
 pnpm-lock.yaml
+worker.js

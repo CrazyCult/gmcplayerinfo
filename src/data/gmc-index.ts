@@ -57,7 +57,10 @@ export class IndexError extends Error {
     );
   }
 }
-async function request(path: string) {
+async function request(
+  path: string,
+  init: { method?: "GET" | "POST"; tags?: string[]; fresh?: boolean } = {},
+) {
   if (!indexEnabled()) throw new IndexError(503);
   const base =
     process.env.GMC_INDEX_URL ||
@@ -65,8 +68,11 @@ async function request(path: string) {
   let response: Response;
   try {
     response = await fetch(`${base}${path}`, {
+      method: init.method ?? "GET",
       headers: { Authorization: `Bearer ${process.env.GMC_SITE_TOKEN}` },
-      next: { revalidate: 900 },
+      ...(init.fresh || init.method === "POST"
+        ? { cache: "no-store" as const }
+        : { next: { revalidate: 900, tags: init.tags } }),
       signal: AbortSignal.timeout(15000),
     });
   } catch {
@@ -75,11 +81,35 @@ async function request(path: string) {
   if (!response.ok) throw new IndexError(response.status);
   return response.json();
 }
+export const playerTag = (id: string) => `player:${id}`.slice(0, 256);
 export const getPlayer = cache(async (id: string) =>
   snapshotSchema.parse(
-    await request(`/v1/site/player/${encodeURIComponent(id)}`),
+    await request(`/v1/site/player/${encodeURIComponent(id)}`, {
+      tags: [playerTag(id)],
+    }),
   ),
 );
+const fullStatusSchema = z.object({
+  light: z.boolean(),
+  fetchedAt: z.number().nullable().optional(),
+  requestedAt: z.number().nullable().optional(),
+  status: z.string().optional(),
+});
+export type FullStatus = z.infer<typeof fullStatusSchema>;
+/** État en direct (sans cache) : fiche toujours légère ? club demandé ? */
+export async function getFullStatus(id: string) {
+  return fullStatusSchema.parse(
+    await request(`/v1/site/status/${encodeURIComponent(id)}`, { fresh: true }),
+  );
+}
+/** Demande aux extensions GMC Companion de lire le club en priorité. */
+export async function requestFull(id: string) {
+  return fullStatusSchema.parse(
+    await request(`/v1/site/request/${encodeURIComponent(id)}`, {
+      method: "POST",
+    }),
+  );
+}
 export const CATALOG_AVAIL = ["", "transfer", "loan", "free", "full"] as const;
 export const CATALOG_SORTS = [
   "overall",
