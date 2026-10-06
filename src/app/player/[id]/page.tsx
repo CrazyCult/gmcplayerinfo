@@ -4,6 +4,7 @@ import Search from "@/components/Search";
 import PlayerView from "@/components/PlayerView";
 import MarketPanel from "@/components/MarketPanel";
 import OvrHistory from "@/components/OvrHistory";
+import Fold from "@/components/UI/Fold";
 import { parseOverallHistory } from "@/engine/progression";
 import {
   getFullStatus,
@@ -66,6 +67,7 @@ export default async function PlayerPage({
           quelques instants. <small className="muted">(code {code})</small>
         </div>
       );
+    const history = parseOverallHistory(snapshot.history);
     return (
       <>
         <Search remote={indexEnabled()} />
@@ -90,14 +92,13 @@ export default async function PlayerPage({
               : undefined
           }
         />
-        <section className="card" style={{ marginTop: 24 }}>
-          <h2>Progression réelle</h2>
-          <OvrHistory
-            points={parseOverallHistory(snapshot.history)}
-            potential={snapshot.player.potential}
-          />
-        </section>
-        <div style={{ marginTop: 24 }}>
+        <div className="stack" style={{ marginTop: 24 }}>
+          <Fold title="Progression réelle" summary={historySummary(history)}>
+            <OvrHistory
+              points={history}
+              potential={snapshot.player.potential}
+            />
+          </Fold>
           <MarketPanel
             market={snapshot.market}
             prices={snapshot.prices}
@@ -116,4 +117,10 @@ export default async function PlayerPage({
       <LocalPlayer id={id} />
     </>
   );
+}
+
+function historySummary(points: { overall: number }[]) {
+  if (points.length < 2) return "Pas encore d’historique relevé";
+  const gain = points[points.length - 1].overall - points[0].overall;
+  return `${points.length} relevés · ${gain >= 0 ? "+" : ""}${gain} OVR`;
 }

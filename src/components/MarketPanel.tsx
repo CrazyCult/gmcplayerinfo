@@ -1,4 +1,5 @@
 import type { MarketInfo, PriceObservation } from "@/data/gmc-index";
+import Fold from "./UI/Fold";
 import { estimateFromAsking } from "@/engine/market";
 import { money } from "@/lib/format";
 
@@ -21,8 +22,18 @@ export default function MarketPanel({
   const loanEstimate = estimateFromAsking(comparables, "loan");
   if (!market && !prices.length && !estimate && !loanEstimate) return null;
   return (
-    <section className="card">
-      <h2>Marché</h2>
+    <Fold
+      title="Marché"
+      summary={
+        market?.transferPrice
+          ? `En vente · ${money(market.transferPrice)}`
+          : market?.loanFee
+            ? `Prêt proposé · ${money(market.loanFee)}`
+            : estimate
+              ? "Pas en vente · prix des joueurs comparables"
+              : "Pas en vente"
+      }
+    >
       <div className="statline">
         <div>
           <strong style={{ fontSize: 19 }}>
@@ -88,6 +99,6 @@ export default function MarketPanel({
           ))}
         </details>
       )}
-    </section>
+    </Fold>
   );
 }

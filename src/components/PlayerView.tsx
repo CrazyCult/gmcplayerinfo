@@ -27,6 +27,7 @@ import {
   tint,
 } from "@/lib/colors";
 import TrainingSimulator from "./TrainingSimulator";
+import Fold from "./UI/Fold";
 import LoadFullButton from "./LoadFullButton";
 
 export function portraitUrl(player: Player) {
@@ -87,201 +88,208 @@ export default function PlayerView({
   const tiers = { natural: "P", good: "B", okay: "A", poor: "M" };
   const rarity = playerRarity(player);
   const rarityColor = RARITY_COLOR[rarity];
+  const bestPositions = [...ratings]
+    .slice(0, 4)
+    .map(
+      (row) =>
+        `${row.position} ${fit ? (row.adjusted ?? "—") : (row.raw ?? "—")}`,
+    )
+    .join(" · ");
   return (
     <div className="stack">
-      <section className="card">
-        <div className="player-top">
-          <Image
-            className="portrait"
-            style={{
-              borderColor: rarityColor,
-              boxShadow: `0 0 24px ${tint(rarityColor, 25)}`,
-            }}
-            src={portraitUrl(player)}
-            alt={`Portrait de ${player.name}`}
-            width={150}
-            height={190}
-            unoptimized={portraitUrl(player).endsWith(".svg")}
-          />
-          <div className="player-info">
-            <div className="eyebrow">
-              Fiche joueur ·{" "}
-              {light
-                ? "base du jeu (fiche légère)"
-                : remote
-                  ? "GMC Companion"
-                  : "import local"}
-            </div>
-            <h1>{player.name}</h1>
-            <div className="pills">
-              <span className="pill accent">{player.position}</span>
-              <span className="pill">{player.age} ans</span>
-              {player.nationality && (
-                <span className="pill">{player.nationality}</span>
-              )}
-              <span
-                className="pill"
-                style={{
-                  color: rarityColor,
-                  borderColor: tint(rarityColor, 40),
-                }}
-              >
-                {RARITY_LABEL[rarity]}
-              </span>
-              {club &&
-                (club.freeAgent ? (
-                  <span className="pill club-pill">Agent libre</span>
-                ) : club.id ? (
-                  <Link
-                    className="pill club-pill"
-                    href={`/squad?club=${encodeURIComponent(club.id)}`}
-                    prefetch={false}
-                    title="Voir l’effectif de ce club"
-                  >
-                    {club.name ?? "Club inconnu"}
-                  </Link>
-                ) : (
-                  <span className="pill club-pill">{club.name}</span>
-                ))}
-              <span className="pill">
-                {player.preferredFoot === "left"
-                  ? "Pied gauche"
-                  : player.preferredFoot === "both"
-                    ? "Ambidextre"
-                    : player.preferredFoot === "right"
-                      ? "Pied droit"
-                      : "Pied inconnu"}
-              </span>
-            </div>
-            <div className="player-links">
-              {/^[0-9a-f-]{36}$/i.test(player.id) && (
-                <a
-                  className="button"
-                  href={`https://gamechase.io/gamev2/players/${encodeURIComponent(player.id)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+      <div className={trainingOnly ? undefined : "player-hero"}>
+        <section className="card player-card">
+          <div className="player-top">
+            <Image
+              className="portrait"
+              style={{
+                borderColor: rarityColor,
+                boxShadow: `0 0 24px ${tint(rarityColor, 25)}`,
+              }}
+              src={portraitUrl(player)}
+              alt={`Portrait de ${player.name}`}
+              width={150}
+              height={190}
+              unoptimized={portraitUrl(player).endsWith(".svg")}
+            />
+            <div className="player-info">
+              <div className="eyebrow">
+                Fiche joueur ·{" "}
+                {light
+                  ? "base du jeu (fiche légère)"
+                  : remote
+                    ? "GMC Companion"
+                    : "import local"}
+              </div>
+              <h1>{player.name}</h1>
+              <div className="pills">
+                <span className="pill accent">{player.position}</span>
+                <span className="pill">{player.age} ans</span>
+                {player.nationality && (
+                  <span className="pill">{player.nationality}</span>
+                )}
+                <span
+                  className="pill"
+                  style={{
+                    color: rarityColor,
+                    borderColor: tint(rarityColor, 40),
+                  }}
                 >
-                  Fiche dans GameChase ↗
-                </a>
-              )}
-              <Link
-                className="button"
-                href={`/compare?player1=${encodeURIComponent(localId)}`}
-              >
-                Comparer
-              </Link>
-              {(!light || trainingOnly) && (
-                <Link
-                  className="button primary"
-                  href={`/player/${encodeURIComponent(localId)}${trainingOnly ? "" : "/training"}`}
-                >
-                  {trainingOnly ? "Fiche complète" : "Simulateur plein écran"}
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="statline player-statline">
-          <div>
-            <strong>
-              <span style={{ color: rarityColor }}>{player.overall}</span>
-              <span className="unit">→</span>
-              <span
-                style={{
-                  color:
-                    RARITY_COLOR[playerRarity({ overall: player.potential })],
-                }}
-              >
-                {player.potential}
-              </span>
-            </strong>
-            <small>OVR → potentiel</small>
-          </div>
-          <div>
-            <strong>
-              {player.fitness ?? "—"}
-              <span className="unit">/100</span>
-            </strong>
-            <small>Forme</small>
-          </div>
-          <div>
-            <strong>
-              {player.value === undefined ? "—" : shortAmount(player.value)}
-              <span className="unit">GMC2</span>
-            </strong>
-            <small>Valeur du jeu</small>
-          </div>
-          <div>
-            <strong>
-              {player.wage === undefined ? "—" : shortAmount(player.wage)}
-              <span className="unit">GMC2</span>
-            </strong>
-            <small>Salaire</small>
-          </div>
-        </div>
-        {modelOvr(player) !== player.overall && (
-          <div className="notice warning">
-            OVR du jeu {player.overall} · formule initiale{" "}
-            {modelOvr(player) ?? "incomplète"}. Les simulations utilisent la
-            formule.
-          </div>
-        )}
-        {subs !== player.attributes.subs && (
-          <div className="notice">
-            Simulation en cours : OVR calculé {modelOvr(player) ?? "—"} →{" "}
-            {calculated ?? "—"}. Les données importées sont conservées.
-          </div>
-        )}
-        {player.traits.length > 0 && (
-          <ul className="traits">
-            {player.traits.map((trait) => {
-              const info = TRAITS[trait];
-              return (
-                <li key={trait}>
-                  <div className="trait-head">
-                    <span className="pill accent">{trait}</span>
-                    {info && (
-                      <span
-                        className={`trait-tier tier-${info.tier === "-" ? "down" : info.tier}`}
-                      >
-                        {TRAIT_TIER_LABEL[info.tier]}
-                      </span>
-                    )}
-                    {info && <small className="muted">{info.scope}</small>}
-                  </div>
-                  {info ? (
-                    <p>
-                      {info.summary} <strong>{info.effect}</strong>
-                    </p>
+                  {RARITY_LABEL[rarity]}
+                </span>
+                {club &&
+                  (club.freeAgent ? (
+                    <span className="pill club-pill">Agent libre</span>
+                  ) : club.id ? (
+                    <Link
+                      className="pill club-pill"
+                      href={`/squad?club=${encodeURIComponent(club.id)}`}
+                      prefetch={false}
+                      title="Voir l’effectif de ce club"
+                    >
+                      {club.name ?? "Club inconnu"}
+                    </Link>
                   ) : (
-                    <p className="muted">Effet inconnu pour l’instant.</p>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        {player.contractEnd && (
-          <p className="muted" style={{ marginTop: 16, fontSize: 12 }}>
-            Fin de contrat : {player.contractEnd}
-            {player.contractDemand !== undefined
-              ? ` · Renouvellement : ${money(player.contractDemand)}`
-              : player.value !== undefined
-                ? ` · Budget contrat estimé : ${money(player.value * 0.04)}`
-                : ""}
-          </p>
-        )}
-        {player.matchesPlayed !== undefined && (
-          <p className="muted" style={{ fontSize: 12, marginTop: 14 }}>
-            {player.matchesPlayed === 0
-              ? "Aucun match joué"
-              : `${player.matchesPlayed} match${player.matchesPlayed > 1 ? "s" : ""} · ${player.goals ?? 0} buts · ${player.assists ?? 0} passes${player.position === "GK" && player.cleanSheets ? ` · ${player.cleanSheets} clean sheets` : ""}`}
-          </p>
-        )}
-      </section>
-      {!trainingOnly && (
-        <>
-          <section className="card">
+                    <span className="pill club-pill">{club.name}</span>
+                  ))}
+                <span className="pill">
+                  {player.preferredFoot === "left"
+                    ? "Pied gauche"
+                    : player.preferredFoot === "both"
+                      ? "Ambidextre"
+                      : player.preferredFoot === "right"
+                        ? "Pied droit"
+                        : "Pied inconnu"}
+                </span>
+              </div>
+              <div className="player-links">
+                {/^[0-9a-f-]{36}$/i.test(player.id) && (
+                  <a
+                    className="button"
+                    href={`https://gamechase.io/gamev2/players/${encodeURIComponent(player.id)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Fiche dans GameChase ↗
+                  </a>
+                )}
+                <Link
+                  className="button"
+                  href={`/compare?player1=${encodeURIComponent(localId)}`}
+                >
+                  Comparer
+                </Link>
+                {(!light || trainingOnly) && (
+                  <Link
+                    className="button primary"
+                    href={`/player/${encodeURIComponent(localId)}${trainingOnly ? "" : "/training"}`}
+                  >
+                    {trainingOnly ? "Fiche complète" : "Simulateur plein écran"}
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="statline player-statline">
+            <div>
+              <strong>
+                <span style={{ color: rarityColor }}>{player.overall}</span>
+                <span className="unit">→</span>
+                <span
+                  style={{
+                    color:
+                      RARITY_COLOR[playerRarity({ overall: player.potential })],
+                  }}
+                >
+                  {player.potential}
+                </span>
+              </strong>
+              <small>OVR → potentiel</small>
+            </div>
+            <div>
+              <strong>
+                {player.fitness ?? "—"}
+                <span className="unit">/100</span>
+              </strong>
+              <small>Forme</small>
+            </div>
+            <div>
+              <strong>
+                {player.value === undefined ? "—" : shortAmount(player.value)}
+                <span className="unit">GMC2</span>
+              </strong>
+              <small>Valeur du jeu</small>
+            </div>
+            <div>
+              <strong>
+                {player.wage === undefined ? "—" : shortAmount(player.wage)}
+                <span className="unit">GMC2</span>
+              </strong>
+              <small>Salaire</small>
+            </div>
+          </div>
+          {modelOvr(player) !== player.overall && (
+            <div className="notice warning">
+              OVR du jeu {player.overall} · formule initiale{" "}
+              {modelOvr(player) ?? "incomplète"}. Les simulations utilisent la
+              formule.
+            </div>
+          )}
+          {subs !== player.attributes.subs && (
+            <div className="notice">
+              Simulation en cours : OVR calculé {modelOvr(player) ?? "—"} →{" "}
+              {calculated ?? "—"}. Les données importées sont conservées.
+            </div>
+          )}
+          {player.traits.length > 0 && (
+            <ul className="traits">
+              {player.traits.map((trait) => {
+                const info = TRAITS[trait];
+                return (
+                  <li key={trait}>
+                    <div className="trait-head">
+                      <span className="pill accent">{trait}</span>
+                      {info && (
+                        <span
+                          className={`trait-tier tier-${info.tier === "-" ? "down" : info.tier}`}
+                        >
+                          {TRAIT_TIER_LABEL[info.tier]}
+                        </span>
+                      )}
+                      {info && <small className="muted">{info.scope}</small>}
+                    </div>
+                    {info ? (
+                      <p>
+                        {info.summary} <strong>{info.effect}</strong>
+                      </p>
+                    ) : (
+                      <p className="muted">Effet inconnu pour l’instant.</p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {player.contractEnd && (
+            <p className="muted" style={{ marginTop: 16, fontSize: 12 }}>
+              Fin de contrat : {player.contractEnd}
+              {player.contractDemand !== undefined
+                ? ` · Renouvellement : ${money(player.contractDemand)}`
+                : player.value !== undefined
+                  ? ` · Budget contrat estimé : ${money(player.value * 0.04)}`
+                  : ""}
+            </p>
+          )}
+          {player.matchesPlayed !== undefined && (
+            <p className="muted" style={{ fontSize: 12, marginTop: 14 }}>
+              {player.matchesPlayed === 0
+                ? "Aucun match joué"
+                : `${player.matchesPlayed} match${player.matchesPlayed > 1 ? "s" : ""} · ${player.goals ?? 0} buts · ${player.assists ?? 0} passes${player.position === "GK" && player.cleanSheets ? ` · ${player.cleanSheets} clean sheets` : ""}`}
+            </p>
+          )}
+        </section>
+        {!trainingOnly && (
+          <section className="card player-attributes">
             <div className="section-head">
               <h2 style={{ margin: 0 }}>
                 Attributs{light && <small> · 6 stats du jeu</small>}
@@ -373,9 +381,12 @@ export default function PlayerView({
               </p>
             )}
           </section>
-          <section className="card">
+        )}
+      </div>
+      {!trainingOnly && (
+        <>
+          <Fold title="Notes par poste" summary={bestPositions} open>
             <div className="section-head">
-              <h2 style={{ margin: 0 }}>Notes par poste</h2>
               <div
                 className="pills"
                 role="radiogroup"
@@ -421,12 +432,12 @@ export default function PlayerView({
                 </div>
               ))}
             </div>
-          </section>
+          </Fold>
           {!light && (
-            <details className="card">
-              <summary style={{ cursor: "pointer", fontWeight: 700 }}>
-                Leviers d’OVR · coachs niveau 5
-              </summary>
+            <Fold
+              title="Leviers d’OVR"
+              summary="Le sous-attribut le moins cher pour gagner +1 OVR · coachs niveau 5"
+            >
               {ovrLevers(
                 { ...player, attributes: { ...player.attributes, subs } },
                 { coaches: MAX_COACHES },
@@ -440,7 +451,7 @@ export default function PlayerView({
                     </small>
                   </div>
                 ))}
-            </details>
+            </Fold>
           )}
         </>
       )}
@@ -452,11 +463,21 @@ export default function PlayerView({
           </div>
         )
       ) : (
-        <TrainingSimulator player={player} onChange={setSubs} />
+        <TrainingSimulator
+          player={player}
+          onChange={setSubs}
+          open={trainingOnly}
+        />
       )}
       {!trainingOnly && (
-        <section className="card">
-          <h2>Progression par les matchs</h2>
+        <Fold
+          title="Progression par les matchs"
+          summary={
+            matchesPerSeries(player.age, calculated ?? player.overall) === null
+              ? "Plus de progression par les matchs après 30 ans"
+              : `+${matchGain(rating)} par série de ${matchesPerSeries(player.age, calculated ?? player.overall)} matchs`
+          }
+        >
           <div className="notice">
             Projection estimée. Matchs officiels d’au moins 45 minutes ;
             vieillissement estimé à +1 an tous les 40 jours. Aucun historique
@@ -502,7 +523,7 @@ export default function PlayerView({
               ))}
             </div>
           )}
-        </section>
+        </Fold>
       )}
     </div>
   );

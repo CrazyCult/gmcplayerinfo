@@ -1126,3 +1126,126 @@ a.club-pill:hover {
 tr.best-row td {
   background: color-mix(in srgb, var(--attr-good) 10%, transparent);
 }
+
+/* Fiche joueur compacte : infos à gauche, attributs à droite */
+.player-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.player-hero .player-card {
+  padding: 22px;
+}
+.player-hero .player-top {
+  gap: 16px;
+  align-items: flex-start;
+}
+.player-hero .portrait {
+  width: 96px;
+  height: 122px;
+  border-radius: 12px;
+}
+.player-hero .player-info h1 {
+  font-size: 26px;
+  margin: 6px 0 10px;
+  line-height: 1.1;
+}
+.player-hero .player-links {
+  margin-top: 14px;
+}
+.player-hero .player-statline {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 18px 0;
+}
+.player-hero .player-statline > div {
+  padding: 14px 10px;
+}
+.player-hero .player-statline strong {
+  font-size: 22px;
+}
+.player-hero .player-attributes {
+  padding: 22px;
+}
+.player-hero .player-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 1000px) {
+  .player-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .player-hero .player-card,
+  .player-hero .player-attributes {
+    padding: 18px;
+  }
+}
+@media (max-width: 600px) {
+  .player-hero .player-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .player-hero .player-statline strong {
+    font-size: 19px;
+  }
+}
+
+/* Parties repliables */
+details.fold {
+  padding: 0;
+  overflow: hidden;
+}
+details.fold > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 22px;
+  cursor: pointer;
+  flex-wrap: wrap;
+}
+details.fold > summary::-webkit-details-marker {
+  display: none;
+}
+details.fold > summary:hover .fold-title {
+  color: var(--primary);
+}
+.fold-title {
+  font-size: 17px;
+  font-weight: 800;
+}
+.fold-summary {
+  flex: 1 1 200px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.fold-chevron {
+  margin-left: auto;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid var(--primary);
+  border-bottom: 2px solid var(--primary);
+  transform: rotate(45deg);
+  transition: transform 0.15s;
+  flex: none;
+}
+details.fold[open] > summary .fold-chevron {
+  transform: rotate(-135deg);
+}
+.fold-body {
+  padding: 0 22px 22px;
+}
+@media (max-width: 600px) {
+  details.fold > summary {
+    padding: 16px;
+  }
+  .fold-body {
+    padding: 0 16px 16px;
+  }
+}
+.player-hero .player-links {
+  gap: 6px;
+}
+.player-hero .player-links .button {
+  padding: 8px 12px;
+  font-size: 12px;
+  min-height: 0;
+}

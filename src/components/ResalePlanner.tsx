@@ -6,6 +6,7 @@ import { MAX_COACHES } from "@/engine/tables";
 import { resaleSteps } from "@/engine/value";
 import { money, shortAmount } from "@/lib/format";
 import type { Player } from "@/types";
+import Fold from "./UI/Fold";
 
 /** Faire progresser pour revendre : coût de chaque palier d’OVR et valeur estimée. */
 export default function ResalePlanner({
@@ -36,16 +37,19 @@ export default function ResalePlanner({
     -1,
   );
   return (
-    <section className="card">
-      <div className="section-head">
-        <div>
-          <div className="eyebrow">Faire progresser pour revendre</div>
-          <h2 style={{ margin: "8px 0 0" }}>Valeur après entraînement</h2>
-        </div>
-        <span className="pill">
-          Aujourd’hui : {player.overall} OVR · {shortAmount(player.value)} GMC2
-        </span>
-      </div>
+    <Fold
+      title="Valeur après entraînement"
+      summary={
+        best >= 0 && steps[best].net > 0
+          ? `Meilleur palier : ${steps[best].ovr} (+${steps[best].ovr - player.overall}) · gain net +${shortAmount(steps[best].net)} GMC2`
+          : steps.length
+            ? "Aucun palier rentable à la valeur du jeu"
+            : "Pas de progression possible"
+      }
+    >
+      <p className="muted" style={{ marginTop: 0 }}>
+        Aujourd’hui : {player.overall} OVR · {shortAmount(player.value)} GMC2
+      </p>
       {maxed && (
         <div className="notice">
           Tes coachs actuels ne permettent plus de faire progresser ce joueur :
@@ -112,6 +116,6 @@ export default function ResalePlanner({
         chaque point d’OVR augmente la valeur du jeu d’environ 11 à 15 % (mesuré
         sur 4 184 joueurs). Le prix réel de revente dépend du marché.
       </p>
-    </section>
+    </Fold>
   );
 }

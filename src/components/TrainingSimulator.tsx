@@ -13,6 +13,7 @@ import {
 import { modelOvr } from "@/engine/ovr";
 import { planTraining, planVariants } from "@/engine/planner";
 import ResalePlanner from "./ResalePlanner";
+import Fold from "./UI/Fold";
 import {
   exerciseAccess,
   trainSession,
@@ -42,9 +43,12 @@ interface State {
 export default function TrainingSimulator({
   player,
   onChange,
+  open = false,
 }: {
   player: Player;
   onChange?: (subs: Subs) => void;
+  /** Volet du simulateur déplié d’emblée (page plein écran). */
+  open?: boolean;
 }) {
   const [settings, setSettings] = useState<Settings>({
     coaches: { ...DEFAULT_COACHES },
@@ -167,14 +171,17 @@ export default function TrainingSimulator({
   }
   return (
     <>
-      <section className="card">
-        <div className="section-head">
-          <div>
-            <div className="eyebrow">Planifier la progression</div>
-            <h2 style={{ margin: "8px 0 0" }}>Simulateur d’entraînement</h2>
-          </div>
-          <span className="pill">Séances réussies</span>
-        </div>
+      <Fold
+        open={open}
+        title="Simulateur d’entraînement"
+        summary={
+          plan.incomplete || plan.to === undefined
+            ? "Sous-attributs manquants"
+            : plan.sessions === 0
+              ? "Plus de progression possible avec ces coachs"
+              : `Jusqu’à ${plan.to} en ${plan.sessions} séances réussies · ${money(plan.cost)}`
+        }
+      >
         {modelOvr(player) !== player.overall && (
           <div className="notice warning">
             La simulation part de l’OVR calculé (
@@ -448,7 +455,7 @@ export default function TrainingSimulator({
             })}
           </>
         )}
-      </section>
+      </Fold>
       <ResalePlanner player={player} settings={settings} />
     </>
   );
