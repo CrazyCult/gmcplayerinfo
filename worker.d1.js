@@ -82,6 +82,12 @@ const SCHEMA = [
   'CREATE TABLE IF NOT EXISTS player_requests (player_id TEXT PRIMARY KEY, requested_at INTEGER NOT NULL)',
   // Historique d'OVR fourni par le jeu (/api/players/{id}/overall-history), tel quel.
   'CREATE TABLE IF NOT EXISTS player_history (player_id TEXT PRIMARY KEY, fetched_at INTEGER NOT NULL, data TEXT NOT NULL)',
+  // Clubs connus par leur nom (base du jeu) : recherche « Mon effectif ».
+  'CREATE TABLE IF NOT EXISTS site_clubs (team_id TEXT PRIMARY KEY, name TEXT NOT NULL, name_norm TEXT NOT NULL, updated_at INTEGER NOT NULL)',
+  'CREATE INDEX IF NOT EXISTS sp_team ON site_players(team_id)',
+  // Compte du site → club rattaché. k = empreinte HMAC de l'identifiant Google,
+  // calculée par le site : le serveur ne voit jamais l'identifiant lui-même.
+  'CREATE TABLE IF NOT EXISTS site_users (k TEXT PRIMARY KEY, team_id TEXT, updated_at INTEGER NOT NULL)',
 ];
 const dbReady = new WeakSet();
 async function ensureDb(env) {
@@ -143,6 +149,12 @@ function upsertFull(env, p, teamId, fetchedAt) {
       OR site_players.name IS NOT excluded.name OR site_players.position IS NOT excluded.position OR site_players.age IS NOT excluded.age
       OR site_players.overall IS NOT excluded.overall OR site_players.potential IS NOT excluded.potential))`)
     .bind(p.id, teamId, fetchedAt, p.name, normName(p.name), lastToken(p.name), String(p.position || ''), int(p.age), int(p.overall), int(p.potential));
+}
+// Nom de club (n'écrit que s'il change).
+function upsertClubName(env, id, name, now) {
+  return env.DB.prepare(`INSERT INTO site_clubs (team_id, name, name_norm, updated_at) VALUES (?1, ?2, ?3, ?4)
+    ON CONFLICT(team_id) DO UPDATE SET name = excluded.name, name_norm = excluded.name_norm, updated_at = excluded.updated_at
+    WHERE site_clubs.name IS NOT excluded.name`).bind(id, name, normName(name), now);
 }
 // Joueur de la base du jeu : fiche légère, et prix pour tout le monde.
 function upsertLight(env, x) {
@@ -309,13 +321,15 @@ async function siteRequest(req, env, url, json) {
     return json({ error: 'Accès site non autorisé' }, 401);
   const requestPrefix = '/v1/site/request/', statusPrefix = '/v1/site/status/', playerPrefix = '/v1/site/player/';
   const isRequest = url.pathname.startsWith(requestPrefix);
-  if (req.method !== (isRequest ? 'POST' : 'GET')) return json({ error: isRequest ? 'POST attendu' : 'Lecture seule' }, 405);
+  const isClub = url.pathname.startsWith('/v1/site/me/') || url.pathname === '/v1/site/clubs' || url.pathname.startsWith('/v1/site/club/');
+  if (!isClub && req.method !== (isRequest ? 'POST' : 'GET')) return json({ error: isRequest ? 'POST attendu' : 'Lecture seule' }, 405);
   if (env.SITE_RATE_LIMITER) {
     try {
       const { success } = await env.SITE_RATE_LIMITER.limit({ key: req.headers.get('CF-Connecting-IP') || 'site' });
       if (!success) return json({ error: 'Trop de requêtes' }, 429);
     } catch (_) { /* limiteur indisponible : on continue */ }
   }
+  if (isClub) return siteClubRequest(req, env, url, json);
   await ensureDb(env);
   const idFrom = (prefix) => { try { const id = decodeURIComponent(url.pathname.slice(prefix.length)); return isStr(id, 128) ? id : null; } catch { return null; } };
 
@@ -377,6 +391,86 @@ async function siteRequest(req, env, url, json) {
     player: { id: row.id, name: row.name, position: row.position, age: row.age, overall: row.overall, potential: row.potential },
     fetchedAt: row.src_at || 0, teamId: row.team_id || '', light: !!row.light, market: marketOf(row),
   })), total: c.total, capped: c.capped, page: c.page, pages: c.pages });
+}
+
+// --- « Mon effectif » : clubs et compte du site ------------------------------------
+const CLUB_STALE_MS = 24 * 3600e3;
+async function siteClubRequest(req, env, url, json) {
+  await ensureDb(env);
+  const now = Date.now();
+  const tail = (prefix) => { try { return decodeURIComponent(url.pathname.slice(prefix.length)); } catch { return ''; } };
+
+  // Club rattaché au compte (k = empreinte calculée par le site).
+  if (url.pathname.startsWith('/v1/site/me/')) {
+    const k = tail('/v1/site/me/');
+    if (!/^[A-Za-z0-9_-]{20,128}$/.test(k)) return json({ error: 'Clé invalide' }, 400);
+    if (req.method === 'GET') {
+      const u = await env.DB.prepare('SELECT team_id FROM site_users WHERE k = ?1').bind(k).first();
+      return json({ teamId: (u && u.team_id) || null });
+    }
+    if (req.method !== 'PUT') return json({ error: 'GET ou PUT attendu' }, 405);
+    let body; try { body = await req.json(); } catch (_) { return json({ error: 'JSON invalide' }, 400); }
+    const teamId = body && body.teamId == null ? null : (isStr(body && body.teamId, 64) ? body.teamId : undefined);
+    if (teamId === undefined) return json({ error: 'Club invalide' }, 400);
+    if (teamId === null) await env.DB.prepare('DELETE FROM site_users WHERE k = ?1').bind(k).run();
+    else await env.DB.prepare(`INSERT INTO site_users (k, team_id, updated_at) VALUES (?1, ?2, ?3)
+      ON CONFLICT(k) DO UPDATE SET team_id = excluded.team_id, updated_at = excluded.updated_at`).bind(k, teamId, now).run();
+    return json({ teamId });
+  }
+  if (req.method !== 'GET') return json({ error: 'Lecture seule' }, 405);
+
+  // Recherche de club par nom.
+  if (url.pathname === '/v1/site/clubs') {
+    const q = normName(url.searchParams.get('q') || '').slice(0, 60);
+    if (q.length < 2) return json({ clubs: [] });
+    // Première recherche : on remplit la table des noms depuis le catalogue (une seule fois).
+    if (!(await env.DB.prepare("SELECT v FROM db_meta WHERE k = 'clubs:v1'").first())) {
+      await env.DB.batch([
+        env.DB.prepare(`INSERT OR IGNORE INTO site_clubs (team_id, name, name_norm, updated_at)
+          SELECT team_id, MAX(club_name), '', ?1 FROM site_players WHERE team_id IS NOT NULL AND club_name IS NOT NULL GROUP BY team_id`).bind(now),
+        env.DB.prepare("INSERT OR IGNORE INTO db_meta (k, v) VALUES ('clubs:v1', '1')"),
+      ]);
+      const empty = (await env.DB.prepare("SELECT team_id, name FROM site_clubs WHERE name_norm = ''").all()).results;
+      for (let i = 0; i < empty.length; i += 200)
+        await env.DB.batch(empty.slice(i, i + 200).map(c => env.DB.prepare('UPDATE site_clubs SET name_norm = ?2 WHERE team_id = ?1').bind(c.team_id, normName(c.name))));
+    }
+    const like = '%' + q.replace(/[%_\\]/g, m => '\\' + m) + '%';
+    const { results } = await env.DB.prepare(`SELECT c.team_id, c.name, k.fetched_at FROM site_clubs c LEFT JOIN clubs k ON k.team_id = c.team_id
+      WHERE c.name_norm LIKE ?1 ESCAPE '\\' ORDER BY (c.name_norm LIKE ?2 ESCAPE '\\') DESC, c.name LIMIT 20`)
+      .bind(like, like.slice(1)).all();
+    return json({ clubs: results.map(r => ({ teamId: r.team_id, name: r.name, fetchedAt: r.fetched_at ?? null })) });
+  }
+
+  // Effectif d'un club : fiche complète (instantané du club) si connue,
+  // sinon fiches légères de la base du jeu. Instantané absent ou vieux d'un
+  // jour : le club passe en tête de ce qui est confié aux extensions.
+  const teamId = tail('/v1/site/club/');
+  if (!isStr(teamId, 64)) return json({ error: 'Identifiant invalide' }, 400);
+  const [c, n] = await Promise.all([
+    env.DB.prepare('SELECT fetched_at, players FROM clubs WHERE team_id = ?1').bind(teamId).first(),
+    env.DB.prepare('SELECT name FROM site_clubs WHERE team_id = ?1').bind(teamId).first(),
+  ]);
+  let players = [];
+  if (c) { try { players = JSON.parse(c.players).filter(validPlayer).map(raw => ({ player: publicPlayer({ data: raw, team_id: teamId }), light: false })); } catch (_) {} }
+  if (!players.length) {
+    const ids = (await env.DB.prepare('SELECT id FROM site_players WHERE team_id = ?1 LIMIT 80').bind(teamId).all()).results.map(r => r.id);
+    if (ids.length) {
+      const rows = (await env.DB.prepare(`SELECT * FROM db_players WHERE id IN (${ids.map((_, i) => '?' + (i + 1)).join(',')})`).bind(...ids).all()).results;
+      players = rows.map(d => ({ player: dbPublicPlayer(d), light: true }));
+    }
+  }
+  if (!c && !n && !players.length) return json({ error: 'Club inconnu' }, 404);
+  let requestedAt = null;
+  if (!c || now - c.fetched_at > CLUB_STALE_MS) {
+    const r = await env.DB.prepare('SELECT requested_at FROM site_requests WHERE team_id = ?1').bind(teamId).first();
+    if (r && now - r.requested_at < REQUEST_TTL) requestedAt = r.requested_at;
+    else {
+      await env.DB.prepare(`INSERT INTO site_requests (team_id, player_id, requested_at) VALUES (?1, NULL, ?2)
+        ON CONFLICT(team_id) DO UPDATE SET player_id = NULL, requested_at = excluded.requested_at`).bind(teamId, now).run();
+      requestedAt = now;
+    }
+  }
+  return json({ teamId, name: (n && n.name) || null, fetchedAt: c ? c.fetched_at : null, requestedAt, players });
 }
 
 // --- Licence -------------------------------------------------------------------
@@ -551,9 +645,11 @@ async function extensionRequest(req, env, url, json) {
       ).bind('p:' + id, now + 10 * 60e3, installId || null)));
       limit -= players.length;
     }
-    const asked = limit && body.players !== true ? (await env.DB.prepare(`SELECT r.team_id FROM site_requests r
+    // Extensions récentes : les demandes de fiche passent par les joueurs ; seules
+    // les demandes de club entier (« Mon effectif », player_id nul) restent.
+    const asked = limit ? (await env.DB.prepare(`SELECT r.team_id FROM site_requests r
         LEFT JOIN clubs c ON c.team_id = r.team_id LEFT JOIN leases l ON l.team_id = r.team_id
-        WHERE r.requested_at > ?1 AND (c.fetched_at IS NULL OR c.fetched_at < r.requested_at) AND (l.leased_until IS NULL OR l.leased_until < ?2)
+        WHERE r.requested_at > ?1 AND ${body.players === true ? 'r.player_id IS NULL AND' : ''} (c.fetched_at IS NULL OR c.fetched_at < r.requested_at) AND (l.leased_until IS NULL OR l.leased_until < ?2)
         ORDER BY r.requested_at ASC LIMIT ?3`).bind(now - REQUEST_TTL, now, limit).all()).results.map(x => x.team_id) : [];
     const cands = [...new Set(asked.concat((Array.isArray(body.candidates) ? body.candidates : []).filter(x => isStr(x, 64)).slice(0, 300)))];
     if (!limit || !cands.length) return json({ assigned: [], players });
@@ -616,6 +712,9 @@ async function extensionRequest(req, env, url, json) {
     const over = (await writesToday(env)) >= writeBudget(env) && a !== 'transfer' && a !== 'loan';
     const stmts = [];
     if (!over) {
+      const clubs = new Map();
+      for (const x of players) if (!x.free_agent && isStr(x.club_id, 64) && isStr(x.club_name, 80)) clubs.set(x.club_id, x.club_name);
+      for (const [id, name] of clubs) stmts.push(upsertClubName(env, id, name, now));
       for (const x of players) {
         stmts.push(upsertDbDetail(env, x, now), upsertLight(env, x));
         if (x.transfer_price > 0) stmts.push(upsertPrice(env, x, 'transfer', x.transfer_price, now));

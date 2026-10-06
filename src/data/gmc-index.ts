@@ -63,7 +63,12 @@ export class IndexError extends Error {
 }
 async function request(
   path: string,
-  init: { method?: "GET" | "POST"; tags?: string[]; fresh?: boolean } = {},
+  init: {
+    method?: "GET" | "POST" | "PUT";
+    tags?: string[];
+    fresh?: boolean;
+    body?: unknown;
+  } = {},
 ) {
   if (!indexEnabled()) throw new IndexError(503);
   const base =
@@ -73,8 +78,14 @@ async function request(
   try {
     response = await fetch(`${base}${path}`, {
       method: init.method ?? "GET",
-      headers: { Authorization: `Bearer ${process.env.GMC_SITE_TOKEN}` },
-      ...(init.fresh || init.method === "POST"
+      headers: {
+        Authorization: `Bearer ${process.env.GMC_SITE_TOKEN}`,
+        ...(init.body === undefined
+          ? {}
+          : { "Content-Type": "application/json" }),
+      },
+      ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+      ...(init.fresh || (init.method && init.method !== "GET")
         ? { cache: "no-store" as const }
         : { next: { revalidate: 900, tags: init.tags } }),
       signal: AbortSignal.timeout(15000),
@@ -155,4 +166,58 @@ export async function getCatalog({
   return catalogSchema.parse(
     await request(`/v1/site/${search ? "search" : "players"}?${params}`),
   );
+}
+
+// --- « Mon effectif » -------------------------------------------------------
+const clubSearchSchema = z.object({
+  clubs: z.array(
+    z.object({
+      teamId: z.string(),
+      name: z.string(),
+      fetchedAt: z.number().nullable(),
+    }),
+  ),
+});
+export type ClubHit = z.infer<typeof clubSearchSchema>["clubs"][number];
+export async function searchClubs(q: string) {
+  const params = new URLSearchParams({ q: q.slice(0, 60) });
+  return clubSearchSchema.parse(
+    await request(`/v1/site/clubs?${params}`, { tags: ["clubs"] }),
+  ).clubs;
+}
+const clubSchema = z.object({
+  teamId: z.string(),
+  name: z.string().nullable(),
+  fetchedAt: z.number().nullable(),
+  requestedAt: z.number().nullable(),
+  players: z.array(z.object({ player: playerSchema, light: z.boolean() })),
+});
+export type ClubSquad = z.infer<typeof clubSchema>;
+/** Effectif d’un club (sans cache : l’instantané peut arriver à tout moment). */
+export async function getClub(teamId: string) {
+  const parsed = clubSchema.safeParse(
+    await request(`/v1/site/club/${encodeURIComponent(teamId)}`, {
+      fresh: true,
+    }),
+  );
+  if (!parsed.success) {
+    console.error("Effectif invalide", teamId, parsed.error.issues.slice(0, 5));
+    throw new IndexError(422);
+  }
+  return parsed.data;
+}
+const meSchema = z.object({ teamId: z.string().nullable() });
+/** Club rattaché à un compte (clé = empreinte du compte Google). */
+export async function getAccountClub(key: string) {
+  return meSchema.parse(
+    await request(`/v1/site/me/${encodeURIComponent(key)}`, { fresh: true }),
+  ).teamId;
+}
+export async function setAccountClub(key: string, teamId: string | null) {
+  return meSchema.parse(
+    await request(`/v1/site/me/${encodeURIComponent(key)}`, {
+      method: "PUT",
+      body: { teamId },
+    }),
+  ).teamId;
 }

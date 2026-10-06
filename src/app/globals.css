@@ -973,3 +973,22 @@ button.pill.accent {
     animation: none;
   }
 }
+
+/* Mon effectif : recherche de club et import replié */
+.club-hits {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 0;
+  display: grid;
+  gap: 8px;
+}
+.club-hits a {
+  font-weight: 700;
+}
+details.card > summary {
+  cursor: pointer;
+  list-style-position: inside;
+}
+details.card[open] > summary {
+  margin-bottom: 16px;
+}

@@ -27,11 +27,24 @@ Importer le dépôt public `CrazyCult/gmcplayerinfo` comme projet Next.js ou uti
 
 Configurer pour Production et Preview :
 
-| Variable         | Valeur                                                   |
-| ---------------- | -------------------------------------------------------- |
-| `GMC_INDEX_URL`  | URL du Worker Companion existant                         |
-| `GMC_SITE_TOKEN` | Secret identique à `SITE_TOKEN`, côté serveur uniquement |
-| `NEXT_SITE_URL`  | URL canonique de production du site                      |
+| Variable               | Valeur                                                           |
+| ---------------------- | ---------------------------------------------------------------- |
+| `GMC_INDEX_URL`        | URL du Worker Companion existant                                 |
+| `GMC_SITE_TOKEN`       | Secret identique à `SITE_TOKEN`, côté serveur uniquement         |
+| `NEXT_SITE_URL`        | URL canonique de production du site                              |
+| `GOOGLE_CLIENT_ID`     | ID client OAuth Google (connexion « Mon effectif »)              |
+| `GOOGLE_CLIENT_SECRET` | Code secret du client OAuth Google, côté serveur uniquement      |
+| `AUTH_SECRET`          | Chaîne aléatoire d’au moins 32 caractères qui signe les sessions |
+
+### Connexion Google (« Mon effectif »)
+
+Sans ces trois variables, la page « Mon effectif » fonctionne sans compte (recherche de club, lien depuis l’extension, import de fichier).
+
+1. Sur https://console.cloud.google.com, créer un projet, puis **API et services → Écran de consentement OAuth** : type « Externe », nom « GMC Player Info », portée `openid` et `profile` seulement, puis **Publier l’application**.
+2. **Identifiants → Créer des identifiants → ID client OAuth** : type « Application Web », URI de redirection autorisé `https://gmcplayerinfo.vercel.app/api/auth/callback` (et `http://localhost:3000/api/auth/callback` pour le développement).
+3. Copier l’ID client et le code secret dans Vercel (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), ajouter `AUTH_SECRET` (par exemple le résultat de `openssl rand -base64 32`), puis redéployer.
+
+Le serveur d’index ne reçoit jamais l’identifiant Google : seulement une empreinte HMAC calculée avec `AUTH_SECRET` (changer ce secret détache donc tous les clubs rattachés).
 
 Publier avec `pnpm dlx vercel deploy --prod`. Après ajout ou modification des variables, redéployer pour mettre à jour les pages précompilées. L’interface ne contacte jamais GameChase directement.
 
