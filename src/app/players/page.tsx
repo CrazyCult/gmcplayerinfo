@@ -33,7 +33,7 @@ export default async function PlayersPage({
     CATALOG_SORTS.find((value) => value === params.sort) ?? "overall";
   const page = Math.max(
     1,
-    Math.min(1000000, Number.parseInt(params.page || "1", 10) || 1),
+    Math.min(20, Number.parseInt(params.page || "1", 10) || 1),
   );
   let catalog;
   try {
@@ -59,7 +59,7 @@ export default async function PlayersPage({
           <input
             name="q"
             aria-label="Nom ou identifiant du joueur"
-            placeholder="Nom ou identifiant"
+            placeholder="Début du nom ou du nom de famille"
             defaultValue={q}
             maxLength={100}
           />
@@ -82,7 +82,6 @@ export default async function PlayersPage({
             <option value="gap">Marge de progression</option>
             <option value="price">Prix de vente croissant</option>
             <option value="loan">Prix de prêt croissant</option>
-            <option value="age">Plus jeunes d’abord</option>
           </select>
           <button className="button primary" type="submit">
             Rechercher
@@ -92,8 +91,16 @@ export default async function PlayersPage({
       {catalog ? (
         <section className="card">
           <p>
-            {catalog.total.toLocaleString("fr-CH")} joueurs · page{" "}
-            {catalog.page} / {Math.max(1, catalog.pages)}
+            {catalog.total.toLocaleString("fr-CH")}
+            {catalog.capped ? "+" : ""} joueurs · page {catalog.page} /{" "}
+            {Math.max(1, catalog.pages)}
+            {catalog.capped && (
+              <small className="muted">
+                {" "}
+                · affiche les 1 000 premiers : affine la recherche (nom, poste,
+                disponibilité) pour aller plus loin
+              </small>
+            )}
           </p>
           <div className="table-wrap">
             <table>
@@ -106,7 +113,7 @@ export default async function PlayersPage({
                   <th>POT</th>
                   <th>Prix demandé</th>
                   <th>Club</th>
-                  <th>Vu le</th>
+                  <th>Collecte</th>
                 </tr>
               </thead>
               <tbody>
@@ -142,9 +149,11 @@ export default async function PlayersPage({
                       {market?.freeAgent ? "libre" : (market?.clubName ?? "—")}
                     </td>
                     <td>
-                      {new Date(fetchedAt).toLocaleDateString("fr-CH", {
-                        timeZone: "Europe/Zurich",
-                      })}
+                      {fetchedAt
+                        ? new Date(fetchedAt).toLocaleDateString("fr-CH", {
+                            timeZone: "Europe/Zurich",
+                          })
+                        : "—"}
                     </td>
                   </tr>
                 ))}

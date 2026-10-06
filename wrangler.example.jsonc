@@ -12,6 +12,9 @@
   "ratelimits": [{
     "name": "SITE_RATE_LIMITER",
     "namespace_id": "1001",
-    "simple": { "limit": 60, "period": 60 }
-  }]
+    "simple": { "limit": 300, "period": 60 }
+  }],
+  // Rattrapage du catalogue (site_players) toutes les 5 minutes, dans la
+  // limite du budget d'écritures du jour (plan gratuit : 70 000 par défaut).
+  "triggers": { "crons": ["*/5 * * * *"] }
 }

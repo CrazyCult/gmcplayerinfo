@@ -44,6 +44,8 @@ const catalogSchema = z.object({
       .extend({ player: playerSummarySchema }),
   ),
   total: z.number().int().nonnegative(),
+  /** Plus de résultats que le décompte affiché (décompte plafonné par l’index). */
+  capped: z.boolean().default(false),
   page: z.number().int().positive(),
   pages: z.number().int().nonnegative(),
 });
@@ -125,7 +127,6 @@ export const CATALOG_SORTS = [
   "gap",
   "price",
   "loan",
-  "age",
 ] as const;
 export async function getCatalog({
   q = "",

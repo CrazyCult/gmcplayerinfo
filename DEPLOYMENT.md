@@ -10,6 +10,17 @@
 
 Ce `worker.js` est **la seule version à déployer** : il contient les routes de l’extension (dont `/v1/db/*` pour GMC Companion 2.30) et celles du site. Les routes site sont `GET /v1/site/players?q=&position=&avail=&sort=&page=`, `GET /v1/site/search?q=` et `GET /v1/site/player/:id`. Elles passent avant le contrôle de licence, restent en lecture seule et refusent l’accès si `SITE_TOKEN` est absent. Le binding de limitation de débit est configuré dans l’exemple Wrangler ; vérifier que son namespace n’entre pas en conflit avec un binding existant.
 
+## Quotas D1 (important)
+
+Le plan gratuit de Cloudflare limite D1 à **5 millions de lignes lues et 100 000 écrites par jour** (remise à zéro à minuit UTC). Le Worker est conçu pour tenir dedans :
+
+- le site lit la table indexée `site_players` (une ligne par joueur) : une fiche lit quelques lignes, une page de catalogue au plus ~1 000 ;
+- toutes les écritures sont conditionnelles (rien n'est réécrit si rien n'a changé) ;
+- un budget d'écritures journalier (`DAILY_WRITE_BUDGET`, 70 000 par défaut) suspend la lecture de la base complète et le rattrapage quand il est atteint ; le marché continue ;
+- le rattrapage (tâche planifiée toutes les 5 min, `triggers.crons`) remplit `site_players` depuis les clubs et la base déjà collectés.
+
+Un nouveau joueur coûte environ 8 lignes écrites (table + index). Remplir le catalogue la première fois (~90 000 joueurs) prend donc environ **10 jours** sur le plan gratuit. Avec **Workers Paid** (5 $/mois, 25 milliards de lectures et 50 millions d'écritures inclus par mois), ajouter la variable `D1_PAID=1` : le budget est levé et le rattrapage se fait en quelques minutes.
+
 ## Projet Vercel
 
 Importer le dépôt public `CrazyCult/gmcplayerinfo` comme projet Next.js ou utiliser `pnpm dlx vercel login` puis `pnpm dlx vercel link`. Le gestionnaire et le lockfile sont pnpm.

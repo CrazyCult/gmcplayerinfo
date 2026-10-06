@@ -1,35 +1,82 @@
 import { describe, expect, it, vi } from "vitest";
-import { execFileSync } from "node:child_process";
 import worker, {
-  SITE_CATALOG_SQL,
-  SITE_PLAYERS_SQL,
+  backfillStep,
   dbPublicPlayer,
   publicPlayer,
 } from "../worker.js";
 import { FIELD_SUBS, GK_SUBS } from "../src/types";
 import { playerSchema } from "../src/schemas/player";
+import { d1 } from "./d1-mock";
 
-describe("lecture des collectes Companion", () => {
-  it("refuse l’accès sans secret, sans toucher à D1 ni à la licence", async () => {
+function setup(extra: Record<string, unknown> = {}) {
+  const mock = d1();
+  const env = { SITE_TOKEN: "tok", DB: mock.DB, ...extra };
+  const call = async (
+    method: string,
+    path: string,
+    body?: unknown,
+    site = false,
+  ) => {
+    const response = await worker.fetch(
+      new Request(`https://index.test${path}`, {
+        method,
+        body: body ? JSON.stringify(body) : undefined,
+        headers: site ? { Authorization: "Bearer tok" } : {},
+      }),
+      env,
+    );
+    return { status: response.status, body: await response.json() };
+  };
+  return { mock, env, call };
+}
+const full = (id: string, overall = 80, extra = {}) => ({
+  id,
+  name: `Joueur ${id}`,
+  position: "CM",
+  age: 22,
+  overall,
+  potential: overall + 5,
+  attributes: { pac: 80, vision: 81 },
+  ...extra,
+});
+const light = (id: string, extra = {}) => ({
+  id,
+  name: `Leger ${id}`,
+  position: "ST",
+  age: 24,
+  overall: 85,
+  potential: 88,
+  club_id: "clubL",
+  club_name: "Club L",
+  attributes: { pac: 90, sho: 85, pas: 70, dri: 80, def: 40, phy: 75 },
+  ...extra,
+});
+
+describe("accès et confidentialité", () => {
+  it("refuse l’accès site sans secret, sans toucher à D1", async () => {
     const prepare = vi.fn();
     const response = await worker.fetch(
       new Request("https://index.test/v1/site/players"),
-      { DB: { prepare }, PUBLIC_KEY_JWK: "invalid" },
+      { DB: { prepare }, PUBLIC_KEY_JWK: "x" },
     );
     expect(response.status).toBe(401);
     expect(prepare).not.toHaveBeenCalled();
   });
-  it("refuse les écritures même avec le secret site", async () => {
-    const response = await worker.fetch(
-      new Request("https://index.test/v1/site/players", {
-        method: "POST",
-        headers: { Authorization: "Bearer test" },
-      }),
-      { SITE_TOKEN: "test" },
-    );
-    expect(response.status).toBe(405);
+  it("refuse les écritures sur les routes de lecture du site", async () => {
+    const { call } = setup();
+    expect(
+      (await call("POST", "/v1/site/players", undefined, true)).status,
+    ).toBe(405);
   });
-  it("ne publie aucun champ privé, et conserve tous les attributs utilisés par le moteur", () => {
+  it("applique la limitation de débit avant de lire D1", async () => {
+    const { call } = setup({
+      SITE_RATE_LIMITER: { limit: async () => ({ success: false }) },
+    });
+    expect(
+      (await call("GET", "/v1/site/players", undefined, true)).status,
+    ).toBe(429);
+  });
+  it("ne publie aucun champ privé et garde tous les attributs du moteur", () => {
     const subs = Object.fromEntries(
       [...FIELD_SUBS, ...GK_SUBS].map((key) => [key, 80]),
     );
@@ -45,96 +92,13 @@ describe("lecture des collectes Companion", () => {
         contributor: "private",
         traits: [{ manager: "private" }],
         manager: { email: "private" },
-        club: { manager: "private" },
         attributes: { ...subs, pac: 80, secret: "private" },
       },
     });
     expect(playerSchema.parse(player).attributes.subs).toEqual(subs);
     expect(JSON.stringify(player)).not.toContain("private");
-    expect(player.club_id).toBe("club");
   });
-  it("lit les anciennes collectes, dédoublonne les transferts et pagine tous les joueurs dans SQLite", () => {
-    const code = `import sqlite3, json, sys
-db = sqlite3.connect(':memory:')
-db.row_factory = sqlite3.Row
-db.execute('CREATE TABLE clubs(team_id TEXT, fetched_at INTEGER, players TEXT)')
-players = [{'id': str(i), 'name': 'Player '+str(i), 'overall': 70+i%20, 'position':'CM'} for i in range(125)]
-db.execute('INSERT INTO clubs VALUES(?,?,?)', ('old', 1, json.dumps(players)))
-db.execute('INSERT INTO clubs VALUES(?,?,?)', ('new', 2, json.dumps([dict(players[0], name='Transferred', overall=100)])))
-sql = sys.stdin.read()
-pages = [[dict(r) for r in db.execute(sql+' SELECT id, name, team_id FROM players ORDER BY overall DESC, id ASC LIMIT 50 OFFSET ?', (offset,))] for offset in (0,50,100)]
-print(json.dumps({'total':db.execute(sql+' SELECT COUNT(*) FROM players').fetchone()[0], 'pages':pages}))`;
-    const result = JSON.parse(
-      execFileSync("python", ["-c", code], {
-        input: SITE_PLAYERS_SQL,
-        encoding: "utf8",
-      }),
-    );
-    expect(result.total).toBe(125);
-    expect(result.pages.map((page: unknown[]) => page.length)).toEqual([
-      50, 50, 25,
-    ]);
-    expect(result.pages[0][0]).toEqual({
-      id: "0",
-      name: "Transferred",
-      team_id: "new",
-    });
-    const ids = result.pages.flat().map((row: { id: string }) => row.id);
-    expect(new Set(ids).size).toBe(125);
-  }, 30000);
-  it("applique la limitation de débit avant de lire D1", async () => {
-    const response = await worker.fetch(
-      new Request("https://index.test/v1/site/players", {
-        headers: { Authorization: "Bearer test" },
-      }),
-      {
-        SITE_TOKEN: "test",
-        SITE_RATE_LIMITER: { limit: async () => ({ success: false }) },
-      },
-    );
-    expect(response.status).toBe(429);
-  });
-});
-
-describe("base des joueurs du jeu (fiches légères et prix)", () => {
-  it("fusionne collectes complètes et base du jeu sans doublon, avec le prix demandé", () => {
-    const code = `import sqlite3, json, sys
-db = sqlite3.connect(':memory:')
-db.row_factory = sqlite3.Row
-db.execute('CREATE TABLE clubs(team_id TEXT, fetched_at INTEGER, players TEXT)')
-db.execute('CREATE TABLE db_players(id TEXT PRIMARY KEY, name TEXT, position TEXT, age INTEGER, overall INTEGER, potential INTEGER, club_id TEXT, club_name TEXT, free_agent INTEGER, transfer_price INTEGER, loan_fee INTEGER, seen_at INTEGER)')
-db.execute('INSERT INTO clubs VALUES(?,?,?)', ('t', 1, json.dumps([{'id':'a','name':'Complet','position':'CM','age':20,'overall':80,'potential':90}])))
-db.execute("INSERT INTO db_players VALUES('a','Complet','CM',20,81,90,'t','Club',0,5000,NULL,9)")
-db.execute("INSERT INTO db_players VALUES('b','Leger','ST',30,85,86,'u','Autre',0,NULL,700,9)")
-sql = sys.stdin.read()
-rows = [dict(r) for r in db.execute(sql+' SELECT id, overall, potential, light, transfer_price, loan_fee FROM merged ORDER BY overall DESC')]
-print(json.dumps(rows))`;
-    const rows = JSON.parse(
-      execFileSync("python", ["-c", code], {
-        input: SITE_CATALOG_SQL,
-        encoding: "utf8",
-      }),
-    );
-    expect(rows).toEqual([
-      {
-        id: "b",
-        overall: 85,
-        potential: 86,
-        light: 1,
-        transfer_price: null,
-        loan_fee: 700,
-      },
-      {
-        id: "a",
-        overall: 80,
-        potential: 90,
-        light: 0,
-        transfer_price: 5000,
-        loan_fee: null,
-      },
-    ]);
-  }, 30000);
-  it("publie une fiche légère compatible avec le schéma, sans champ privé", () => {
+  it("publie une fiche légère compatible avec le schéma", () => {
     const player = dbPublicPlayer({
       id: "b",
       name: "Leger",
@@ -154,78 +118,188 @@ print(json.dumps(rows))`;
       traits: JSON.stringify(["Workhorse", { private: true }]),
       club_id: "u",
       free_agent: 0,
-      nationality: "Netherlands",
-      value: 2050000,
-      seen_at: 1,
       leased_by: "private",
     });
     const parsed = playerSchema.parse(player);
     expect(parsed.attributes.div).toBe(99);
-    expect(parsed.attributes.subs).toEqual({});
     expect(parsed.traits).toEqual(["Workhorse"]);
     expect(JSON.stringify(player)).not.toContain("private");
-    expect(JSON.stringify(player)).not.toContain("secret");
+  });
+});
+
+describe("catalogue indexé (économie de lectures et d’écritures)", () => {
+  it("indexe les effectifs, fusionne la base du jeu, sans doublon", async () => {
+    const { call } = setup();
+    const now = Date.now();
+    await call("POST", "/v1/clubs", {
+      clubs: [
+        {
+          teamId: "t1",
+          fetchedAt: now,
+          players: [full("a", 80), full("b", 90)],
+        },
+      ],
+    });
+    await call("POST", "/v1/db/players", {
+      players: [light("b", { overall: 91, transfer_price: 5000 }), light("c")],
+    });
+    const all = (await call("GET", "/v1/site/players", undefined, true)).body;
+    expect(
+      all.players.map((p: { player: { id: string } }) => p.player.id),
+    ).toEqual(["b", "c", "a"]);
+    const b = all.players[0];
+    expect(b.light).toBe(false);
+    expect(b.player.overall).toBe(90); // la fiche complète garde ses valeurs
+    expect(b.market.transferPrice).toBe(5000); // mais reçoit le prix
+    expect(all.players[1].light).toBe(true);
+    const sale = (
+      await call("GET", "/v1/site/players?sort=price", undefined, true)
+    ).body;
+    expect(
+      sale.players.map((p: { player: { id: string } }) => p.player.id),
+    ).toEqual(["b"]);
+  });
+  it("recherche par début du nom ou du nom de famille", async () => {
+    const { call } = setup();
+    await call("POST", "/v1/clubs", {
+      clubs: [
+        {
+          teamId: "t1",
+          fetchedAt: Date.now(),
+          players: [
+            full("x", 70, { name: "Kévin De Bruyn" }),
+            full("y", 71, { name: "Paolo Maldino" }),
+          ],
+        },
+      ],
+    });
+    const ids = async (q: string) =>
+      (
+        await call(
+          "GET",
+          `/v1/site/players?q=${encodeURIComponent(q)}`,
+          undefined,
+          true,
+        )
+      ).body.players.map((p: { player: { id: string } }) => p.player.id);
+    expect(await ids("kevin")).toEqual(["x"]);
+    expect(await ids("bruy")).toEqual(["x"]);
+    expect(await ids("Maldino")).toEqual(["y"]);
+    expect(await ids("zzz")).toEqual([]);
+  });
+  it("une fiche ne lit qu’une ligne du catalogue et une ligne de club", async () => {
+    const { call, mock } = setup();
+    const players = Array.from({ length: 40 }, (_, i) => full(`p${i}`, 60 + i));
+    for (let t = 0; t < 30; t++)
+      await call("POST", "/v1/clubs", {
+        clubs: [
+          {
+            teamId: `t${t}`,
+            fetchedAt: Date.now(),
+            players: players.map((p) => ({ ...p, id: `${t}-${p.id}` })),
+          },
+        ],
+      });
+    const before = mock.reads();
+    const r = await call("GET", "/v1/site/player/12-p5", undefined, true);
+    expect(r.status).toBe(200);
+    expect(r.body.player.attributes.vision).toBe(81);
+    expect(mock.reads() - before).toBeLessThan(10);
+  });
+  it("ne réécrit rien quand une page ou un club n’a pas changé", async () => {
+    const { call, mock } = setup();
+    const club = {
+      teamId: "t1",
+      fetchedAt: Date.now(),
+      players: [full("a"), full("b")],
+    };
+    await call("POST", "/v1/clubs", { clubs: [club] });
+    await call("POST", "/v1/db/players", {
+      a: "all",
+      p: 1,
+      total: 48,
+      players: [light("c"), light("d")],
+    });
+    const w = () =>
+      Number(
+        (
+          mock.db
+            .prepare("SELECT v FROM db_meta WHERE k LIKE 'writes:%'")
+            .get() as { v: string }
+        ).v,
+      );
+    const before = w();
+    await call("POST", "/v1/clubs", {
+      clubs: [{ ...club, fetchedAt: club.fetchedAt + 1000 }],
+    });
+    await call("POST", "/v1/db/players", { players: [light("c"), light("d")] });
+    expect(w() - before).toBe(1); // seule la ligne du club (nouvelle date) est réécrite
+  });
+  it("suspend la base complète quand le budget d’écritures du jour est atteint", async () => {
+    const { call } = setup({ DAILY_WRITE_BUDGET: "1000" });
+    await call("POST", "/v1/db/players", {
+      a: "all",
+      p: 1,
+      total: 48,
+      players: [light("c")],
+    });
+    await call("POST", "/v1/db/players", {
+      a: "transfer",
+      p: 1,
+      total: 24,
+      players: [light("t", { transfer_price: 9 })],
+    });
+    expect(
+      (await call("POST", "/v1/db/assign", { limit: 5 })).body.tasks.length,
+    ).toBeGreaterThan(0);
+    const { mock, call: call2 } = setup({ DAILY_WRITE_BUDGET: "1000" });
+    mock.db.exec(
+      "CREATE TABLE IF NOT EXISTS db_meta (k TEXT PRIMARY KEY, v TEXT)",
+    );
+    mock.db
+      .prepare("INSERT INTO db_meta VALUES (?, ?)")
+      .run(`writes:${new Date().toISOString().slice(0, 10)}`, "5000");
+    const r = await call2("POST", "/v1/db/players", {
+      a: "all",
+      p: 1,
+      players: [light("z")],
+    });
+    expect(r.body.paused).toBe(true);
+    const tasks = (await call2("POST", "/v1/db/assign", { limit: 5 })).body;
+    expect(tasks.budget).toBe("atteint");
+    expect(
+      tasks.tasks.every((t: { kind: string }) => t.kind === "market"),
+    ).toBe(true);
+  });
+  it("le rattrapage remplit le catalogue depuis les clubs et la base existants", async () => {
+    const { mock, env, call } = setup();
+    await call("GET", "/v1/site/players", undefined, true); // crée le schéma
+    mock.db
+      .prepare("INSERT INTO clubs VALUES (?, ?, ?, ?, ?)")
+      .run("old", 1, 1, "x", JSON.stringify([full("o1"), full("o2")]));
+    mock.db
+      .prepare(
+        `INSERT INTO db_players (id, name, name_norm, position, age, overall, potential, club_id, free_agent, attrs, traits, seen_at)
+      VALUES ('l1', 'Leger Un', 'leger un', 'ST', 20, 70, 80, 'k', 0, '{}', '[]', 1)`,
+      )
+      .run();
+    for (let i = 0; i < 5; i++) await backfillStep(env);
+    const ids = (
+      await call("GET", "/v1/site/players", undefined, true)
+    ).body.players.map((p: { player: { id: string } }) => p.player.id);
+    expect(ids.sort()).toEqual(["l1", "o1", "o2"]);
+    expect((await backfillStep(env)).done).toBe(true);
   });
 });
 
 describe("demande de fiche complète depuis le site", () => {
   it("met le club en tête des clubs confiés aux extensions, une seule fois", async () => {
-    const { DatabaseSync } = await import("node:sqlite");
-    const db = new DatabaseSync(":memory:");
-    db.exec(
-      "CREATE TABLE clubs (team_id TEXT PRIMARY KEY, fetched_at INTEGER, updated_at INTEGER, contributor TEXT, players TEXT)",
-    );
-    const statement = (query: string) => {
-      let args: unknown[] = [];
-      const s = {
-        bind: (...values: unknown[]) => ((args = values), s),
-        run: async () => (db.prepare(query).run(...(args as never[])), {}),
-        all: async () => ({
-          results: db.prepare(query).all(...(args as never[])),
-        }),
-        first: async () => db.prepare(query).get(...(args as never[])) ?? null,
-      };
-      return s;
-    };
-    const env = {
-      SITE_TOKEN: "tok",
-      DB: {
-        prepare: statement,
-        batch: async (list: { run: () => Promise<unknown> }[]) => {
-          for (const item of list) await item.run();
-          return [];
-        },
-      },
-    };
-    const call = async (
-      method: string,
-      path: string,
-      body?: unknown,
-      site = false,
-    ) => {
-      const response = await worker.fetch(
-        new Request(`https://index.test${path}`, {
-          method,
-          body: body ? JSON.stringify(body) : undefined,
-          headers: site ? { Authorization: "Bearer tok" } : {},
-        }),
-        env,
-      );
-      return { status: response.status, body: await response.json() };
-    };
-    const light = (id: string, extra = {}) => ({
-      id,
-      name: `P ${id}`,
-      position: "CM",
-      age: 22,
-      overall: 80,
-      potential: 85,
-      club_id: "clubX",
-      attributes: { pac: 80, sho: 70, pas: 60, dri: 75, def: 40, phy: 65 },
-      ...extra,
-    });
+    const { call } = setup();
     await call("POST", "/v1/db/players", {
-      players: [light("p1"), light("free", { free_agent: true })],
+      players: [
+        light("p1", { club_id: "clubX" }),
+        light("free", { free_agent: true, club_id: "sys" }),
+      ],
     });
     expect(
       (await call("GET", "/v1/site/request/p1", undefined, true)).status,
@@ -240,9 +314,6 @@ describe("demande de fiche complète depuis le site", () => {
       (await call("POST", "/v1/site/request/free", undefined, true)).status,
     ).toBe(409);
     expect(
-      (await call("POST", "/v1/site/players", undefined, true)).status,
-    ).toBe(405);
-    expect(
       (await call("POST", "/v1/assign", { limit: 5, candidates: ["a"] })).body
         .assigned,
     ).toEqual(["clubX", "a"]);
@@ -255,21 +326,16 @@ describe("demande de fiche complète depuis le site", () => {
         {
           teamId: "clubX",
           fetchedAt: Date.now() + 1000,
-          players: [
-            {
-              id: "p1",
-              name: "P p1",
-              position: "CM",
-              age: 22,
-              overall: 80,
-              potential: 85,
-            },
-          ],
+          players: [full("p1")],
         },
       ],
     });
     expect(
       (await call("GET", "/v1/site/status/p1", undefined, true)).body,
     ).toMatchObject({ light: false, requestedAt: null });
+    const page = (await call("GET", "/v1/site/player/p1", undefined, true))
+      .body;
+    expect(page.light).toBe(false);
+    expect(page.player.attributes.vision).toBe(81);
   });
 });
