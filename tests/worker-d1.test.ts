@@ -430,42 +430,112 @@ describe("Mon effectif : clubs et compte du site", () => {
       ],
     });
     const r = await call("GET", "/v1/site/clubs?q=ICAU", undefined, true);
-    expect(r.body.clubs.map((c: { teamId: string }) => c.teamId).sort()).toEqual(["c1", "c2"]);
-    expect((await call("GET", "/v1/site/clubs?q=stellar", undefined, true)).body.clubs).toEqual([]);
-    expect((await call("GET", "/v1/site/clubs?q=a", undefined, true)).body.clubs).toEqual([]);
+    expect(
+      r.body.clubs.map((c: { teamId: string }) => c.teamId).sort(),
+    ).toEqual(["c1", "c2"]);
+    expect(
+      (await call("GET", "/v1/site/clubs?q=stellar", undefined, true)).body
+        .clubs,
+    ).toEqual([]);
+    for (const q of ["l'icaunique", "L’ICAUNIQUE", "licaunique", "icaunique"])
+      expect(
+        (
+          await call(
+            "GET",
+            `/v1/site/clubs?q=${encodeURIComponent(q)}`,
+            undefined,
+            true,
+          )
+        ).body.clubs.map((c: { teamId: string }) => c.teamId),
+      ).toContain("c1");
+    expect(
+      (await call("GET", "/v1/site/clubs?q=a", undefined, true)).body.clubs,
+    ).toEqual([]);
   });
   it("remplit les noms depuis le catalogue existant à la première recherche", async () => {
     const { call, mock } = setup();
-    await call("POST", "/v1/db/players", { players: [light("p1", { club_id: "c1", club_name: "Racing Fox" })] });
+    await call("POST", "/v1/db/players", {
+      players: [light("p1", { club_id: "c1", club_name: "Racing Fox" })],
+    });
     await mock.DB.prepare("DELETE FROM site_clubs").run();
-    expect((await call("GET", "/v1/site/clubs?q=fox", undefined, true)).body.clubs).toMatchObject([{ teamId: "c1", name: "Racing Fox" }]);
+    expect(
+      (await call("GET", "/v1/site/clubs?q=fox", undefined, true)).body.clubs,
+    ).toMatchObject([{ teamId: "c1", name: "Racing Fox" }]);
   });
   it("donne l’effectif complet d’un club connu, sinon les fiches légères, et demande sa lecture", async () => {
     const { call } = setup();
-    await call("POST", "/v1/db/players", { players: [light("p1", { club_id: "c1", club_name: "Fox" }), light("p2", { club_id: "c1", club_name: "Fox" })] });
+    await call("POST", "/v1/db/players", {
+      players: [
+        light("p1", { club_id: "c1", club_name: "Fox" }),
+        light("p2", { club_id: "c1", club_name: "Fox" }),
+      ],
+    });
     const lightSquad = await call("GET", "/v1/site/club/c1", undefined, true);
-    expect(lightSquad.body).toMatchObject({ teamId: "c1", name: "Fox", fetchedAt: null });
+    expect(lightSquad.body).toMatchObject({
+      teamId: "c1",
+      name: "Fox",
+      fetchedAt: null,
+    });
     expect(lightSquad.body.players).toHaveLength(2);
-    expect(lightSquad.body.players.every((p: { light: boolean }) => p.light)).toBe(true);
+    expect(
+      lightSquad.body.players.every((p: { light: boolean }) => p.light),
+    ).toBe(true);
     expect(lightSquad.body.requestedAt).toBeGreaterThan(0);
     // Une extension récente se voit confier ce club entier.
-    expect((await call("POST", "/v1/assign", { limit: 5, players: true, candidates: [] })).body.assigned).toEqual(["c1"]);
-    await call("POST", "/v1/clubs", { clubs: [{ teamId: "c1", fetchedAt: Date.now(), players: [full("p1"), full("p2"), full("p9")] }] });
+    expect(
+      (
+        await call("POST", "/v1/assign", {
+          limit: 5,
+          players: true,
+          candidates: [],
+        })
+      ).body.assigned,
+    ).toEqual(["c1"]);
+    await call("POST", "/v1/clubs", {
+      clubs: [
+        {
+          teamId: "c1",
+          fetchedAt: Date.now(),
+          players: [full("p1"), full("p2"), full("p9")],
+        },
+      ],
+    });
     const fullSquad = await call("GET", "/v1/site/club/c1", undefined, true);
     expect(fullSquad.body.players).toHaveLength(3);
     expect(fullSquad.body.requestedAt).toBeNull();
-    expect(fullSquad.body.players.every((p: { light: boolean; player: unknown }) => !p.light && playerSchema.safeParse(p.player).success)).toBe(true);
-    expect((await call("GET", "/v1/site/club/inconnu", undefined, true)).status).toBe(404);
+    expect(
+      fullSquad.body.players.every(
+        (p: { light: boolean; player: unknown }) =>
+          !p.light && playerSchema.safeParse(p.player).success,
+      ),
+    ).toBe(true);
+    expect(
+      (await call("GET", "/v1/site/club/inconnu", undefined, true)).status,
+    ).toBe(404);
   });
   it("rattache, lit et détache le club d’un compte", async () => {
     const { call } = setup();
-    expect((await call("GET", `/v1/site/me/${key}`, undefined, true)).body).toEqual({ teamId: null });
-    expect((await call("PUT", `/v1/site/me/${key}`, { teamId: "c1" }, true)).body).toEqual({ teamId: "c1" });
-    expect((await call("GET", `/v1/site/me/${key}`, undefined, true)).body).toEqual({ teamId: "c1" });
-    expect((await call("PUT", `/v1/site/me/${key}`, { teamId: null }, true)).body).toEqual({ teamId: null });
-    expect((await call("GET", `/v1/site/me/${key}`, undefined, true)).body).toEqual({ teamId: null });
-    expect((await call("GET", "/v1/site/me/court", undefined, true)).status).toBe(400);
-    expect((await call("PUT", `/v1/site/me/${key}`, { teamId: 5 }, true)).status).toBe(400);
+    expect(
+      (await call("GET", `/v1/site/me/${key}`, undefined, true)).body,
+    ).toEqual({ teamId: null });
+    expect(
+      (await call("PUT", `/v1/site/me/${key}`, { teamId: "c1" }, true)).body,
+    ).toEqual({ teamId: "c1" });
+    expect(
+      (await call("GET", `/v1/site/me/${key}`, undefined, true)).body,
+    ).toEqual({ teamId: "c1" });
+    expect(
+      (await call("PUT", `/v1/site/me/${key}`, { teamId: null }, true)).body,
+    ).toEqual({ teamId: null });
+    expect(
+      (await call("GET", `/v1/site/me/${key}`, undefined, true)).body,
+    ).toEqual({ teamId: null });
+    expect(
+      (await call("GET", "/v1/site/me/court", undefined, true)).status,
+    ).toBe(400);
+    expect(
+      (await call("PUT", `/v1/site/me/${key}`, { teamId: 5 }, true)).status,
+    ).toBe(400);
     expect((await call("GET", `/v1/site/me/${key}`)).status).toBe(401);
   });
 });

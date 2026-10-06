@@ -131,6 +131,9 @@ async function runBatch(env, stmts) {
 
 // --- Noms -------------------------------------------------------------------
 const normName = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+// Nom de club pour la recherche : sans accents, apostrophes, tirets, points ni espaces
+// (« L’Icaunique », « L'Icaunique » et « licaunique » se retrouvent).
+const normClub = (s) => normName(s).replace(/[\s'’‘`´"“”«»\-_.·,]+/g, '');
 const lastToken = (s) => { const t = normName(s).split(/\s+/).filter(Boolean); return t.length ? t[t.length - 1] : ''; };
 const isStr = (v, max = 200) => typeof v === 'string' && v.length > 0 && v.length <= max;
 const isInt = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
@@ -154,7 +157,7 @@ function upsertFull(env, p, teamId, fetchedAt) {
 function upsertClubName(env, id, name, now) {
   return env.DB.prepare(`INSERT INTO site_clubs (team_id, name, name_norm, updated_at) VALUES (?1, ?2, ?3, ?4)
     ON CONFLICT(team_id) DO UPDATE SET name = excluded.name, name_norm = excluded.name_norm, updated_at = excluded.updated_at
-    WHERE site_clubs.name IS NOT excluded.name`).bind(id, name, normName(name), now);
+    WHERE site_clubs.name IS NOT excluded.name OR site_clubs.name_norm IS NOT excluded.name_norm`).bind(id, name, normClub(name), now);
 }
 // Joueur de la base du jeu : fiche légère, et prix pour tout le monde.
 function upsertLight(env, x) {
@@ -421,18 +424,23 @@ async function siteClubRequest(req, env, url, json) {
 
   // Recherche de club par nom.
   if (url.pathname === '/v1/site/clubs') {
-    const q = normName(url.searchParams.get('q') || '').slice(0, 60);
+    const q = normClub(url.searchParams.get('q') || '').slice(0, 60);
     if (q.length < 2) return json({ clubs: [] });
-    // Première recherche : on remplit la table des noms depuis le catalogue (une seule fois).
+    // Première recherche : on remplit la table des noms depuis le catalogue,
+    // puis (v2) on recalcule les noms normalisés. Une seule fois chacun.
     if (!(await env.DB.prepare("SELECT v FROM db_meta WHERE k = 'clubs:v1'").first())) {
       await env.DB.batch([
         env.DB.prepare(`INSERT OR IGNORE INTO site_clubs (team_id, name, name_norm, updated_at)
           SELECT team_id, MAX(club_name), '', ?1 FROM site_players WHERE team_id IS NOT NULL AND club_name IS NOT NULL GROUP BY team_id`).bind(now),
         env.DB.prepare("INSERT OR IGNORE INTO db_meta (k, v) VALUES ('clubs:v1', '1')"),
       ]);
-      const empty = (await env.DB.prepare("SELECT team_id, name FROM site_clubs WHERE name_norm = ''").all()).results;
-      for (let i = 0; i < empty.length; i += 200)
-        await env.DB.batch(empty.slice(i, i + 200).map(c => env.DB.prepare('UPDATE site_clubs SET name_norm = ?2 WHERE team_id = ?1').bind(c.team_id, normName(c.name))));
+    }
+    if (!(await env.DB.prepare("SELECT v FROM db_meta WHERE k = 'clubs:v2'").first())) {
+      const all = (await env.DB.prepare('SELECT team_id, name, name_norm FROM site_clubs').all()).results
+        .filter(c => c.name_norm !== normClub(c.name));
+      for (let i = 0; i < all.length; i += 200)
+        await env.DB.batch(all.slice(i, i + 200).map(c => env.DB.prepare('UPDATE site_clubs SET name_norm = ?2 WHERE team_id = ?1').bind(c.team_id, normClub(c.name))));
+      await env.DB.prepare("INSERT OR IGNORE INTO db_meta (k, v) VALUES ('clubs:v2', '1')").run();
     }
     const like = '%' + q.replace(/[%_\\]/g, m => '\\' + m) + '%';
     const { results } = await env.DB.prepare(`SELECT c.team_id, c.name, k.fetched_at FROM site_clubs c LEFT JOIN clubs k ON k.team_id = c.team_id
