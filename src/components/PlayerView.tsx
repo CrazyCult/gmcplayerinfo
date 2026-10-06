@@ -246,15 +246,24 @@ export default function PlayerView({
               </dd>
             </div>
           )}
-          {player.contractEnd && (
-            <div>
+          {/* Demande du jeu si le contrat est en attente ; sinon la règle du
+              jeu : un joueur rare ou mieux réclame 4 % de sa valeur en fin de
+              saison. */}
+          {(player.contractDemand !== undefined ||
+            (player.value !== undefined &&
+              ["rare", "epic", "legendary", "galactico"].includes(rarity))) && (
+            <div
+              title={
+                player.contractDemand !== undefined
+                  ? "Demande de renouvellement envoyée par le jeu"
+                  : "Règle du jeu : 4 % de la valeur en fin de saison (joueurs rares ou mieux)"
+              }
+            >
               <dt>Renouvellement</dt>
               <dd>
                 {player.contractDemand !== undefined
                   ? `${shortAmount(player.contractDemand)} GMC2`
-                  : player.value !== undefined
-                    ? `≈ ${shortAmount(player.value * 0.04)} GMC2`
-                    : "—"}
+                  : `≈ ${shortAmount((player.value ?? 0) * 0.04)} GMC2`}
               </dd>
             </div>
           )}
