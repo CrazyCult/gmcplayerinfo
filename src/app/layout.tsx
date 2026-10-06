@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import localFont from "next/font/local";
 import { Toaster } from "sonner";
@@ -38,7 +39,14 @@ export default function RootLayout({
               className="brand"
               aria-label="GameChase Player Info, accueil"
             >
-              <span className="logo">G</span>
+              <Image
+                className="logo"
+                src="/brand/emblem.png"
+                alt=""
+                width={40}
+                height={40}
+                priority
+              />
               <span className="brand-word">
                 GAMECHASE<span>PLAYER INFO</span>
               </span>
