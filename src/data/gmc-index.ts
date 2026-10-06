@@ -75,20 +75,28 @@ async function request(
         : { next: { revalidate: 900, tags: init.tags } }),
       signal: AbortSignal.timeout(15000),
     });
-  } catch {
+  } catch (error) {
+    console.error("Index injoignable", path, error);
     throw new IndexError(502);
   }
-  if (!response.ok) throw new IndexError(response.status);
+  if (!response.ok) {
+    console.error("Index : réponse", response.status, path);
+    throw new IndexError(response.status);
+  }
   return response.json();
 }
 export const playerTag = (id: string) => `player:${id}`.slice(0, 256);
-export const getPlayer = cache(async (id: string) =>
-  snapshotSchema.parse(
-    await request(`/v1/site/player/${encodeURIComponent(id)}`, {
-      tags: [playerTag(id)],
-    }),
-  ),
-);
+export const getPlayer = cache(async (id: string) => {
+  const raw = await request(`/v1/site/player/${encodeURIComponent(id)}`, {
+    tags: [playerTag(id)],
+  });
+  const parsed = snapshotSchema.safeParse(raw);
+  if (!parsed.success) {
+    console.error("Fiche joueur invalide", id, parsed.error.issues.slice(0, 5));
+    throw new IndexError(422);
+  }
+  return parsed.data;
+});
 const fullStatusSchema = z.object({
   light: z.boolean(),
   fetchedAt: z.number().nullable().optional(),

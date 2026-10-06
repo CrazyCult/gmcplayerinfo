@@ -49,17 +49,19 @@ export default async function PlayerPage({
     notFound();
   }
   if (!id.startsWith("local:")) {
-    let snapshot;
+    let snapshot,
+      code = "?";
     try {
       snapshot = await getPlayer(id);
     } catch (error) {
       if (error instanceof IndexError && error.status === 404) notFound();
+      code = error instanceof IndexError ? String(error.status) : "app";
     }
     if (!snapshot)
       return (
         <div className="notice">
           Impossible de charger ce joueur depuis l’index. Réessayez dans
-          quelques instants.
+          quelques instants. <small className="muted">(code {code})</small>
         </div>
       );
     return (
