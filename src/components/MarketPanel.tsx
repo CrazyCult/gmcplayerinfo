@@ -65,7 +65,7 @@ export default function MarketPanel({
           <strong style={{ fontSize: 19 }}>
             {value === undefined ? "—" : money(value)}
           </strong>
-          <small>Valeur du jeu</small>
+          <small>Valeur</small>
         </div>
       </div>
       <p className="muted" style={{ fontSize: 12 }}>

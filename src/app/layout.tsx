@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
 import HeaderAccount from "@/components/HeaderAccount";
+import ThemeToggle from "@/components/ThemeToggle";
 import localFont from "next/font/local";
 import { Toaster } from "sonner";
 import { text } from "@/lib/i18n";
@@ -24,14 +25,28 @@ export const metadata: Metadata = {
   description:
     "Fiche complète, notes à chaque poste et coût exact d’entraînement jusqu’au potentiel pour les joueurs GameChase.",
 };
-export const viewport: Viewport = { themeColor: "#101521" };
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b1120" },
+  ],
+};
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" className={manrope.variable}>
+    <html lang="fr" className={manrope.variable} suppressHydrationWarning>
+      <head>
+        {/* Applique le thème choisi avant l’affichage (pas de flash). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('gmc-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}",
+          }}
+        />
+      </head>
       <body>
         <div className="shell">
           <header className="header">
@@ -60,6 +75,7 @@ export default function RootLayout({
                 <span className="status-dot" />
                 {indexEnabled() ? "Index GMC Companion" : "Mode import local"}
               </span>
+              <ThemeToggle />
               <Suspense fallback={null}>
                 <HeaderAccount />
               </Suspense>

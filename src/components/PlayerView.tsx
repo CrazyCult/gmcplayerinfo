@@ -88,61 +88,30 @@ export default function PlayerView({
   const tiers = { natural: "P", good: "B", okay: "A", poor: "M" };
   const rarity = playerRarity(player);
   const rarityColor = RARITY_COLOR[rarity];
-  const bestPositions = [...ratings]
-    .slice(0, 4)
-    .map(
-      (row) =>
-        `${row.position} ${fit ? (row.adjusted ?? "—") : (row.raw ?? "—")}`,
-    )
-    .join(" · ");
+
   return (
     <div className="stack">
-      <div className={trainingOnly ? undefined : "player-hero"}>
-        <section className="card player-card">
-          <div className="player-top">
-            <Image
-              className="portrait"
-              style={{
-                borderColor: rarityColor,
-                boxShadow: `0 0 24px ${tint(rarityColor, 25)}`,
-              }}
-              src={portraitUrl(player)}
-              alt={`Portrait de ${player.name}`}
-              width={150}
-              height={190}
-              unoptimized={portraitUrl(player).endsWith(".svg")}
-            />
-            <div className="player-info">
-              <div className="eyebrow">
-                Fiche joueur ·{" "}
-                {light
-                  ? "base du jeu (fiche légère)"
-                  : remote
-                    ? "GMC Companion"
-                    : "import local"}
-              </div>
-              <h1>{player.name}</h1>
-              <div className="pills">
-                <span className="pill accent">{player.position}</span>
-                <span className="pill">{player.age} ans</span>
-                {player.nationality && (
-                  <span className="pill">{player.nationality}</span>
-                )}
-                <span
-                  className="pill"
-                  style={{
-                    color: rarityColor,
-                    borderColor: tint(rarityColor, 40),
-                  }}
-                >
-                  {RARITY_LABEL[rarity]}
-                </span>
-                {club &&
-                  (club.freeAgent ? (
-                    <span className="pill club-pill">Agent libre</span>
+      <section className="card mini-hero">
+        <div className="mini-id">
+          <Image
+            className="portrait"
+            style={{ borderColor: rarityColor }}
+            src={portraitUrl(player)}
+            alt={`Portrait de ${player.name}`}
+            width={110}
+            height={138}
+            unoptimized={portraitUrl(player).endsWith(".svg")}
+          />
+          <div className="mini-id-text">
+            <div className="mini-kicker">
+              {player.position}
+              {club && (
+                <>
+                  {" · "}
+                  {club.freeAgent ? (
+                    "Agent libre"
                   ) : club.id ? (
                     <Link
-                      className="pill club-pill"
                       href={`/squad?club=${encodeURIComponent(club.id)}`}
                       prefetch={false}
                       title="Voir l’effectif de ce club"
@@ -150,151 +119,218 @@ export default function PlayerView({
                       {club.name ?? "Club inconnu"}
                     </Link>
                   ) : (
-                    <span className="pill club-pill">{club.name}</span>
-                  ))}
-                <span className="pill">
-                  {player.preferredFoot === "left"
-                    ? "Pied gauche"
-                    : player.preferredFoot === "both"
-                      ? "Ambidextre"
-                      : player.preferredFoot === "right"
-                        ? "Pied droit"
-                        : "Pied inconnu"}
-                </span>
-              </div>
-              <div className="player-links">
-                {/^[0-9a-f-]{36}$/i.test(player.id) && (
-                  <a
-                    className="button"
-                    href={`https://gamechase.io/gamev2/players/${encodeURIComponent(player.id)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Fiche dans GameChase ↗
-                  </a>
-                )}
+                    club.name
+                  )}
+                </>
+              )}
+              {" · "}
+              <span className="muted">
+                {light
+                  ? "fiche légère"
+                  : remote
+                    ? "GMC Companion"
+                    : "import local"}
+              </span>
+            </div>
+            <h1>{player.name}</h1>
+            <div className="mini-ovr">
+              <span
+                className="rating-chip"
+                style={{
+                  color: rarityColor,
+                  background: tint(rarityColor, 16),
+                }}
+              >
+                {player.overall}
+              </span>
+              <span className="muted">→</span>
+              <span
+                className="rating-chip"
+                style={{
+                  color:
+                    RARITY_COLOR[playerRarity({ overall: player.potential })],
+                  background: tint(
+                    RARITY_COLOR[playerRarity({ overall: player.potential })],
+                    16,
+                  ),
+                }}
+              >
+                {player.potential}
+              </span>
+              <small className="muted">OVR → potentiel</small>
+            </div>
+            <div className="mini-links">
+              {/^[0-9a-f-]{36}$/i.test(player.id) && (
+                <a
+                  href={`https://gamechase.io/gamev2/players/${encodeURIComponent(player.id)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Fiche dans GameChase ↗
+                </a>
+              )}
+              <Link href={`/compare?player1=${encodeURIComponent(localId)}`}>
+                Comparer
+              </Link>
+              {(!light || trainingOnly) && (
                 <Link
-                  className="button"
-                  href={`/compare?player1=${encodeURIComponent(localId)}`}
+                  href={`/player/${encodeURIComponent(localId)}${trainingOnly ? "" : "/training"}`}
                 >
-                  Comparer
+                  {trainingOnly ? "Fiche complète" : "Simulateur plein écran"}
                 </Link>
-                {(!light || trainingOnly) && (
-                  <Link
-                    className="button primary"
-                    href={`/player/${encodeURIComponent(localId)}${trainingOnly ? "" : "/training"}`}
-                  >
-                    {trainingOnly ? "Fiche complète" : "Simulateur plein écran"}
-                  </Link>
-                )}
-              </div>
+              )}
             </div>
           </div>
-          <div className="statline player-statline">
-            <div>
-              <strong>
-                <span style={{ color: rarityColor }}>{player.overall}</span>
-                <span className="unit">→</span>
-                <span
-                  style={{
-                    color:
-                      RARITY_COLOR[playerRarity({ overall: player.potential })],
-                  }}
-                >
-                  {player.potential}
-                </span>
-              </strong>
-              <small>OVR → potentiel</small>
-            </div>
-            <div>
-              <strong>
-                {player.fitness ?? "—"}
-                <span className="unit">/100</span>
-              </strong>
-              <small>Forme</small>
-            </div>
-            <div>
-              <strong>
-                {player.value === undefined ? "—" : shortAmount(player.value)}
-                <span className="unit">GMC2</span>
-              </strong>
-              <small>Valeur du jeu</small>
-            </div>
-            <div>
-              <strong>
-                {player.wage === undefined ? "—" : shortAmount(player.wage)}
-                <span className="unit">GMC2</span>
-              </strong>
-              <small>Salaire</small>
-            </div>
+        </div>
+        <dl className="mini-details">
+          <div>
+            <dt>Âge</dt>
+            <dd>{player.age} ans</dd>
           </div>
-          {modelOvr(player) !== player.overall && (
-            <div className="notice warning">
-              OVR du jeu {player.overall} · formule initiale{" "}
-              {modelOvr(player) ?? "incomplète"}. Les simulations utilisent la
-              formule.
+          <div>
+            <dt>Nationalité</dt>
+            <dd>{player.nationality ?? "—"}</dd>
+          </div>
+          <div>
+            <dt>Pied</dt>
+            <dd>
+              {player.preferredFoot === "left"
+                ? "Gauche"
+                : player.preferredFoot === "both"
+                  ? "Les deux"
+                  : player.preferredFoot === "right"
+                    ? "Droit"
+                    : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt>Rareté</dt>
+            <dd style={{ color: rarityColor }}>{RARITY_LABEL[rarity]}</dd>
+          </div>
+          <div>
+            <dt>Forme</dt>
+            <dd>{player.fitness ?? "—"}/100</dd>
+          </div>
+          <div>
+            <dt>Contrat</dt>
+            <dd>{player.contractEnd ?? "—"}</dd>
+          </div>
+          <div>
+            <dt>Valeur</dt>
+            <dd>
+              {player.value === undefined
+                ? "—"
+                : `${shortAmount(player.value)} GMC2`}
+            </dd>
+          </div>
+          <div>
+            <dt>Salaire</dt>
+            <dd>
+              {player.wage === undefined
+                ? "—"
+                : `${shortAmount(player.wage)} GMC2`}
+            </dd>
+          </div>
+          {player.matchesPlayed !== undefined && (
+            <div>
+              <dt>Matchs</dt>
+              <dd>
+                {player.matchesPlayed} · {player.goals ?? 0} but
+                {(player.goals ?? 0) > 1 ? "s" : ""} · {player.assists ?? 0}{" "}
+                passe{(player.assists ?? 0) > 1 ? "s" : ""}
+              </dd>
             </div>
-          )}
-          {subs !== player.attributes.subs && (
-            <div className="notice">
-              Simulation en cours : OVR calculé {modelOvr(player) ?? "—"} →{" "}
-              {calculated ?? "—"}. Les données importées sont conservées.
-            </div>
-          )}
-          {player.traits.length > 0 && (
-            <ul className="traits">
-              {player.traits.map((trait) => {
-                const info = TRAITS[trait];
-                return (
-                  <li key={trait}>
-                    <div className="trait-head">
-                      <span className="pill accent">{trait}</span>
-                      {info && (
-                        <span
-                          className={`trait-tier tier-${info.tier === "-" ? "down" : info.tier}`}
-                        >
-                          {TRAIT_TIER_LABEL[info.tier]}
-                        </span>
-                      )}
-                      {info && <small className="muted">{info.scope}</small>}
-                    </div>
-                    {info ? (
-                      <p>
-                        {info.summary} <strong>{info.effect}</strong>
-                      </p>
-                    ) : (
-                      <p className="muted">Effet inconnu pour l’instant.</p>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
           )}
           {player.contractEnd && (
-            <p className="muted" style={{ marginTop: 16, fontSize: 12 }}>
-              Fin de contrat : {player.contractEnd}
-              {player.contractDemand !== undefined
-                ? ` · Renouvellement : ${money(player.contractDemand)}`
-                : player.value !== undefined
-                  ? ` · Budget contrat estimé : ${money(player.value * 0.04)}`
-                  : ""}
-            </p>
+            <div>
+              <dt>Renouvellement</dt>
+              <dd>
+                {player.contractDemand !== undefined
+                  ? `${shortAmount(player.contractDemand)} GMC2`
+                  : player.value !== undefined
+                    ? `≈ ${shortAmount(player.value * 0.04)} GMC2`
+                    : "—"}
+              </dd>
+            </div>
           )}
-          {player.matchesPlayed !== undefined && (
-            <p className="muted" style={{ fontSize: 12, marginTop: 14 }}>
-              {player.matchesPlayed === 0
-                ? "Aucun match joué"
-                : `${player.matchesPlayed} match${player.matchesPlayed > 1 ? "s" : ""} · ${player.goals ?? 0} buts · ${player.assists ?? 0} passes${player.position === "GK" && player.cleanSheets ? ` · ${player.cleanSheets} clean sheets` : ""}`}
-            </p>
-          )}
+        </dl>
+      </section>
+      {modelOvr(player) !== player.overall && (
+        <div className="notice warning">
+          OVR du jeu {player.overall} · formule initiale{" "}
+          {modelOvr(player) ?? "incomplète"}. Les simulations utilisent la
+          formule.
+        </div>
+      )}
+      {subs !== player.attributes.subs && (
+        <div className="notice">
+          Simulation en cours : OVR calculé {modelOvr(player) ?? "—"} →{" "}
+          {calculated ?? "—"}. Les données importées sont conservées.
+        </div>
+      )}
+      {!trainingOnly && (
+        <div className="mini-stats">
+          {Object.keys(groups).map((stat, index) => (
+            <div
+              className="mini-stat"
+              key={stat}
+              style={{ ["--stat" as string]: `var(--stat-${index + 1})` }}
+            >
+              <span>{statLabels[stat] ?? stat.toUpperCase()}</span>
+              <strong
+                style={{
+                  color: attributeColor(
+                    stats[stat as keyof typeof stats],
+                    player.potential,
+                  ),
+                }}
+              >
+                {stats[stat as keyof typeof stats] ?? "—"}
+              </strong>
+            </div>
+          ))}
+        </div>
+      )}
+      {player.traits.length > 0 && (
+        <section className="card mini-card">
+          <h2 className="mini-title">Traits</h2>
+          <ul className="traits">
+            {player.traits.map((trait) => {
+              const info = TRAITS[trait];
+              return (
+                <li key={trait}>
+                  <div className="trait-head">
+                    <span className="pill accent">{trait}</span>
+                    {info && (
+                      <span
+                        className={`trait-tier tier-${info.tier === "-" ? "down" : info.tier}`}
+                      >
+                        {TRAIT_TIER_LABEL[info.tier]}
+                      </span>
+                    )}
+                    {info && <small className="muted">{info.scope}</small>}
+                  </div>
+                  {info ? (
+                    <p>
+                      {info.summary} <strong>{info.effect}</strong>
+                    </p>
+                  ) : (
+                    <p className="muted">Effet inconnu pour l’instant.</p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </section>
-        {!trainingOnly && (
-          <section className="card player-attributes">
-            <div className="section-head">
-              <h2 style={{ margin: 0 }}>
+      )}
+      {!trainingOnly && (
+        <div className="mini-mid">
+          <section className="card mini-card">
+            <div className="mini-head">
+              <h2 className="mini-title">
                 Attributs{light && <small> · 6 stats du jeu</small>}
               </h2>
-              <span className="pill">Plafond {player.potential}</span>
+              <small className="muted">plafond {player.potential}</small>
             </div>
             {light && (
               <div className="notice">
@@ -379,12 +415,9 @@ export default function PlayerView({
               </p>
             )}
           </section>
-        )}
-      </div>
-      {!trainingOnly && (
-        <>
-          <Fold title="Notes par poste" summary={bestPositions} open>
-            <div className="section-head">
+          <section className="card mini-card">
+            <div className="mini-head">
+              <h2 className="mini-title">Notes par poste</h2>
               <div
                 className="pills"
                 role="radiogroup"
@@ -397,7 +430,7 @@ export default function PlayerView({
                   className={`pill${fit ? " accent" : ""}`}
                   onClick={() => setFit(true)}
                 >
-                  En match, hors poste
+                  En match
                 </button>
                 <button
                   type="button"
@@ -406,31 +439,56 @@ export default function PlayerView({
                   className={`pill${!fit ? " accent" : ""}`}
                   onClick={() => setFit(false)}
                 >
-                  Après carte de poste
+                  Carte de poste
                 </button>
               </div>
             </div>
-            <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+            <p className="muted mini-note">
               {fit
-                ? "Force s’il joue à ce poste sans le changer : note au poste × adéquation du manuel (100 % son poste, 95 % proche, 90 % voisin, 85 % mauvaise ligne). Estimation : le manuel ne précise pas l’arrondi."
-                : "OVR qu’il aurait s’il changeait de poste avec une carte de poste (formule d’OVR du jeu appliquée à ses stats). Une carte ne fait passer qu’à un poste voisin."}
+                ? "S’il joue à ce poste sans le changer : note au poste × adéquation (100 % son poste, 95 % proche, 90 % voisin, 85 % mauvaise ligne). Estimation."
+                : "OVR qu’il aurait après une carte de poste (formule du jeu). Une carte ne fait passer qu’à un poste voisin."}
             </p>
-            <div className="ratings-grid">
-              {ratings.map((row) => (
-                <div className="position-row" key={row.position}>
-                  <div>
-                    <strong>{row.position}</strong>
-                    {fit && (
-                      <small title={`Coefficient ×${row.coefficient} — estimé`}>
-                        {tiers[row.tier]} · ×{row.coefficient}
-                      </small>
-                    )}
-                  </div>
-                  <Rating value={fit ? row.adjusted : row.raw} />
-                </div>
-              ))}
-            </div>
-          </Fold>
+            <table className="mini-table">
+              <thead>
+                <tr>
+                  <th>Poste</th>
+                  <th>{fit ? "Adéquation" : ""}</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ratings.map((row) => {
+                  const value = fit ? row.adjusted : row.raw;
+                  return (
+                    <tr key={row.position}>
+                      <td>
+                        <strong>{row.position}</strong>
+                      </td>
+                      <td className="muted">
+                        {fit
+                          ? `${Math.round(row.coefficient * 100)} % · ${tiers[row.tier]}`
+                          : ""}
+                      </td>
+                      <td
+                        style={{
+                          color:
+                            value === undefined
+                              ? undefined
+                              : RARITY_COLOR[playerRarity({ overall: value })],
+                        }}
+                      >
+                        <strong>{value ?? "—"}</strong>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </section>
+        </div>
+      )}
+      {!trainingOnly && (
+        <>
           {!light && (
             <Fold
               title="Leviers d’OVR"
