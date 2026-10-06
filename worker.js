@@ -71,6 +71,14 @@ function withDb(env) {
 }
 
 export default {
-  fetch: (req, env, ctx) => core.fetch(req, withDb(env), ctx),
+  async fetch(req, env, ctx) {
+    try {
+      return await core.fetch(req, withDb(env), ctx);
+    } catch (e) {
+      console.error(`${req.method} ${new URL(req.url).pathname} : ${e && e.message || e}`);
+      return new Response(JSON.stringify({ error: 'Erreur serveur', detail: String(e && e.message || e).slice(0, 300) }),
+        { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+    }
+  },
   scheduled: (event, env, ctx) => core.scheduled(event, withDb(env), ctx),
 };

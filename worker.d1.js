@@ -452,6 +452,7 @@ export default {
       return await extensionRequest(req, env, url, json);
     } catch (e) {
       const msg = String(e && e.message || e);
+      console.error(`${req.method} ${url.pathname} : ${msg}`);
       const quota = /limit|exceeded/i.test(msg);
       return json({ error: quota ? 'Quota journalier de la base atteint, réessaie après minuit UTC.' : 'Erreur serveur', detail: msg.slice(0, 200) }, quota ? 503 : 500);
     }
