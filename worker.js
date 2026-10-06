@@ -15,10 +15,11 @@ const PRIVACY_HTML = `<!doctype html><html lang="fr"><head><meta charset="utf-8"
 <h2>Données envoyées au serveur de l'extension</h2>
 <p>Si le partage d'index est actif, l'extension envoie au serveur de l'extension (Cloudflare Workers) :</p>
 <ul><li>les effectifs des clubs GameChase que tu consultes dans le jeu (noms des joueurs du jeu, âge, poste, notes, potentiel, valeur, attributs), afin de les partager entre les utilisateurs de l'extension ;</li>
+<li>les pages de la base des joueurs du jeu (scouting) que l'extension lit : joueurs du jeu, notes, potentiel, valeur et prix demandés en vente ou en prêt ;</li>
 <li>l'identifiant d'installation aléatoire et le code d'activation, uniquement pour vérifier que l'accès est autorisé.</li></ul>
 <p>L'extension ne collecte pas ton adresse e-mail, ton mot de passe, tes cookies, tes jetons de connexion GameChase ni ton historique de navigation. Elle ne fonctionne que sur gamechase.io.</p>
 <h2>Utilisation et partage</h2>
-<p>Les données des joueurs fictifs du jeu (identité dans le jeu, club, âge, poste, notes, potentiel, attributs, valeur et informations sportives) alimentent aussi le site public GameChase Player Info. Elles sont consultables sans installer l'extension. Aucune donnée de manager, d'utilisateur, de licence, d'installation ou de connexion n'est publiée sur le site. Les données ne sont ni vendues ni utilisées à des fins publicitaires ou pour évaluer une solvabilité.</p>
+<p>Les données des joueurs fictifs du jeu (identité dans le jeu, club, âge, poste, notes, potentiel, attributs, valeur, prix demandés en vente ou en prêt et informations sportives) alimentent aussi le site public GameChase Player Info. Elles sont consultables sans installer l'extension. Aucune donnée de manager, d'utilisateur, de licence, d'installation ou de connexion n'est publiée sur le site. Les données ne sont ni vendues ni utilisées à des fins publicitaires ou pour évaluer une solvabilité.</p>
 <h2>Conservation et suppression</h2>
 <p>Désinstaller l'extension supprime toutes les données locales. Pour demander la suppression des données envoyées au serveur, contacte l'éditeur à l'adresse indiquée sur la fiche Chrome Web Store de l'extension.</p>
 </body></html>`;
@@ -65,13 +66,80 @@ export function publicPlayer(row) {
   return player;
 }
 
+// Catalogue du site : collectes complètes de Companion (sous-attributs) et,
+// pour les joueurs jamais collectés en entier, la fiche légère de la base du
+// jeu (6 stats, prix). Le prix demandé courant est joint dans les deux cas.
+export const SITE_CATALOG_SQL = `${SITE_PLAYERS_SQL}, merged AS (
+  SELECT p.id, p.name, p.position, p.overall,
+    json_extract(p.data, '$.age') AS age, json_extract(p.data, '$.potential') AS potential,
+    p.fetched_at, p.team_id, 0 AS light, d.transfer_price, d.loan_fee, d.free_agent, d.club_name
+  FROM players p LEFT JOIN db_players d ON d.id = p.id
+  UNION ALL
+  SELECT d.id, d.name, d.position, d.overall, d.age, d.potential, d.seen_at, COALESCE(d.club_id, ''), 1,
+    d.transfer_price, d.loan_fee, d.free_agent, d.club_name
+  FROM db_players d WHERE d.id NOT IN (SELECT id FROM players)
+)`;
+const SITE_SORTS = {
+  overall: 'overall DESC',
+  potential: 'potential DESC',
+  gap: '(potential - overall) DESC',
+  price: 'transfer_price IS NULL, transfer_price ASC',
+  loan: 'loan_fee IS NULL, loan_fee ASC',
+  age: 'age ASC',
+};
+const marketOf = (d) => d ? {
+  transferPrice: d.transfer_price ?? null, loanFee: d.loan_fee ?? null, freeAgent: !!d.free_agent,
+  clubName: d.club_name ?? null, seenAt: d.seen_at ?? null,
+} : null;
+// Fiche légère publiée depuis db_players : mêmes noms de champs que les collectes.
+export function dbPublicPlayer(d) {
+  let attrs = {}, traits = [];
+  try { attrs = JSON.parse(d.attrs || '{}'); } catch (_) {}
+  try { traits = JSON.parse(d.traits || '[]'); } catch (_) {}
+  const player = {
+    id: d.id, name: d.name, position: d.position, age: d.age, overall: d.overall, potential: d.potential,
+    attributes: Object.fromEntries(Object.entries(attrs).filter(([k, v]) => PUBLIC_ATTRIBUTES.has(k) && typeof v === 'number' && Number.isFinite(v))),
+    traits: traits.filter(t => typeof t === 'string'),
+  };
+  for (const [k, v] of [['nationality', d.nationality], ['flag_code', d.flag_code], ['value', d.value], ['portrait_url', d.portrait_url]])
+    if (v != null) player[k] = v;
+  if (d.club_id && !d.free_agent) player.club_id = d.club_id;
+  return player;
+}
+
 async function siteRequest(req, env, url, json) {
   if (!env.SITE_TOKEN || req.headers.get('Authorization') !== `Bearer ${env.SITE_TOKEN}`)
     return json({ error: 'Accès site non autorisé' }, 401);
-  if (req.method !== 'GET') return json({ error: 'Lecture seule' }, 405);
+  const requestPrefix = '/v1/site/request/', statusPrefix = '/v1/site/status/';
+  const isRequest = url.pathname.startsWith(requestPrefix);
+  if (req.method !== (isRequest ? 'POST' : 'GET')) return json({ error: isRequest ? 'POST attendu' : 'Lecture seule' }, 405);
   if (env.SITE_RATE_LIMITER) {
     const { success } = await env.SITE_RATE_LIMITER.limit({ key: req.headers.get('CF-Connecting-IP') || 'site' });
     if (!success) return json({ error: 'Trop de requêtes' }, 429);
+  }
+  await ensureDb(env);
+  // Demande de fiche complète : le club du joueur passe en tête des clubs
+  // confiés aux extensions (/v1/assign). Seule écriture possible du site.
+  if (isRequest || url.pathname.startsWith(statusPrefix)) {
+    let id;
+    try { id = decodeURIComponent(url.pathname.slice((isRequest ? requestPrefix : statusPrefix).length)); } catch { return json({ error: 'Identifiant invalide' }, 400); }
+    if (!isStr(id, 128)) return json({ error: 'Identifiant invalide' }, 400);
+    const full = await env.DB.prepare(`${SITE_PLAYERS_SQL} SELECT fetched_at, team_id FROM players WHERE id = ?1`).bind(id).first();
+    const d = await env.DB.prepare('SELECT club_id, free_agent FROM db_players WHERE id = ?1').bind(id).first();
+    if (!full && !d) return json({ error: 'Joueur introuvable' }, 404);
+    const teamId = full ? full.team_id : d.club_id;
+    const r = teamId ? await env.DB.prepare('SELECT requested_at FROM site_requests WHERE team_id = ?1').bind(teamId).first() : null;
+    const now = Date.now();
+    const pending = r && now - r.requested_at < REQUEST_TTL && !(full && full.fetched_at > r.requested_at);
+    if (!isRequest) return json({ light: !full, fetchedAt: full ? full.fetched_at : null, requestedAt: pending ? r.requested_at : null });
+    if (full) return json({ light: false, status: 'complet' });
+    if (!teamId || d.free_agent) return json({ error: 'Agent libre : aucun effectif à lire.' }, 409);
+    if (pending) return json({ light: true, status: 'deja-demande', requestedAt: r.requested_at });
+    const n = (await env.DB.prepare('SELECT COUNT(*) AS n FROM site_requests WHERE requested_at > ?1').bind(now - REQUEST_TTL).first()).n;
+    if (n >= REQUEST_MAX_PENDING) return json({ error: 'Trop de demandes en attente, réessaie plus tard.' }, 429);
+    await env.DB.prepare(`INSERT INTO site_requests (team_id, player_id, requested_at) VALUES (?1, ?2, ?3)
+      ON CONFLICT(team_id) DO UPDATE SET player_id = excluded.player_id, requested_at = excluded.requested_at`).bind(teamId, id, now).run();
+    return json({ light: true, status: 'demande', requestedAt: now });
   }
   const prefix = '/v1/site/player/';
   if (url.pathname.startsWith(prefix)) {
@@ -79,23 +147,39 @@ async function siteRequest(req, env, url, json) {
     try { id = decodeURIComponent(url.pathname.slice(prefix.length)); } catch { return json({ error: 'Identifiant invalide' }, 400); }
     if (!isStr(id, 128)) return json({ error: 'Identifiant invalide' }, 400);
     const row = await env.DB.prepare(`${SITE_PLAYERS_SQL} SELECT * FROM players WHERE id = ?1`).bind(id).first();
-    return row ? json({ player: publicPlayer(row), fetchedAt: row.fetched_at, teamId: row.team_id }) : json({ error: 'Joueur introuvable' }, 404);
+    const d = await env.DB.prepare('SELECT * FROM db_players WHERE id = ?1').bind(id).first();
+    if (!row && !d) return json({ error: 'Joueur introuvable' }, 404);
+    const player = row ? publicPlayer(row) : dbPublicPlayer(d);
+    const prices = d ? (await env.DB.prepare(`SELECT kind, price, overall, potential, age, first_seen, last_seen FROM db_prices
+      WHERE player_id = ?1 ORDER BY first_seen DESC LIMIT 50`).bind(id).all()).results : [];
+    // Prix demandés de joueurs comparables (même poste, âge et OVR ±2, 30 derniers jours).
+    const comparables = (await env.DB.prepare(`SELECT kind, price, overall, potential, age, last_seen FROM db_prices
+      WHERE position = ?1 AND age BETWEEN ?2 - 2 AND ?2 + 2 AND overall BETWEEN ?3 - 2 AND ?3 + 2 AND last_seen > ?4 AND player_id != ?5
+      ORDER BY last_seen DESC LIMIT 300`).bind(player.position, player.age, player.overall, Date.now() - 30 * 864e5, id).all()).results;
+    return json({
+      player, fetchedAt: row ? row.fetched_at : d.seen_at, teamId: row ? row.team_id : (d.club_id || ''),
+      light: !row, market: marketOf(d), prices, comparables,
+    });
   }
   if (!['/v1/site/players', '/v1/site/search'].includes(url.pathname)) return json({ error: 'Introuvable' }, 404);
   const query = (url.searchParams.get('q') || '').trim().slice(0, 100);
   if (url.pathname.endsWith('/search') && query.length < 3) return json({ players: [], total: 0, page: 1, pages: 0 });
   const position = (url.searchParams.get('position') || '').slice(0, 3);
+  const avail = ['transfer', 'loan', 'free', 'full'].includes(url.searchParams.get('avail')) ? url.searchParams.get('avail') : '';
+  const order = SITE_SORTS[url.searchParams.get('sort')] || SITE_SORTS.overall;
   const page = Math.min(1000000, Math.max(1, Number.parseInt(url.searchParams.get('page') || '1', 10) || 1));
   const limit = url.pathname.endsWith('/search') ? 10 : 50;
   // instr treats %, _ and quotes as literal text; all user values are bound.
-  const where = " WHERE (?1 = '' OR instr(lower(name), lower(?1)) > 0 OR id = ?1) AND (?2 = '' OR position = ?2)";
-  const count = await env.DB.prepare(`${SITE_PLAYERS_SQL} SELECT COUNT(*) AS total FROM players${where}`).bind(query, position).first();
-  const { results } = await env.DB.prepare(`${SITE_PLAYERS_SQL} SELECT * FROM players${where} ORDER BY overall DESC, id ASC LIMIT ?3 OFFSET ?4`).bind(query, position, limit, (page - 1) * limit).all();
-  return json({ players: results.map(row => {
-    const raw = publicPlayer(row);
-    const player = Object.fromEntries(['id', 'name', 'position', 'age', 'overall', 'potential'].map(key => [key, raw[key]]));
-    return { player, fetchedAt: row.fetched_at, teamId: row.team_id };
-  }), total: count.total, page, pages: Math.ceil(count.total / limit) });
+  const where = ` WHERE (?1 = '' OR instr(lower(name), lower(?1)) > 0 OR id = ?1) AND (?2 = '' OR position = ?2)
+    AND (?3 = '' OR (?3 = 'transfer' AND transfer_price > 0) OR (?3 = 'loan' AND loan_fee > 0) OR (?3 = 'free' AND free_agent = 1) OR (?3 = 'full' AND light = 0))`;
+  const count = await env.DB.prepare(`${SITE_CATALOG_SQL} SELECT COUNT(*) AS total FROM merged${where}`).bind(query, position, avail).first();
+  const { results } = await env.DB.prepare(`${SITE_CATALOG_SQL} SELECT * FROM merged${where} ORDER BY ${order}, id ASC LIMIT ?4 OFFSET ?5`)
+    .bind(query, position, avail, limit, (page - 1) * limit).all();
+  return json({ players: results.map(row => ({
+    player: { id: row.id, name: row.name, position: row.position, age: row.age, overall: row.overall, potential: row.potential },
+    fetchedAt: row.fetched_at, teamId: row.team_id || '', light: !!row.light,
+    market: { transferPrice: row.transfer_price ?? null, loanFee: row.loan_fee ?? null, freeAgent: !!row.free_agent, clubName: row.club_name ?? null },
+  })), total: count.total, page, pages: Math.ceil(count.total / limit) });
 }
 
 function weekKey(d = new Date()) {
@@ -115,6 +199,50 @@ const b64uDecStr = (s) => new TextDecoder().decode(b64uDec(s));
 
 let keyCache = null;
 let leasesReady = false;
+let dbReady = false;
+
+// --- Base des joueurs du jeu (/api/players/database) -------------------------
+// Pages de 24 joueurs lues par les extensions (passivement ou confiées par
+// /v1/db/assign), version légère : 6 stats résumées, OVR, POT, prix.
+const DB_PAGE_SIZE = 24, DB_AVAIL = ['all', 'transfer', 'loan', 'free'];
+const DB_MARKET_MS = 55 * 60e3;      // marché et prêts : relus chaque heure
+const DB_FULL_MS = 24 * 3600e3;      // base complète : un tour par jour au plus
+const DB_LEASE_MS = 10 * 60e3;
+const DB_SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS db_players (id TEXT PRIMARY KEY, name TEXT NOT NULL, name_norm TEXT NOT NULL, position TEXT,
+    age INTEGER, overall INTEGER, potential INTEGER, value INTEGER, club_id TEXT, club_name TEXT, nationality TEXT, flag_code TEXT,
+    free_agent INTEGER, transfer_price INTEGER, loan_fee INTEGER, traits TEXT, attrs TEXT, portrait_url TEXT, seen_at INTEGER NOT NULL)`,
+  'CREATE INDEX IF NOT EXISTS db_players_name ON db_players(name_norm)',
+  'CREATE INDEX IF NOT EXISTS db_players_ovr ON db_players(overall)',
+  'CREATE INDEX IF NOT EXISTS db_players_pos ON db_players(position, overall)',
+  `CREATE TABLE IF NOT EXISTS db_prices (player_id TEXT NOT NULL, kind TEXT NOT NULL, price INTEGER NOT NULL,
+    overall INTEGER, potential INTEGER, age INTEGER, position TEXT, first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL,
+    PRIMARY KEY (player_id, kind, price))`,
+  'CREATE INDEX IF NOT EXISTS db_prices_seen ON db_prices(last_seen)',
+  `CREATE TABLE IF NOT EXISTS db_pages (a TEXT NOT NULL, p INTEGER NOT NULL, done_at INTEGER NOT NULL DEFAULT 0,
+    leased_until INTEGER NOT NULL DEFAULT 0, leased_by TEXT, PRIMARY KEY (a, p))`,
+  'CREATE TABLE IF NOT EXISTS db_meta (k TEXT PRIMARY KEY, v TEXT)',
+  'CREATE TABLE IF NOT EXISTS leases (team_id TEXT PRIMARY KEY, leased_until INTEGER NOT NULL, leased_by TEXT)',
+  // Demandes du site : « lire ce club en priorité » (fiche légère → complète).
+  'CREATE TABLE IF NOT EXISTS site_requests (team_id TEXT PRIMARY KEY, player_id TEXT, requested_at INTEGER NOT NULL)',
+];
+const REQUEST_TTL = 24 * 3600e3, REQUEST_MAX_PENDING = 300;
+async function ensureDb(env) {
+  if (dbReady) return;
+  await env.DB.batch(DB_SCHEMA.map(q => env.DB.prepare(q)));
+  // Première page de chaque liste suivie : le reste est créé quand le total est connu.
+  await env.DB.batch(['all', 'transfer', 'loan'].map(a => env.DB.prepare('INSERT OR IGNORE INTO db_pages (a, p) VALUES (?1, 1)').bind(a)));
+  dbReady = true;
+}
+const normName = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const isNum = (v, lo, hi) => typeof v === 'number' && isFinite(v) && v >= lo && v <= hi;
+function validDbPlayer(p) {
+  if (!p || !isStr(p.id, 64) || !isStr(p.name, 80) || !isInt(p.overall, 1, 200) || !isInt(p.potential, 1, 200) || !isInt(p.age, 10, 60) || !isStr(p.position, 4)) return false;
+  if (p.attributes != null && (typeof p.attributes !== 'object' || Object.keys(p.attributes).length > 12 || !Object.values(p.attributes).every(v => v == null || isNum(v, 0, 250)))) return false;
+  for (const k of ['value', 'transfer_price', 'loan_fee']) if (p[k] != null && !isNum(p[k], 0, 1e12)) return false;
+  return true;
+}
+
 async function licenceOk(env, installId, code) {
   if (!env.PUBLIC_KEY_JWK) return true;
   if (!installId || !code) return false;
@@ -203,9 +331,15 @@ export default {
       // Fenêtre de fraîcheur demandée par le client (1 h à 72 h), défaut 12 h :
       // un club relu dans cette fenêtre n'est pas réattribué.
       const freshH = Math.max(1, Math.min(72, parseInt(body.minFreshHours, 10) || 12));
-      const cands = (Array.isArray(body.candidates) ? body.candidates : []).filter(x => isStr(x, 64)).slice(0, 300);
-      if (!limit || !cands.length) return json({ assigned: [] });
+      await ensureDb(env);
       const now = Date.now();
+      // Clubs demandés depuis le site (fiche complète), pas encore relus ni réservés : en premier.
+      const asked = limit ? (await env.DB.prepare(`SELECT r.team_id FROM site_requests r
+          LEFT JOIN clubs c ON c.team_id = r.team_id LEFT JOIN leases l ON l.team_id = r.team_id
+          WHERE r.requested_at > ?1 AND (c.fetched_at IS NULL OR c.fetched_at < r.requested_at) AND (l.leased_until IS NULL OR l.leased_until < ?2)
+          ORDER BY r.requested_at ASC LIMIT ?3`).bind(now - REQUEST_TTL, now, limit).all()).results.map(x => x.team_id) : [];
+      const cands = [...new Set(asked.concat((Array.isArray(body.candidates) ? body.candidates : []).filter(x => isStr(x, 64)).slice(0, 300)))];
+      if (!limit || !cands.length) return json({ assigned: [] });
       const busy = new Set(), fresh = new Set();
       for (let i = 0; i < cands.length; i += 90) {
         const part = cands.slice(i, i + 90), ph = part.map((_, k) => '?' + (k + 2)).join(',');
@@ -214,7 +348,7 @@ export default {
         const c = await env.DB.prepare(`SELECT team_id FROM clubs WHERE fetched_at > ?1 AND team_id IN (${ph})`).bind(now - freshH * 3600e3, ...part).all();
         c.results.forEach(r => fresh.add(r.team_id));
       }
-      const assigned = cands.filter(id => !busy.has(id) && !fresh.has(id)).slice(0, limit);
+      const assigned = cands.filter(id => asked.includes(id) || (!busy.has(id) && !fresh.has(id))).slice(0, limit);
       if (assigned.length) {
         await env.DB.batch(assigned.map(id => env.DB.prepare(
           'INSERT INTO leases (team_id, leased_until, leased_by) VALUES (?1, ?2, ?3) ON CONFLICT(team_id) DO UPDATE SET leased_until = excluded.leased_until, leased_by = excluded.leased_by'
@@ -228,6 +362,121 @@ export default {
     if (req.method === 'GET' && url.pathname === '/v1/index') {
       const { results } = await env.DB.prepare('SELECT team_id, fetched_at FROM clubs').all();
       return json({ count: results.length, clubs: results.map(r => [r.team_id, r.fetched_at]) });
+    }
+
+    // --- Base des joueurs ---------------------------------------------------
+    if (url.pathname.startsWith('/v1/db/')) {
+      await ensureDb(env);
+      const now = Date.now();
+
+      // Envoi d'une page lue dans le jeu.
+      if (req.method === 'POST' && url.pathname === '/v1/db/players') {
+        let body; try { body = await req.json(); } catch (_) { return json({ error: 'JSON invalide' }, 400); }
+        const a = DB_AVAIL.includes(body.a) ? body.a : null;
+        const p = isInt(body.p, 1, 100000) ? body.p : null;
+        const raw = Array.isArray(body.players) ? body.players.slice(0, 60) : [];
+        const players = raw.filter(validDbPlayer);
+        if (!players.length && !(a && p)) return json({ error: 'données refusées' }, 400);
+        const stmts = [];
+        for (const x of players) {
+          const tp = x.transfer_price ?? null, lf = x.loan_fee ?? null;
+          stmts.push(env.DB.prepare(
+            `INSERT INTO db_players (id, name, name_norm, position, age, overall, potential, value, club_id, club_name, nationality, flag_code,
+               free_agent, transfer_price, loan_fee, traits, attrs, portrait_url, seen_at)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)
+             ON CONFLICT(id) DO UPDATE SET name=excluded.name, name_norm=excluded.name_norm, position=excluded.position, age=excluded.age,
+               overall=excluded.overall, potential=excluded.potential, value=excluded.value, club_id=excluded.club_id, club_name=excluded.club_name,
+               nationality=excluded.nationality, flag_code=excluded.flag_code, free_agent=excluded.free_agent, transfer_price=excluded.transfer_price,
+               loan_fee=excluded.loan_fee, traits=excluded.traits, attrs=excluded.attrs, portrait_url=excluded.portrait_url, seen_at=excluded.seen_at`
+          ).bind(x.id, x.name, normName(x.name), x.position, x.age, x.overall, x.potential, x.value ?? null,
+            isStr(x.club_id, 64) ? x.club_id : null, isStr(x.club_name, 80) ? x.club_name : null,
+            isStr(x.nationality, 60) ? x.nationality : null, isStr(x.flag_code, 4) ? x.flag_code : null,
+            x.free_agent ? 1 : 0, tp, lf, JSON.stringify(Array.isArray(x.traits) ? x.traits.filter(t => isStr(t, 40)).slice(0, 8) : []),
+            JSON.stringify(x.attributes || {}), isStr(x.portrait_url, 300) ? x.portrait_url : null, now));
+          for (const [kind, price] of [['transfer', tp], ['loan', lf]]) {
+            if (price == null || price <= 0) continue;
+            stmts.push(env.DB.prepare(
+              `INSERT INTO db_prices (player_id, kind, price, overall, potential, age, position, first_seen, last_seen)
+               VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?8) ON CONFLICT(player_id, kind, price) DO UPDATE SET last_seen = excluded.last_seen`
+            ).bind(x.id, kind, Math.round(price), x.overall, x.potential, x.age, x.position, now));
+          }
+        }
+        if (a && p) {
+          stmts.push(env.DB.prepare('INSERT INTO db_pages (a, p, done_at) VALUES (?1, ?2, ?3) ON CONFLICT(a, p) DO UPDATE SET done_at = excluded.done_at, leased_until = 0').bind(a, p, now));
+          // Total connu : on crée (ou on retire) les pages de cette liste.
+          if (isInt(body.total, 0, 2000000) && a !== 'free') {
+            const pages = Math.ceil(body.total / DB_PAGE_SIZE);
+            stmts.push(env.DB.prepare(`WITH RECURSIVE s(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM s WHERE x < ?2)
+              INSERT OR IGNORE INTO db_pages (a, p) SELECT ?1, x FROM s`).bind(a, Math.max(1, pages)));
+            stmts.push(env.DB.prepare('DELETE FROM db_pages WHERE a = ?1 AND p > ?2').bind(a, Math.max(1, pages)));
+            stmts.push(env.DB.prepare('INSERT INTO db_meta (k, v) VALUES (?1, ?2) ON CONFLICT(k) DO UPDATE SET v = excluded.v').bind('total:' + a, String(body.total)));
+          }
+        }
+        await env.DB.batch(stmts);
+        return json({ accepted: players.length, rejected: raw.length - players.length });
+      }
+
+      // Pages confiées : marché et prêts d'abord (toutes les heures), puis la
+      // base complète, les pages les plus anciennes en premier (un tour par jour).
+      if (req.method === 'POST' && url.pathname === '/v1/db/assign') {
+        let body; try { body = await req.json(); } catch (_) { body = {}; }
+        const limit = Math.max(1, Math.min(30, parseInt(body.limit, 10) || 10));
+        const market = await env.DB.prepare(`SELECT a, p FROM db_pages WHERE a IN ('transfer', 'loan') AND done_at < ?1 AND leased_until < ?2
+          ORDER BY done_at ASC, p ASC LIMIT ?3`).bind(now - DB_MARKET_MS, now, limit).all();
+        let tasks = market.results.map(r => ({ a: r.a, p: r.p, kind: 'market' }));
+        if (tasks.length < limit && body.full !== false) {
+          const full = await env.DB.prepare(`SELECT a, p FROM db_pages WHERE a = 'all' AND done_at < ?1 AND leased_until < ?2
+            ORDER BY done_at ASC, p ASC LIMIT ?3`).bind(now - DB_FULL_MS, now, limit - tasks.length).all();
+          tasks = tasks.concat(full.results.map(r => ({ a: r.a, p: r.p, kind: 'full' })));
+        }
+        if (tasks.length) await env.DB.batch(tasks.map(t => env.DB.prepare('UPDATE db_pages SET leased_until = ?3, leased_by = ?4 WHERE a = ?1 AND p = ?2')
+          .bind(t.a, t.p, now + DB_LEASE_MS, installId || null)));
+        return json({ tasks });
+      }
+
+      // Recherche dans la base (50 par page).
+      if (req.method === 'GET' && url.pathname === '/v1/db/search') {
+        const q = url.searchParams, where = [], args = [];
+        const add = (sql, v) => { args.push(v); where.push(sql.replace('?', '?' + args.length)); };
+        const num = (k) => { const v = parseInt(q.get(k) || '', 10); return Number.isFinite(v) ? v : null; };
+        if (q.get('q') && q.get('q').length >= 2) { const v = '%' + normName(q.get('q')).slice(0, 40) + '%'; args.push(v); where.push(`(name_norm LIKE ?${args.length} OR lower(club_name) LIKE ?${args.length} OR lower(nationality) LIKE ?${args.length})`); }
+        const pos = (q.get('pos') || '').toUpperCase(); if (/^[A-Z]{2,3}$/.test(pos)) add('position = ?', pos);
+        if (num('ageMin') != null) add('age >= ?', num('ageMin')); if (num('ageMax') != null) add('age <= ?', num('ageMax'));
+        if (num('ovrMin') != null) add('overall >= ?', num('ovrMin')); if (num('ovrMax') != null) add('overall <= ?', num('ovrMax'));
+        if (num('potMin') != null) add('potential >= ?', num('potMin')); if (num('potMax') != null) add('potential <= ?', num('potMax'));
+        if (num('gapMin') != null) add('potential - overall >= ?', num('gapMin'));
+        if (num('priceMax') != null) add('transfer_price <= ?', num('priceMax'));
+        const av = q.get('avail');
+        if (av === 'transfer') where.push('transfer_price IS NOT NULL AND transfer_price > 0');
+        else if (av === 'loan') where.push('loan_fee IS NOT NULL AND loan_fee > 0');
+        else if (av === 'free') where.push('free_agent = 1');
+        const SORT = { overall: 'overall', potential: 'potential', gap: '(potential - overall)', age: 'age', value: 'value', price: 'transfer_price', loan: 'loan_fee', seen: 'seen_at', name: 'name_norm' };
+        const sort = SORT[q.get('sort')] || 'overall', dir = q.get('dir') === 'asc' ? 'ASC' : 'DESC';
+        const page = Math.max(0, Math.min(2000, num('page') || 0));
+        const W = where.length ? 'WHERE ' + where.join(' AND ') : '';
+        const total = (await env.DB.prepare(`SELECT COUNT(*) AS n FROM db_players ${W}`).bind(...args).first()).n;
+        const { results } = await env.DB.prepare(`SELECT id, name, position, age, overall, potential, value, club_id, club_name, nationality, flag_code,
+            free_agent, transfer_price, loan_fee, traits, attrs, portrait_url, seen_at FROM db_players ${W}
+            ORDER BY ${sort} IS NULL, ${sort} ${dir}, id LIMIT 50 OFFSET ${page * 50}`).bind(...args).all();
+        return json({ total, page, players: results.map(r => ({ ...r, free_agent: !!r.free_agent, traits: JSON.parse(r.traits || '[]'), attrs: JSON.parse(r.attrs || '{}') })) });
+      }
+
+      // Historique des prix demandés d'un joueur.
+      if (req.method === 'GET' && url.pathname === '/v1/db/prices') {
+        const id = url.searchParams.get('id');
+        if (!isStr(id, 64)) return json({ error: 'id manquant' }, 400);
+        const { results } = await env.DB.prepare('SELECT kind, price, overall, potential, age, first_seen, last_seen FROM db_prices WHERE player_id = ?1 ORDER BY first_seen').bind(id).all();
+        return json({ prices: results });
+      }
+
+      if (req.method === 'GET' && url.pathname === '/v1/db/stats') {
+        const c = await env.DB.prepare(`SELECT COUNT(*) AS players, SUM(transfer_price > 0) AS transfer, SUM(loan_fee > 0) AS loan, SUM(free_agent) AS free,
+          MAX(seen_at) AS last FROM db_players`).first();
+        const pg = await env.DB.prepare(`SELECT a, COUNT(*) AS pages, SUM(done_at > ?1) AS fresh, MAX(done_at) AS last FROM db_pages GROUP BY a`).bind(now - DB_FULL_MS).all();
+        const meta = await env.DB.prepare("SELECT k, v FROM db_meta WHERE k LIKE 'total:%'").all();
+        return json({ ...c, pages: pg.results, totals: Object.fromEntries(meta.results.map(r => [r.k.slice(6), +r.v])) });
+      }
+      return json({ error: 'introuvable' }, 404);
     }
 
     if (req.method === 'GET' && url.pathname === '/v1/stats') {

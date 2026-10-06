@@ -2,7 +2,13 @@ import { notFound } from "next/navigation";
 import LocalPlayer from "@/components/LocalPlayer";
 import Search from "@/components/Search";
 import PlayerView from "@/components/PlayerView";
-import { getPlayer, IndexError, indexEnabled } from "@/data/gmc-index";
+import MarketPanel from "@/components/MarketPanel";
+import {
+  getFullStatus,
+  getPlayer,
+  IndexError,
+  indexEnabled,
+} from "@/data/gmc-index";
 export async function generateMetadata({
   params,
 }: {
@@ -23,7 +29,7 @@ export async function generateMetadata({
     const { player } = await getPlayer(id);
     return {
       title: `${player.name} · ${player.position} · OVR ${player.overall} / POT ${player.potential}`,
-      description: `Attributs, notes par poste et simulation d’entraînement de ${player.name}, joueur GameChase collecté par GMC Companion.`,
+      description: `Attributs, notes par poste et simulation d’entraînement de ${player.name}, joueur GameChase.`,
       alternates: { canonical: `/player/${encodeURIComponent(id)}` },
     };
   } catch {
@@ -60,13 +66,37 @@ export default async function PlayerPage({
       <>
         <Search remote={indexEnabled()} />
         <p className="notice">
-          Collecté le{" "}
+          {snapshot.light ? "Vu dans la base du jeu le" : "Collecté le"}{" "}
           {new Date(snapshot.fetchedAt).toLocaleString("fr-CH", {
             timeZone: "Europe/Zurich",
           })}{" "}
           par GMC Companion.
         </p>
-        <PlayerView player={snapshot.player} remote />
+        <PlayerView
+          player={snapshot.player}
+          remote
+          full={
+            snapshot.light
+              ? {
+                  teamId:
+                    snapshot.market?.freeAgent || !snapshot.teamId
+                      ? undefined
+                      : snapshot.teamId,
+                  requestedAt: await getFullStatus(id)
+                    .then((status) => status.requestedAt)
+                    .catch(() => null),
+                }
+              : undefined
+          }
+        />
+        <div style={{ marginTop: 24 }}>
+          <MarketPanel
+            market={snapshot.market}
+            prices={snapshot.prices}
+            comparables={snapshot.comparables}
+            value={snapshot.player.value}
+          />
+        </div>
       </>
     );
   }
