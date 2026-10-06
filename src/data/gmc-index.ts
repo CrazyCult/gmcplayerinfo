@@ -38,7 +38,18 @@ const snapshotSchema = z.object({
   comparables: z.array(priceSchema).default([]),
   /** Historique d'OVR brut du jeu (format lu par parseOverallHistory). */
   history: z.unknown().optional(),
+  /** Club actuel (nom connu par la base du jeu), ou agent libre. */
+  club: z
+    .object({
+      id: z.string(),
+      name: z.string().nullable(),
+      freeAgent: z.boolean(),
+    })
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null),
 });
+export type CurrentClub = NonNullable<z.infer<typeof snapshotSchema>["club"]>;
 const catalogSchema = z.object({
   players: z.array(
     snapshotSchema

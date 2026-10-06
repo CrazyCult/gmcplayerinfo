@@ -382,7 +382,13 @@ async function siteRequest(req, env, url, json) {
       Date.now() - 30 * 864e5, id).all()).results : [];
     const h = await env.DB.prepare('SELECT fetched_at, data FROM player_history WHERE player_id = ?1').bind(id).first();
     let history = null; try { history = h ? JSON.parse(h.data) : null; } catch (_) {}
-    return json({ player, fetchedAt: found.fetchedAt, teamId: (s && s.team_id) || player.club_id || '', light: found.light,
+    // Club actuel : nom connu par la base du jeu (agent libre : pas de club).
+    const teamId = (s && s.team_id) || player.club_id || '';
+    const freeAgent = !!((s && s.free_agent) || (found.d && found.d.free_agent));
+    const c = teamId && !freeAgent ? await env.DB.prepare('SELECT name FROM site_clubs WHERE team_id = ?1').bind(teamId).first() : null;
+    const clubName = freeAgent ? null : (c && c.name) || (s && s.club_name) || (found.d && found.d.club_name) || player.club_name || null;
+    return json({ player, fetchedAt: found.fetchedAt, teamId, light: found.light,
+      club: freeAgent ? { id: '', name: null, freeAgent: true } : teamId || clubName ? { id: teamId, name: clubName, freeAgent: false } : null,
       market: marketOf(s || found.d), prices, comparables, history, historyAt: h ? h.fetched_at : null });
   }
 

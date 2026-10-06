@@ -1111,3 +1111,13 @@ details.card[open] > summary {
 .tier-down {
   color: var(--attr-bad);
 }
+
+/* Club actuel dans l'en-tête de la fiche */
+.club-pill {
+  color: var(--foreground);
+  font-weight: 700;
+  border-color: var(--primary);
+}
+a.club-pill:hover {
+  color: var(--primary);
+}

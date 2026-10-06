@@ -42,12 +42,15 @@ export default function PlayerView({
   trainingOnly = false,
   remote = false,
   full,
+  club,
 }: {
   player: Player;
   trainingOnly?: boolean;
   remote?: boolean;
   /** Fiche légère distante : de quoi demander la fiche complète. */
   full?: { requestedAt?: number | null };
+  /** Club actuel du joueur (fiche de l’index). */
+  club?: { id: string; name: string | null; freeAgent: boolean } | null;
 }) {
   const [subs, setSubs] = useState<Subs>(player.attributes.subs),
     [fit, setFit] = useState(true);
@@ -125,6 +128,21 @@ export default function PlayerView({
               >
                 {RARITY_LABEL[rarity]}
               </span>
+              {club &&
+                (club.freeAgent ? (
+                  <span className="pill club-pill">Agent libre</span>
+                ) : club.id ? (
+                  <Link
+                    className="pill club-pill"
+                    href={`/squad?club=${encodeURIComponent(club.id)}`}
+                    prefetch={false}
+                    title="Voir l’effectif de ce club"
+                  >
+                    {club.name ?? "Club inconnu"}
+                  </Link>
+                ) : (
+                  <span className="pill club-pill">{club.name}</span>
+                ))}
               <span className="pill">
                 {player.preferredFoot === "left"
                   ? "Pied gauche"

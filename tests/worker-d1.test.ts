@@ -563,3 +563,28 @@ describe("historique d’OVR seul", () => {
     expect(sheet.body.player.attributes).toMatchObject({ vision: 81 });
   });
 });
+
+describe("club actuel sur la fiche", () => {
+  it("donne le nom du club, ou agent libre", async () => {
+    const { call } = setup();
+    await call("POST", "/v1/db/players", {
+      players: [
+        light("p1", { club_id: "c1", club_name: "L’Icaunique" }),
+        light("p2", {
+          club_id: "sys",
+          club_name: "Stellar Olympic",
+          free_agent: true,
+        }),
+      ],
+    });
+    await call("POST", "/v1/clubs", {
+      clubs: [{ teamId: "c1", fetchedAt: Date.now(), players: [full("p1")] }],
+    });
+    expect(
+      (await call("GET", "/v1/site/player/p1", undefined, true)).body.club,
+    ).toEqual({ id: "c1", name: "L’Icaunique", freeAgent: false });
+    expect(
+      (await call("GET", "/v1/site/player/p2", undefined, true)).body.club,
+    ).toEqual({ id: "", name: null, freeAgent: true });
+  });
+});

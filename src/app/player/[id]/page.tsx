@@ -79,6 +79,7 @@ export default async function PlayerPage({
         <PlayerView
           player={snapshot.player}
           remote
+          club={snapshot.club}
           full={
             snapshot.light
               ? {
