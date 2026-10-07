@@ -1,25 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { get, set } from "idb-keyval";
+import { useMemo, useState } from "react";
+import { saveClubSettings, useClubSettings } from "@/lib/trainingSettings";
 import { toast } from "sonner";
 import type { Player, Subs } from "@/types";
-import {
-  EXERCISES,
-  DEFAULT_COACHES,
-  type Coach,
-  type CoachLevels,
-} from "@/engine/tables";
+import { EXERCISES, type Coach, type CoachLevels } from "@/engine/tables";
 import { modelOvr } from "@/engine/ovr";
 import { planTraining, planVariants } from "@/engine/planner";
 import ResalePlanner from "./ResalePlanner";
 import Fold from "./UI/Fold";
-import {
-  exerciseAccess,
-  trainSession,
-  validateSettings,
-  type Session,
-} from "@/engine/training";
+import { exerciseAccess, trainSession, type Session } from "@/engine/training";
 import { money, number } from "@/lib/format";
 import { subLabels } from "@/lib/i18n";
 
@@ -50,34 +40,18 @@ export default function TrainingSimulator({
   /** Volet du simulateur déplié d’emblée (page plein écran). */
   open?: boolean;
 }) {
-  const [settings, setSettings] = useState<Settings>({
-    coaches: { ...DEFAULT_COACHES },
-    center: 1,
-    age: player.age,
-  });
+  const club = useClubSettings();
+  const [age, setAge] = useState(player.age);
+  const settings: Settings = useMemo(
+    () => ({ coaches: club.coaches, center: club.center, age }),
+    [club, age],
+  );
   const [state, setState] = useState<State>({
     subs: player.attributes.subs,
     sequence: [],
     fitness: player.fitness ?? 100,
   });
   const [mode, setMode] = useState<"auto" | "manual">("auto");
-  useEffect(() => {
-    let active = true;
-    void get<Settings>("gmc-training-settings")
-      .then((saved) => {
-        if (!saved || !active) return;
-        try {
-          validateSettings(saved.coaches, saved.center, player.age);
-          setSettings({ ...saved, age: player.age });
-        } catch {
-          /* Réglages invalides : garder les valeurs par défaut. */
-        }
-      })
-      .catch(() => toast.error("Réglages mémorisés inaccessibles."));
-    return () => {
-      active = false;
-    };
-  }, [player.age]);
   const simulated = useMemo(
     () => ({
       ...player,
@@ -101,10 +75,11 @@ export default function TrainingSimulator({
     { cost: 0, expected: 0 },
   );
   function updateSettings(next: Settings) {
-    setSettings(next);
-    void set("gmc-training-settings", next).catch(() =>
-      toast.error("Impossible de mémoriser les réglages."),
-    );
+    setAge(next.age);
+    if (next.coaches !== club.coaches || next.center !== club.center)
+      void saveClubSettings(next.coaches, next.center).catch(() =>
+        toast.error("Impossible de mémoriser les réglages."),
+      );
   }
   function update(next: State) {
     setState(next);

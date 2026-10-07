@@ -9,6 +9,7 @@ import { summaryStats, gkStats, isLight } from "@/engine/stats";
 import { positionRatings } from "@/engine/positionFit";
 import { FIELD_GROUPS, GK_GROUPS, MAX_COACHES } from "@/engine/tables";
 import { ovrLevers } from "@/engine/planner";
+import { coachSummary, useClubSettings } from "@/lib/trainingSettings";
 import {
   matchGain,
   matchesPerSeries,
@@ -61,6 +62,7 @@ export default function PlayerView({
 }) {
   const [subs, setSubs] = useState<Subs>(player.attributes.subs),
     [fit, setFit] = useState(true);
+  const training = useClubSettings();
   const [rating, setRating] = useState(7),
     [perWeek, setPerWeek] = useState(7);
   const light = isLight(player.attributes);
@@ -537,11 +539,13 @@ export default function PlayerView({
           {!light && (
             <Fold
               title="Leviers d’OVR"
-              summary="Le sous-attribut le moins cher pour gagner +1 OVR · coachs niveau 5"
+              summary={`Le sous-attribut le moins cher pour gagner +1 OVR · ${training.saved ? coachSummary(training) : "coachs niveau 5"}`}
             >
               {ovrLevers(
                 { ...player, attributes: { ...player.attributes, subs } },
-                { coaches: MAX_COACHES },
+                training.saved
+                  ? { coaches: training.coaches, center: training.center }
+                  : { coaches: MAX_COACHES, center: 5 },
               )
                 .filter((lever) => lever.progresses)
                 .map((lever) => (

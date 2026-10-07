@@ -7,6 +7,9 @@ import { ovrLevers, planTraining } from "@/engine/planner";
 import { positionRatings } from "@/engine/positionFit";
 import { projectValue } from "@/engine/value";
 import { MAX_COACHES } from "@/engine/tables";
+import { coachSummary, useClubSettings } from "@/lib/trainingSettings";
+import ClubSettingsForm from "./ClubSettingsForm";
+import Fold from "./UI/Fold";
 import { POSITIONS, type Player } from "@/types";
 import Rating from "./UI/Rating";
 
@@ -29,7 +32,7 @@ export default function SquadTable({
   players,
   hrefPrefix,
   lightIds,
-  subtitle = "Plans avec tous les coachs et le centre au niveau 5.",
+  subtitle,
   action,
   premium = false,
 }: {
@@ -43,6 +46,18 @@ export default function SquadTable({
   premium?: boolean;
 }) {
   const light = useMemo(() => new Set(lightIds), [lightIds]);
+  // Réglages du club s’ils sont enregistrés, sinon tout au niveau 5.
+  const club = useClubSettings();
+  const options = useMemo(
+    () =>
+      club.saved
+        ? { coaches: club.coaches, center: club.center }
+        : { coaches: MAX_COACHES, center: 5 },
+    [club],
+  );
+  const settingsLabel = club.saved
+    ? coachSummary(club)
+    : "tous les coachs et le centre au niveau 5";
   const [filter, setFilter] = useState(""),
     [position, setPosition] = useState(""),
     [age, setAge] = useState("");
@@ -54,7 +69,7 @@ export default function SquadTable({
         // Fiche légère : pas de sous-attributs, donc pas de plan fiable.
         const plan = light.has(player.id)
           ? null
-          : planTraining(player, { coaches: MAX_COACHES, center: 5 });
+          : planTraining(player, options);
         const ok = plan && !plan.incomplete;
         // Réservé : gain d’OVR en changeant de poste (carte de poste) et
         // +1 OVR le moins cher (coachs niveau 5), avec la plus-value estimée.
@@ -82,10 +97,7 @@ export default function SquadTable({
             posBest = posGain > 0 ? best.position : undefined;
           }
           if (!light.has(player.id)) {
-            const cheapest = ovrLevers(player, {
-              coaches: MAX_COACHES,
-              center: 5,
-            })
+            const cheapest = ovrLevers(player, options)
               .filter((l) => l.progresses)
               .sort((a, b) => a.cost - b.cost)[0];
             if (cheapest) {
@@ -117,7 +129,7 @@ export default function SquadTable({
           to: plan?.to,
         };
       }),
-    [players, light, premium],
+    [players, light, premium, options],
   );
   const filtered = rows
     .filter(
@@ -191,7 +203,7 @@ export default function SquadTable({
           <strong>
             {compact(rows.reduce((sum, p) => sum + (p.cost ?? 0), 0))}
           </strong>
-          <small>GMC2 → max · coachs 5</small>
+          <small>GMC2 → max</small>
         </div>
       </div>
       <section className="card">
@@ -200,10 +212,25 @@ export default function SquadTable({
             <h2 style={{ margin: 0 }}>
               Les joueurs <small>({filtered.length})</small>
             </h2>
-            <p>{subtitle}</p>
+            <p>{subtitle ?? `Plans calculés avec ${settingsLabel}.`}</p>
           </div>
           {action}
         </div>
+        <Fold
+          title="Réglages de mon club"
+          summary={
+            club.saved
+              ? settingsLabel
+              : "À renseigner pour des coûts identiques au jeu"
+          }
+        >
+          <p className="muted" style={{ marginTop: 0 }}>
+            Niveaux de tes coachs et de ton centre d’entraînement (menu
+            Entraînement du jeu). Mémorisés dans ce navigateur, repris par le
+            simulateur et les leviers d’OVR.
+          </p>
+          <ClubSettingsForm />
+        </Fold>
         <div className="filters">
           <input
             placeholder="Filtrer par nom…"
