@@ -636,7 +636,11 @@ describe("base du jeu lue par tranches", () => {
       ),
     ).toBe(true);
     expect(
-      (await mock.DB.prepare("SELECT COUNT(*) AS n FROM db_pages WHERE a = 'all'").first())?.n,
+      (
+        await mock.DB.prepare(
+          "SELECT COUNT(*) AS n FROM db_pages WHERE a = 'all'",
+        ).first()
+      )?.n,
     ).toBe(0);
     // Tranche trop grosse : coupée en deux, les joueurs sont gardés.
     const big = await call("POST", "/v1/db/players", {
@@ -673,7 +677,11 @@ describe("base du jeu lue par tranches", () => {
       players: [],
     });
     expect(
-      (await mock.DB.prepare("SELECT COUNT(*) AS n FROM db_pages WHERE a = 's:XX:1:2'").first())?.n,
+      (
+        await mock.DB.prepare(
+          "SELECT COUNT(*) AS n FROM db_pages WHERE a = 's:XX:1:2'",
+        ).first()
+      )?.n,
     ).toBe(0);
     const stats = await call("GET", "/v1/db/stats");
     expect(stats.body.totals.all).toBe(60);
@@ -731,5 +739,35 @@ describe("modules réservés : poste et affaires", () => {
     expect(
       deals.body.players.map((r: { player: { id: string } }) => r.player.id),
     ).toEqual(["a", "c"]);
+  });
+});
+
+describe("effectif à jour", () => {
+  it("préfère la fiche joueur plus récente que l’instantané du club", async () => {
+    const { call } = setup();
+    await call("POST", "/v1/clubs", {
+      clubs: [
+        {
+          teamId: "c1",
+          fetchedAt: Date.now() - 60000,
+          players: [full("p1", 90), full("p2", 80)],
+        },
+      ],
+    });
+    await call("POST", "/v1/players", {
+      players: [
+        { fetchedAt: Date.now(), player: { ...full("p1", 91), club_id: "c1" } },
+      ],
+    });
+    const squad = await call("GET", "/v1/site/club/c1", undefined, true);
+    const byId = Object.fromEntries(
+      squad.body.players.map(
+        (p: { player: { id: string; overall: number } }) => [
+          p.player.id,
+          p.player.overall,
+        ],
+      ),
+    );
+    expect(byId).toEqual({ p1: 91, p2: 80 });
   });
 });

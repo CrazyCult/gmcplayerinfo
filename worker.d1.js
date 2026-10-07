@@ -546,7 +546,20 @@ async function siteClubRequest(req, env, url, json) {
     env.DB.prepare('SELECT name, crest FROM site_clubs WHERE team_id = ?1').bind(teamId).first(),
   ]);
   let players = [];
-  if (c) { try { players = JSON.parse(c.players).filter(validPlayer).map(raw => ({ player: publicPlayer({ data: raw, team_id: teamId }), light: false })); } catch (_) {} }
+  if (c) {
+    let raws = [];
+    try { raws = JSON.parse(c.players).filter(validPlayer); } catch (_) {}
+    // Fiche lue joueur par joueur plus récente que l'instantané du club : on la
+    // préfère (sinon l'effectif montre un OVR, des sous-attributs et des coûts
+    // d'entraînement en retard sur la fiche du joueur).
+    const newer = new Map();
+    for (let i = 0; i < raws.length; i += 90) {
+      const part = raws.slice(i, i + 90).map(r => r.id);
+      (await env.DB.prepare(`SELECT id, data FROM full_players WHERE fetched_at > ?1 AND id IN (${part.map((_, k) => '?' + (k + 2)).join(',')})`)
+        .bind(c.fetched_at, ...part).all()).results.forEach(r => { try { newer.set(r.id, JSON.parse(r.data)); } catch (_) {} });
+    }
+    players = raws.map(raw => ({ player: publicPlayer({ data: newer.get(raw.id) || raw, team_id: teamId }), light: false }));
+  }
   if (!players.length) {
     const ids = (await env.DB.prepare('SELECT id FROM site_players WHERE team_id = ?1 LIMIT 80').bind(teamId).all()).results.map(r => r.id);
     if (ids.length) {
