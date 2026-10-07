@@ -636,11 +636,7 @@ describe("base du jeu lue par tranches", () => {
       ),
     ).toBe(true);
     expect(
-      (
-        await mock.DB.prepare(
-          "SELECT COUNT(*) AS n FROM db_pages WHERE a = 'all'",
-        ).first()
-      ).n,
+      (await mock.DB.prepare("SELECT COUNT(*) AS n FROM db_pages WHERE a = 'all'").first())?.n,
     ).toBe(0);
     // Tranche trop grosse : coupée en deux, les joueurs sont gardés.
     const big = await call("POST", "/v1/db/players", {
@@ -654,7 +650,7 @@ describe("base du jeu lue par tranches", () => {
       await mock.DB.prepare(
         "SELECT a FROM db_pages WHERE a IN ('s:CB:50:54', 's:CB:50:52', 's:CB:53:54') ORDER BY a",
       ).all()
-    ).results.map((r: { a: string }) => r.a);
+    ).results.map((r) => String(r.a));
     expect(parts).toEqual(["s:CB:50:52", "s:CB:53:54"]);
     // Petite tranche : ses pages suivantes sont créées.
     await call("POST", "/v1/db/players", {
@@ -667,7 +663,7 @@ describe("base du jeu lue par tranches", () => {
       await mock.DB.prepare(
         "SELECT p FROM db_pages WHERE a = 's:ST:80:84' ORDER BY p",
       ).all()
-    ).results.map((r: { p: number }) => r.p);
+    ).results.map((r) => Number(r.p));
     expect(st).toEqual([1, 2, 3]);
     // Tranche inconnue refusée comme page (les joueurs restent acceptés).
     await call("POST", "/v1/db/players", {
@@ -677,13 +673,63 @@ describe("base du jeu lue par tranches", () => {
       players: [],
     });
     expect(
-      (
-        await mock.DB.prepare(
-          "SELECT COUNT(*) AS n FROM db_pages WHERE a = 's:XX:1:2'",
-        ).first()
-      ).n,
+      (await mock.DB.prepare("SELECT COUNT(*) AS n FROM db_pages WHERE a = 's:XX:1:2'").first())?.n,
     ).toBe(0);
     const stats = await call("GET", "/v1/db/stats");
     expect(stats.body.totals.all).toBe(60);
+  });
+});
+
+describe("modules réservés : poste et affaires", () => {
+  it("calcule le gain d’OVR en changeant de famille de poste", async () => {
+    const { positionGain } = await import("../worker.d1.js");
+    // Ailier très rapide et bon dribbleur, placé en CB : bien meilleur ailier.
+    expect(
+      positionGain(
+        { pac: 95, sho: 70, pas: 70, dri: 90, def: 50, phy: 60 },
+        "CB",
+      ),
+    ).toEqual({ gain: expect.any(Number), best: "LW/RW" });
+    expect(
+      positionGain(
+        { pac: 95, sho: 70, pas: 70, dri: 90, def: 50, phy: 60 },
+        "LW",
+      ).gain,
+    ).toBe(0);
+    expect(positionGain({ pac: 80 }, "ST")).toEqual({ gain: 0, best: null });
+  });
+  it("trie les joueurs par gain de poste et par écart valeur / prix demandé", async () => {
+    const { call } = setup();
+    await call("POST", "/v1/db/players", {
+      players: [
+        light("a", {
+          position: "CB",
+          attributes: { pac: 95, sho: 70, pas: 70, dri: 90, def: 50, phy: 60 },
+          value: 900000,
+          transfer_price: 400000,
+        }),
+        light("b", { position: "ST", value: 500000, transfer_price: 600000 }),
+        light("c", { position: "ST", value: 800000, transfer_price: 700000 }),
+      ],
+    });
+    const pos = await call(
+      "GET",
+      "/v1/site/players?sort=posgain",
+      undefined,
+      true,
+    );
+    expect(
+      pos.body.players.map((r: { player: { id: string } }) => r.player.id),
+    ).toEqual(["a"]);
+    expect(pos.body.players[0]).toMatchObject({ posBest: "LW/RW" });
+    const deals = await call(
+      "GET",
+      "/v1/site/players?sort=bargain",
+      undefined,
+      true,
+    );
+    expect(
+      deals.body.players.map((r: { player: { id: string } }) => r.player.id),
+    ).toEqual(["a", "c"]);
   });
 });

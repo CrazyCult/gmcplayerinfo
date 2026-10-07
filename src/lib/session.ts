@@ -123,3 +123,17 @@ export function safeNext(next: string | null | undefined) {
     ? next
     : "/squad";
 }
+
+/**
+ * Comptes autorisés aux modules réservés : clés de compte (voir la page
+ * « Mon compte ») séparées par des virgules dans PREMIUM_ACCOUNT_KEYS.
+ */
+export async function isPremium(session?: Session | null) {
+  const s = session === undefined ? await getSession() : session;
+  if (!s) return false;
+  const allowed = (process.env.PREMIUM_ACCOUNT_KEYS ?? "")
+    .split(",")
+    .map((key) => key.trim())
+    .filter(Boolean);
+  return allowed.length > 0 && allowed.includes(await accountKey(s.sub));
+}

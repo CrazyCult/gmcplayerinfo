@@ -25,9 +25,9 @@ export default function HeaderAccount() {
   const here = `${pathname}${search.size ? `?${search}` : ""}`;
   return state.name !== null ? (
     <form action="/api/auth/logout" method="post" className="account">
-      <span className="account-name" title="Connecté avec Google">
+      <a className="account-name" href="/compte" title="Mon compte">
         {state.name || "Connecté"}
-      </span>
+      </a>
       <input type="hidden" name="next" value={here} />
       <button className="pill" type="submit">
         Déconnexion

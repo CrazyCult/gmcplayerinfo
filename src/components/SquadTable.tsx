@@ -3,7 +3,9 @@
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { compact, money } from "@/lib/format";
-import { planTraining } from "@/engine/planner";
+import { ovrLevers, planTraining } from "@/engine/planner";
+import { positionRatings } from "@/engine/positionFit";
+import { projectValue } from "@/engine/value";
 import { MAX_COACHES } from "@/engine/tables";
 import { POSITIONS, type Player } from "@/types";
 import Rating from "./UI/Rating";
@@ -17,7 +19,10 @@ type SortKey =
   | "gap"
   | "sessions"
   | "cost"
-  | "fitness";
+  | "fitness"
+  | "posGain"
+  | "plusOneCost"
+  | "plusOneNet";
 
 /** Tableau d’effectif : notes, écart au potentiel et plan d’entraînement. */
 export default function SquadTable({
@@ -26,6 +31,7 @@ export default function SquadTable({
   lightIds,
   subtitle = "Plans avec tous les coachs et le centre au niveau 5.",
   action,
+  premium = false,
 }: {
   players: Player[];
   /** Début du lien vers la fiche (« /player/ » ou « /player/local: »). */
@@ -33,6 +39,8 @@ export default function SquadTable({
   lightIds?: string[];
   subtitle?: string;
   action?: ReactNode;
+  /** Modules réservés : meilleur poste, +1 OVR le moins cher, revente. */
+  premium?: boolean;
 }) {
   const light = useMemo(() => new Set(lightIds), [lightIds]);
   const [filter, setFilter] = useState(""),
@@ -48,8 +56,60 @@ export default function SquadTable({
           ? null
           : planTraining(player, { coaches: MAX_COACHES, center: 5 });
         const ok = plan && !plan.incomplete;
+        // Réservé : gain d’OVR en changeant de poste (carte de poste) et
+        // +1 OVR le moins cher (coachs niveau 5), avec la plus-value estimée.
+        let posGain: number | undefined,
+          posBest: string | undefined,
+          plusOneCost: number | undefined,
+          plusOneSessions: number | undefined,
+          plusOneNet: number | undefined;
+        if (premium) {
+          const table = positionRatings(player).filter((r) =>
+            player.position === "GK"
+              ? r.position === "GK"
+              : r.position !== "GK",
+          );
+          const own = table.find((r) => r.position === player.position)?.raw;
+          const best = table.reduce<(typeof table)[number] | undefined>(
+            (top, r) =>
+              r.raw !== undefined && (top?.raw === undefined || r.raw > top.raw)
+                ? r
+                : top,
+            undefined,
+          );
+          if (own !== undefined && best?.raw !== undefined) {
+            posGain = best.raw - own;
+            posBest = posGain > 0 ? best.position : undefined;
+          }
+          if (!light.has(player.id)) {
+            const cheapest = ovrLevers(player, {
+              coaches: MAX_COACHES,
+              center: 5,
+            })
+              .filter((l) => l.progresses)
+              .sort((a, b) => a.cost - b.cost)[0];
+            if (cheapest) {
+              plusOneCost = cheapest.cost;
+              plusOneSessions = cheapest.sessions;
+              if (player.value)
+                plusOneNet =
+                  projectValue(
+                    player.value,
+                    player.overall,
+                    player.overall + 1,
+                  ) -
+                  player.value -
+                  cheapest.cost;
+            }
+          }
+        }
         return {
           ...player,
+          posGain,
+          posBest,
+          plusOneCost,
+          plusOneSessions,
+          plusOneNet,
           gap: player.potential - player.overall,
           sessions: ok ? plan.sessions : undefined,
           cost: ok ? plan.cost : undefined,
@@ -57,7 +117,7 @@ export default function SquadTable({
           to: plan?.to,
         };
       }),
-    [players, light],
+    [players, light, premium],
   );
   const filtered = rows
     .filter(
@@ -81,7 +141,9 @@ export default function SquadTable({
     if (sort === key) setDirection(-direction);
     else {
       setSort(key);
-      setDirection(key === "name" || key === "position" ? 1 : -1);
+      setDirection(
+        key === "name" || key === "position" || key === "plusOneCost" ? 1 : -1,
+      );
     }
   }
   const headers: [SortKey, string][] = [
@@ -94,6 +156,13 @@ export default function SquadTable({
     ["sessions", "Séances → max"],
     ["cost", "Coût → max"],
     ["fitness", "Forme"],
+    ...(premium
+      ? ([
+          ["posGain", "★ Poste +"],
+          ["plusOneCost", "★ +1 OVR le moins cher"],
+          ["plusOneNet", "★ Revente +1"],
+        ] as [SortKey, string][])
+      : []),
   ];
   return (
     <>
@@ -225,6 +294,46 @@ export default function SquadTable({
                     {player.cost === undefined ? "—" : compact(player.cost)}
                   </td>
                   <td>{player.fitness ?? "—"}</td>
+                  {premium && (
+                    <>
+                      <td>
+                        {player.posGain && player.posGain > 0 ? (
+                          <strong style={{ color: "var(--attr-good)" }}>
+                            {player.posBest} +{player.posGain}
+                          </strong>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td
+                        title={
+                          player.plusOneCost === undefined
+                            ? undefined
+                            : money(player.plusOneCost)
+                        }
+                      >
+                        {player.plusOneCost === undefined
+                          ? "—"
+                          : `${compact(player.plusOneCost)} · ${player.plusOneSessions} séance${(player.plusOneSessions ?? 0) > 1 ? "s" : ""}`}
+                      </td>
+                      <td
+                        style={{
+                          color:
+                            player.plusOneNet === undefined
+                              ? undefined
+                              : player.plusOneNet >= 0
+                                ? "var(--attr-good)"
+                                : "var(--attr-bad)",
+                          fontWeight: 700,
+                        }}
+                        title="Valeur estimée à +1 OVR − valeur actuelle − coût de l’entraînement"
+                      >
+                        {player.plusOneNet === undefined
+                          ? "—"
+                          : `${player.plusOneNet >= 0 ? "+" : "−"}${compact(Math.abs(player.plusOneNet))}`}
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>

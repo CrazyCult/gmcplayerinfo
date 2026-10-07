@@ -10,7 +10,7 @@ import {
   type ClubHit,
   type ClubSquad,
 } from "@/data/gmc-index";
-import { accountKey, authEnabled, getSession } from "@/lib/session";
+import { accountKey, authEnabled, getSession, isPremium } from "@/lib/session";
 import { linkClub, unlinkClub } from "./actions";
 
 export const metadata = { title: "Mon effectif" };
@@ -46,6 +46,7 @@ export default async function SquadPage({
   if (!indexEnabled()) return <SquadImport />;
 
   const session = authEnabled() ? await getSession() : null;
+  const premium = await isPremium(session);
   let linked: string | null = null,
     problem = "";
   if (session) {
@@ -162,6 +163,7 @@ export default async function SquadPage({
             lightIds={club.players
               .filter((p) => p.light)
               .map((p) => p.player.id)}
+            premium={premium}
           />
         ) : (
           <div className="empty">

@@ -2,12 +2,14 @@ import Link from "next/link";
 import {
   CATALOG_AVAIL,
   CATALOG_SORTS,
+  PREMIUM_SORTS,
   getCatalog,
   indexEnabled,
 } from "@/data/gmc-index";
-import { money } from "@/lib/format";
+import { compact, money } from "@/lib/format";
 import { POSITIONS } from "@/types";
 import Rating from "@/components/UI/Rating";
+import { isPremium } from "@/lib/session";
 
 export const metadata = { title: "Tous les joueurs GameChase" };
 export default async function PlayersPage({
@@ -29,8 +31,11 @@ export default async function PlayersPage({
     ? params.position!
     : "";
   const avail = CATALOG_AVAIL.find((value) => value === params.avail) ?? "";
+  const premium = await isPremium();
   const sort =
-    CATALOG_SORTS.find((value) => value === params.sort) ?? "overall";
+    CATALOG_SORTS.filter(
+      (value) => premium || !PREMIUM_SORTS.includes(value),
+    ).find((value) => value === params.sort) ?? "overall";
   const page = Math.max(
     1,
     Math.min(20, Number.parseInt(params.page || "1", 10) || 1),
@@ -82,6 +87,16 @@ export default async function PlayersPage({
             <option value="gap">Marge de progression</option>
             <option value="price">Prix de vente croissant</option>
             <option value="loan">Prix de prêt croissant</option>
+            {premium && (
+              <>
+                <option value="posgain">
+                  ★ Gain d’OVR en changeant de poste
+                </option>
+                <option value="bargain">
+                  ★ Affaires : valeur au-dessus du prix demandé
+                </option>
+              </>
+            )}
           </select>
           <button className="button primary" type="submit">
             Rechercher
@@ -112,54 +127,102 @@ export default async function PlayersPage({
                   <th>OVR</th>
                   <th>POT</th>
                   <th>Prix demandé</th>
+                  {premium && <th title="Valeur du jeu">Valeur</th>}
+                  {premium && (
+                    <th title="Meilleur poste après une carte de poste">
+                      Poste +
+                    </th>
+                  )}
                   <th>Club</th>
                   <th>Collecte</th>
                 </tr>
               </thead>
               <tbody>
-                {catalog.players.map(({ player, fetchedAt, light, market }) => (
-                  <tr key={player.id}>
-                    <td>
-                      <Link
-                        href={`/player/${encodeURIComponent(player.id)}`}
-                        prefetch={false}
-                      >
-                        {player.name}
-                      </Link>
-                      {light && (
-                        <small className="muted" title="6 stats seulement">
-                          {" "}
-                          · légère
-                        </small>
+                {catalog.players.map(
+                  ({
+                    player,
+                    fetchedAt,
+                    light,
+                    market,
+                    value,
+                    posGain,
+                    posBest,
+                  }) => (
+                    <tr key={player.id}>
+                      <td>
+                        <Link
+                          href={`/player/${encodeURIComponent(player.id)}`}
+                          prefetch={false}
+                        >
+                          {player.name}
+                        </Link>
+                        {light && (
+                          <small className="muted" title="6 stats seulement">
+                            {" "}
+                            · légère
+                          </small>
+                        )}
+                      </td>
+                      <td>{player.position}</td>
+                      <td>{player.age}</td>
+                      <td>
+                        <Rating value={player.overall} />
+                      </td>
+                      <td>
+                        <Rating value={player.potential} />
+                      </td>
+                      <td>
+                        {market?.transferPrice
+                          ? money(market.transferPrice)
+                          : market?.loanFee
+                            ? `prêt ${money(market.loanFee)}`
+                            : "—"}
+                      </td>
+                      {premium && (
+                        <td>
+                          {value ? money(value) : "—"}
+                          {value && market?.transferPrice ? (
+                            <small
+                              style={{
+                                color:
+                                  value > market.transferPrice
+                                    ? "var(--attr-good)"
+                                    : "var(--attr-bad)",
+                              }}
+                            >
+                              {" "}
+                              ({value > market.transferPrice ? "+" : "−"}
+                              {compact(Math.abs(value - market.transferPrice))})
+                            </small>
+                          ) : null}
+                        </td>
                       )}
-                    </td>
-                    <td>{player.position}</td>
-                    <td>{player.age}</td>
-                    <td>
-                      <Rating value={player.overall} />
-                    </td>
-                    <td>
-                      <Rating value={player.potential} />
-                    </td>
-                    <td>
-                      {market?.transferPrice
-                        ? money(market.transferPrice)
-                        : market?.loanFee
-                          ? `prêt ${money(market.loanFee)}`
+                      {premium && (
+                        <td>
+                          {posGain > 0 ? (
+                            <strong style={{ color: "var(--attr-good)" }}>
+                              {posBest} +{posGain}
+                            </strong>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                      )}
+                      <td>
+                        {market?.freeAgent
+                          ? "libre"
+                          : (market?.clubName ?? "—")}
+                      </td>
+                      <td>
+                        {fetchedAt
+                          ? new Date(fetchedAt).toLocaleDateString("fr-CH", {
+                              timeZone: "Europe/Zurich",
+                            })
                           : "—"}
-                    </td>
-                    <td>
-                      {market?.freeAgent ? "libre" : (market?.clubName ?? "—")}
-                    </td>
-                    <td>
-                      {fetchedAt
-                        ? new Date(fetchedAt).toLocaleDateString("fr-CH", {
-                            timeZone: "Europe/Zurich",
-                          })
-                        : "—"}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  ),
+                )}
               </tbody>
             </table>
           </div>

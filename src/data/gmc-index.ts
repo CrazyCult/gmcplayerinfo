@@ -55,7 +55,12 @@ const catalogSchema = z.object({
   players: z.array(
     snapshotSchema
       .pick({ fetchedAt: true, teamId: true, light: true, market: true })
-      .extend({ player: playerSummarySchema }),
+      .extend({
+        player: playerSummarySchema,
+        value: z.number().nullable().optional(),
+        posGain: z.number().int().optional().default(0),
+        posBest: z.string().nullable().optional(),
+      }),
   ),
   total: z.number().int().nonnegative(),
   /** Plus de résultats que le décompte affiché (décompte plafonné par l’index). */
@@ -152,7 +157,14 @@ export const CATALOG_SORTS = [
   "gap",
   "price",
   "loan",
+  "posgain",
+  "bargain",
 ] as const;
+/** Tris réservés aux comptes autorisés (PREMIUM_ACCOUNT_KEYS). */
+export const PREMIUM_SORTS: readonly (typeof CATALOG_SORTS)[number][] = [
+  "posgain",
+  "bargain",
+];
 export async function getCatalog({
   q = "",
   position = "",

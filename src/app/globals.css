@@ -1641,3 +1641,14 @@ details.fold[open] > summary .fold-chevron {
     display: inline-block;
   }
 }
+
+.account-key {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--secondary);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}

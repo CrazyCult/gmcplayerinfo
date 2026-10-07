@@ -51,3 +51,7 @@ Publier avec `pnpm dlx vercel deploy --prod`. Après ajout ou modification des v
 Vérifier sur l’URL de production : total du catalogue, plusieurs pages, filtre, recherche, fiche, simulateur, comparaison et import local. Un dépôt poussé ou un build local réussi n’est pas une preuve de déploiement.
 
 Documentation : [déploiement Vercel CLI](https://vercel.com/docs/projects/deploy-from-cli), [variables Vercel](https://vercel.com/docs/cli/env), [configuration Wrangler](https://developers.cloudflare.com/workers/wrangler/configuration/), [limitation de débit Worker](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/).
+
+### Modules réservés
+
+`PREMIUM_ACCOUNT_KEYS` : clés de compte autorisées, séparées par des virgules. Chaque utilisateur trouve la sienne sur la page « Mon compte » (clic sur son prénom en haut à droite, une fois connecté avec Google). Ces comptes voient, dans « Tous les joueurs », les tris « Gain d’OVR en changeant de poste » et « Affaires » avec les colonnes Valeur et Poste +, et dans « Mon effectif » les colonnes Poste +, +1 OVR le moins cher et Revente +1. Changer `AUTH_SECRET` change toutes les clés.

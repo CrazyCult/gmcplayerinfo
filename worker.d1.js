@@ -111,7 +111,10 @@ async function ensureDb(env) {
   if (dbReady.has(env.DB)) return;
   await env.DB.batch(SCHEMA.map(q => env.DB.prepare(q)));
   // Colonnes ajoutées après coup (erreur ignorée si elles existent déjà).
-  try { await env.DB.prepare('ALTER TABLE site_clubs ADD COLUMN crest TEXT').run(); } catch (_) {}
+  for (const q of ['ALTER TABLE site_clubs ADD COLUMN crest TEXT', 'ALTER TABLE site_players ADD COLUMN value INTEGER',
+    'ALTER TABLE site_players ADD COLUMN pos_gain INTEGER NOT NULL DEFAULT 0', 'ALTER TABLE site_players ADD COLUMN pos_best TEXT'])
+    try { await env.DB.prepare(q).run(); } catch (_) {}
+  try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS sp_posgain ON site_players(pos_gain) WHERE pos_gain > 0').run(); } catch (_) {}
   await env.DB.batch(['transfer', 'loan'].map(a => env.DB.prepare('INSERT OR IGNORE INTO db_pages (a, p) VALUES (?1, 1)').bind(a)));
   // Passage aux tranches (une seule fois) : la lecture page par page de toute
   // la base (« all ») est remplacée par une page 1 par tranche.
@@ -171,16 +174,53 @@ const int = (v) => (Number.isFinite(v) ? Math.round(v) : null);
 // --- Upserts conditionnels -----------------------------------------------------
 // Joueur d'un effectif complet (club lu par l'extension).
 function upsertFull(env, p, teamId, fetchedAt) {
-  return env.DB.prepare(`INSERT INTO site_players (id, team_id, light, src_at, name, name_norm, last_norm, position, age, overall, potential)
-      VALUES (?1, ?2, 0, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+  const pg = positionGain(p.attributes, p.position);
+  const value = isNum(p.value, 0, 1e12) ? Math.round(p.value) : null;
+  return env.DB.prepare(`INSERT INTO site_players (id, team_id, light, src_at, name, name_norm, last_norm, position, age, overall, potential, value, pos_gain, pos_best)
+      VALUES (?1, ?2, 0, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
     ON CONFLICT(id) DO UPDATE SET team_id = excluded.team_id, light = 0, src_at = excluded.src_at, name = excluded.name,
       name_norm = excluded.name_norm, last_norm = excluded.last_norm, position = excluded.position, age = excluded.age,
-      overall = excluded.overall, potential = excluded.potential
+      overall = excluded.overall, potential = excluded.potential, value = COALESCE(excluded.value, site_players.value),
+      pos_gain = excluded.pos_gain, pos_best = excluded.pos_best
     WHERE site_players.light = 1 OR (excluded.src_at >= site_players.src_at AND (site_players.team_id IS NOT excluded.team_id
       OR site_players.name IS NOT excluded.name OR site_players.position IS NOT excluded.position OR site_players.age IS NOT excluded.age
-      OR site_players.overall IS NOT excluded.overall OR site_players.potential IS NOT excluded.potential))`)
-    .bind(p.id, teamId, fetchedAt, p.name, normName(p.name), lastToken(p.name), String(p.position || ''), int(p.age), int(p.overall), int(p.potential));
+      OR site_players.overall IS NOT excluded.overall OR site_players.potential IS NOT excluded.potential
+      OR site_players.pos_gain IS NOT excluded.pos_gain OR (excluded.value IS NOT NULL AND site_players.value IS NOT excluded.value)))`)
+    .bind(p.id, teamId, fetchedAt, p.name, normName(p.name), lastToken(p.name), String(p.position || ''), int(p.age), int(p.overall), int(p.potential),
+      value, pg.gain, pg.best);
 }
+// --- Gain d'OVR en changeant de poste (carte de poste) ----------------------------
+// Même formule que le jeu : OVR = floor((Σ poids% × stat + 50) / 100) avec les
+// poids de la famille du poste. On compare la famille actuelle à la meilleure.
+const POS_WEIGHTS = {
+  CB: [11, 3, 13, 4, 37, 32], FB: [25, 5, 15, 15, 25, 15], CDM: [10, 5, 25, 10, 30, 20], CM: [13, 13, 27, 17, 17, 13],
+  CAM: [13, 18, 27, 24, 9, 9], WM: [24, 13, 20, 24, 10, 9], W: [28, 19, 14, 28, 5, 6], ST: [25, 30, 10, 20, 3, 12],
+};
+const POS_FAMILY = { CB: 'CB', LB: 'FB', RB: 'FB', LWB: 'FB', RWB: 'FB', CDM: 'CDM', CM: 'CM', CAM: 'CAM', LM: 'WM', RM: 'WM', LW: 'W', RW: 'W', CF: 'ST', ST: 'ST' };
+const FAMILY_LABEL = { CB: 'CB', FB: 'LB/RB', CDM: 'CDM', CM: 'CM', CAM: 'CAM', WM: 'LM/RM', W: 'LW/RW', ST: 'ST' };
+const STAT_SUBS = {
+  pac: ['acceleration', 'sprintSpeed'], sho: ['finishing', 'shotPower', 'longShots', 'volleys', 'penalties', 'attackingPositioning'],
+  pas: ['vision', 'crossing', 'fkAccuracy', 'shortPassing', 'longPassing', 'curve'],
+  dri: ['agility', 'balance', 'reactions', 'ballControl', 'dribblingSub', 'composure'],
+  def: ['interceptions', 'headingAccuracy', 'defensiveAwareness', 'standingTackle', 'slidingTackle'],
+  phy: ['jumping', 'stamina', 'strength', 'aggression'],
+};
+export function positionGain(attrs, position) {
+  const fam = POS_FAMILY[String(position || '')];
+  if (!fam || !attrs || typeof attrs !== 'object') return { gain: 0, best: null };
+  const stats = Object.entries(STAT_SUBS).map(([k, subs]) => {
+    if (isNum(attrs[k], 0, 250)) return attrs[k];
+    const v = subs.map(s => attrs[s]).filter(x => isNum(x, 0, 250));
+    return v.length === subs.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
+  });
+  if (stats.some(v => v == null)) return { gain: 0, best: null };
+  const ovr = (f) => Math.floor((POS_WEIGHTS[f].reduce((sum, w, i) => sum + w * stats[i], 0) + 50) / 100);
+  const own = ovr(fam);
+  let best = fam, top = own;
+  for (const f of Object.keys(POS_WEIGHTS)) if (ovr(f) > top) { top = ovr(f); best = f; }
+  return top > own ? { gain: top - own, best: FAMILY_LABEL[best] } : { gain: 0, best: null };
+}
+
 // Nom de club (n'écrit que s'il change).
 function upsertClubName(env, id, name, now) {
   return env.DB.prepare(`INSERT INTO site_clubs (team_id, name, name_norm, updated_at) VALUES (?1, ?2, ?3, ?4)
@@ -191,9 +231,14 @@ function upsertClubName(env, id, name, now) {
 function upsertLight(env, x) {
   const tp = x.transfer_price > 0 ? Math.round(x.transfer_price) : null, lf = x.loan_fee > 0 ? Math.round(x.loan_fee) : null;
   const club = x.free_agent ? null : (isStr(x.club_id, 64) ? x.club_id : null);
+  const pg = positionGain(x.attributes, x.position);
+  const value = isNum(x.value, 0, 1e12) ? Math.round(x.value) : null;
   return env.DB.prepare(`INSERT INTO site_players (id, team_id, light, name, name_norm, last_norm, position, age, overall, potential,
-      transfer_price, loan_fee, free_agent, club_name) VALUES (?1, ?2, 1, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+      transfer_price, loan_fee, free_agent, club_name, value, pos_gain, pos_best) VALUES (?1, ?2, 1, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
     ON CONFLICT(id) DO UPDATE SET
+      value = CASE WHEN site_players.light = 1 OR site_players.value IS NULL THEN excluded.value ELSE site_players.value END,
+      pos_gain = CASE WHEN site_players.light = 1 THEN excluded.pos_gain ELSE site_players.pos_gain END,
+      pos_best = CASE WHEN site_players.light = 1 THEN excluded.pos_best ELSE site_players.pos_best END,
       team_id = CASE WHEN site_players.light = 1 THEN excluded.team_id ELSE site_players.team_id END,
       name = CASE WHEN site_players.light = 1 THEN excluded.name ELSE site_players.name END,
       name_norm = CASE WHEN site_players.light = 1 THEN excluded.name_norm ELSE site_players.name_norm END,
@@ -205,11 +250,13 @@ function upsertLight(env, x) {
       transfer_price = excluded.transfer_price, loan_fee = excluded.loan_fee, free_agent = excluded.free_agent, club_name = excluded.club_name
     WHERE site_players.transfer_price IS NOT excluded.transfer_price OR site_players.loan_fee IS NOT excluded.loan_fee
       OR site_players.free_agent IS NOT excluded.free_agent OR site_players.club_name IS NOT excluded.club_name
+      OR (site_players.value IS NULL AND excluded.value IS NOT NULL)
+      OR (site_players.light = 1 AND (site_players.value IS NOT excluded.value OR site_players.pos_gain IS NOT excluded.pos_gain))
       OR (site_players.light = 1 AND (site_players.team_id IS NOT excluded.team_id OR site_players.name IS NOT excluded.name
         OR site_players.position IS NOT excluded.position OR site_players.age IS NOT excluded.age
         OR site_players.overall IS NOT excluded.overall OR site_players.potential IS NOT excluded.potential))`)
     .bind(x.id, club, x.name, normName(x.name), lastToken(x.name), x.position, x.age, x.overall, x.potential, tp, lf,
-      x.free_agent ? 1 : 0, isStr(x.club_name, 80) ? x.club_name : null);
+      x.free_agent ? 1 : 0, isStr(x.club_name, 80) ? x.club_name : null, value, pg.gain, pg.best);
 }
 function upsertDbDetail(env, x, now) {
   const tp = x.transfer_price > 0 ? Math.round(x.transfer_price) : null, lf = x.loan_fee > 0 ? Math.round(x.loan_fee) : null;
@@ -310,6 +357,9 @@ async function findPlayer(env, id) {
 const SITE_SORTS = {
   overall: 'overall DESC', potential: 'potential DESC', gap: '(potential - overall) DESC',
   price: 'transfer_price ASC', loan: 'loan_fee ASC',
+  // Réservés (le site ne les propose qu'aux comptes autorisés).
+  posgain: 'pos_gain DESC, overall DESC',
+  bargain: '(value - transfer_price) DESC',
 };
 function catalogWhere(params) {
   const where = [], args = [];
@@ -326,7 +376,9 @@ function catalogWhere(params) {
     if (num(k) != null) add(sql, num(k));
   const sort = SITE_SORTS[params.sort] ? params.sort : 'overall';
   // Index partiels : un tri par prix ne montre que les joueurs à vendre / en prêt.
-  if (params.avail === 'transfer' || sort === 'price' || num('priceMax') != null) where.push('transfer_price > 0');
+  if (params.avail === 'transfer' || sort === 'price' || sort === 'bargain' || num('priceMax') != null) where.push('transfer_price > 0');
+  if (sort === 'bargain') where.push('value > transfer_price');
+  if (sort === 'posgain') where.push('pos_gain > 0');
   if (params.avail === 'loan' || sort === 'loan') where.push('loan_fee > 0');
   if (params.avail === 'free') where.push('free_agent = 1');
   if (params.avail === 'full') where.push('light = 0');
@@ -427,6 +479,7 @@ async function siteRequest(req, env, url, json) {
   return json({ players: c.results.map(row => ({
     player: { id: row.id, name: row.name, position: row.position, age: row.age, overall: row.overall, potential: row.potential },
     fetchedAt: row.src_at || 0, teamId: row.team_id || '', light: !!row.light, market: marketOf(row),
+    value: row.value ?? null, posGain: row.pos_gain || 0, posBest: row.pos_best || null,
   })), total: c.total, capped: c.capped, page: c.page, pages: c.pages });
 }
 
