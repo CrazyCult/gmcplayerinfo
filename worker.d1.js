@@ -36,6 +36,21 @@ const PRIVACY_HTML = `<!doctype html><html lang="fr"><head><meta charset="utf-8"
 // ---------------------------------------------------------------------------
 const MAX_CLUBS_PER_POST = 10, MAX_PLAYERS = 60, MAX_CLUB_BYTES = 250000, PAGE = 50;
 const DB_PAGE_SIZE = 24, DB_AVAIL = ['all', 'transfer', 'loan', 'free'];
+// Base complète lue par tranches (poste × fourchette d'OVR) : chaque tranche
+// ne fait que quelques pages, donc pas de pages profondes (lentes pour le jeu)
+// ni de joueurs qui glissent d'une page à l'autre pendant la lecture. Une
+// tranche trop grosse (> DB_SLICE_SPLIT joueurs) est coupée en deux.
+const DB_POSITIONS = ['GK', 'CB', 'LB', 'RB', 'LWB', 'RWB', 'CDM', 'CM', 'CAM', 'LM', 'RM', 'LW', 'RW', 'CF', 'ST'];
+const DB_BANDS = [[1, 49], [50, 54], [55, 59], [60, 64], [65, 69], [70, 74], [75, 79], [80, 84], [85, 89], [90, 94], [95, 99], [100, 150]];
+const DB_SLICE_SPLIT = 240;
+const SLICE_RE = /^s:([A-Z]{2,3}):(\d{1,3}):(\d{1,3})$/;
+const sliceKey = (pos, min, max) => `s:${pos}:${min}:${max}`;
+function parseSlice(a) {
+  const m = SLICE_RE.exec(String(a || ''));
+  if (!m || !DB_POSITIONS.includes(m[1])) return null;
+  const min = +m[2], max = +m[3];
+  return min >= 1 && max <= 150 && min <= max ? { pos: m[1], min, max } : null;
+}
 const DB_MARKET_MS = 55 * 60e3;      // marché et prêts : relus chaque heure
 const DB_FULL_MS = 24 * 3600e3;      // base complète : un tour par jour au plus
 const DB_LEASE_MS = 10 * 60e3;
@@ -97,7 +112,16 @@ async function ensureDb(env) {
   await env.DB.batch(SCHEMA.map(q => env.DB.prepare(q)));
   // Colonnes ajoutées après coup (erreur ignorée si elles existent déjà).
   try { await env.DB.prepare('ALTER TABLE site_clubs ADD COLUMN crest TEXT').run(); } catch (_) {}
-  await env.DB.batch(['all', 'transfer', 'loan'].map(a => env.DB.prepare('INSERT OR IGNORE INTO db_pages (a, p) VALUES (?1, 1)').bind(a)));
+  await env.DB.batch(['transfer', 'loan'].map(a => env.DB.prepare('INSERT OR IGNORE INTO db_pages (a, p) VALUES (?1, 1)').bind(a)));
+  // Passage aux tranches (une seule fois) : la lecture page par page de toute
+  // la base (« all ») est remplacée par une page 1 par tranche.
+  if (!(await env.DB.prepare("SELECT v FROM db_meta WHERE k = 'slices:v1'").first())) {
+    const stmts = [env.DB.prepare("DELETE FROM db_pages WHERE a = 'all'"), env.DB.prepare("DELETE FROM db_meta WHERE k = 'total:all'")];
+    for (const pos of DB_POSITIONS) for (const [min, max] of DB_BANDS)
+      stmts.push(env.DB.prepare('INSERT OR IGNORE INTO db_pages (a, p) VALUES (?1, 1)').bind(sliceKey(pos, min, max)));
+    stmts.push(env.DB.prepare("INSERT OR IGNORE INTO db_meta (k, v) VALUES ('slices:v1', '1')"));
+    await env.DB.batch(stmts);
+  }
   dbReady.add(env.DB);
 }
 
@@ -741,7 +765,8 @@ async function extensionRequest(req, env, url, json) {
   // --- Base des joueurs du jeu -----------------------------------------------
   if (req.method === 'POST' && url.pathname === '/v1/db/players') {
     let body; try { body = await req.json(); } catch (_) { return json({ error: 'JSON invalide' }, 400); }
-    const a = DB_AVAIL.includes(body.a) ? body.a : null;
+    const slice = parseSlice(body.a);
+    const a = DB_AVAIL.includes(body.a) || slice ? body.a : null;
     const p = isInt(body.p, 1, 100000) ? body.p : null;
     const raw = Array.isArray(body.players) ? body.players.slice(0, 60) : [];
     const players = raw.filter(validDbPlayer);
@@ -759,7 +784,14 @@ async function extensionRequest(req, env, url, json) {
         if (x.loan_fee > 0) stmts.push(upsertPrice(env, x, 'loan', x.loan_fee, now));
       }
     }
-    if (a && p) {
+    const tooBig = slice && p === 1 && isInt(body.total, 0, 2000000) && body.total > DB_SLICE_SPLIT && slice.max > slice.min;
+    if (tooBig) {
+      // Tranche trop grosse : coupée en deux (ses joueurs sont quand même gardés).
+      const mid = Math.floor((slice.min + slice.max) / 2);
+      stmts.push(env.DB.prepare('DELETE FROM db_pages WHERE a = ?1').bind(a), env.DB.prepare('DELETE FROM db_meta WHERE k = ?1').bind('total:' + a));
+      for (const [lo, hi] of [[slice.min, mid], [mid + 1, slice.max]])
+        stmts.push(env.DB.prepare('INSERT OR IGNORE INTO db_pages (a, p) VALUES (?1, 1)').bind(sliceKey(slice.pos, lo, hi)));
+    } else if (a && p) {
       stmts.push(env.DB.prepare('INSERT INTO db_pages (a, p, done_at) VALUES (?1, ?2, ?3) ON CONFLICT(a, p) DO UPDATE SET done_at = excluded.done_at, leased_until = 0').bind(a, p, now));
       if (isInt(body.total, 0, 2000000) && a !== 'free') {
         const pages = Math.max(1, Math.ceil(body.total / DB_PAGE_SIZE));
@@ -787,8 +819,8 @@ async function extensionRequest(req, env, url, json) {
     let tasks = market.results.map(r => ({ a: r.a, p: r.p, kind: 'market' }));
     const budgetOk = (await writesToday(env)) < writeBudget(env);
     if (tasks.length < limit && body.full !== false && budgetOk) {
-      const full = await env.DB.prepare(`SELECT a, p FROM db_pages WHERE a = 'all' AND done_at < ?1 AND leased_until < ?2
-        ORDER BY done_at ASC, p ASC LIMIT ?3`).bind(now - DB_FULL_MS, now, limit - tasks.length).all();
+      const full = await env.DB.prepare(`SELECT a, p FROM db_pages WHERE a LIKE 's:%' AND done_at < ?1 AND leased_until < ?2
+        ORDER BY done_at ASC, a ASC, p ASC LIMIT ?3`).bind(now - DB_FULL_MS, now, limit - tasks.length).all();
       tasks = tasks.concat(full.results.map(r => ({ a: r.a, p: r.p, kind: 'full' })));
     }
     if (tasks.length) await runBatch(env, tasks.map(t => env.DB.prepare('UPDATE db_pages SET leased_until = ?3, leased_by = ?4 WHERE a = ?1 AND p = ?2')
@@ -837,9 +869,14 @@ async function extensionRequest(req, env, url, json) {
     const players = (await env.DB.prepare('SELECT MAX(rowid) AS n FROM site_players').first())?.n || 0;
     const transfer = (await env.DB.prepare('SELECT COUNT(*) AS n FROM site_players WHERE transfer_price > 0').first()).n;
     const loan = (await env.DB.prepare('SELECT COUNT(*) AS n FROM site_players WHERE loan_fee > 0').first()).n;
-    const pg = await env.DB.prepare('SELECT a, COUNT(*) AS pages, SUM(done_at > ?1) AS fresh, MAX(done_at) AS last FROM db_pages GROUP BY a').bind(now - DB_FULL_MS).all();
+    const pg = await env.DB.prepare(`SELECT CASE WHEN a LIKE 's:%' THEN 'all' ELSE a END AS a, COUNT(*) AS pages, SUM(done_at > ?1) AS fresh,
+      MAX(done_at) AS last, COUNT(DISTINCT a) AS slices FROM db_pages GROUP BY 1`).bind(now - DB_FULL_MS).all();
     const meta = await env.DB.prepare("SELECT k, v FROM db_meta WHERE k LIKE 'total:%'").all();
-    const totals = Object.fromEntries(meta.results.map(r => [r.k.slice(6), +r.v]));
+    const totals = {};
+    for (const r of meta.results) {
+      const k = r.k.slice(6);
+      if (k.startsWith('s:')) totals.all = (totals.all || 0) + (+r.v); else totals[k] = +r.v;
+    }
     const data = { players, transfer, loan, free: totals.free ?? null, pages: pg.results, totals,
       writesToday: await writesToday(env), writeBudget: Number.isFinite(writeBudget(env)) ? writeBudget(env) : null };
     const entry = { at: now, data };

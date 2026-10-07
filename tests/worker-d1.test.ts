@@ -617,3 +617,73 @@ describe("club actuel sur la fiche", () => {
     ).toBe(crest);
   });
 });
+
+describe("base du jeu lue par tranches", () => {
+  it("confie des tranches poste × OVR, coupe les grosses, ajoute les pages des petites", async () => {
+    const { call, mock } = setup();
+    const first = await call("POST", "/v1/db/assign", {
+      limit: 30,
+      full: true,
+    });
+    const slices = first.body.tasks.filter(
+      (t: { kind: string }) => t.kind === "full",
+    );
+    expect(slices.length).toBeGreaterThan(0);
+    expect(
+      slices.every(
+        (t: { a: string; p: number }) =>
+          /^s:[A-Z]+:\d+:\d+$/.test(t.a) && t.p === 1,
+      ),
+    ).toBe(true);
+    expect(
+      (
+        await mock.DB.prepare(
+          "SELECT COUNT(*) AS n FROM db_pages WHERE a = 'all'",
+        ).first()
+      ).n,
+    ).toBe(0);
+    // Tranche trop grosse : coupée en deux, les joueurs sont gardés.
+    const big = await call("POST", "/v1/db/players", {
+      a: "s:CB:50:54",
+      p: 1,
+      total: 900,
+      players: [light("x1", { position: "CB", overall: 52 })],
+    });
+    expect(big.body.accepted).toBe(1);
+    const parts = (
+      await mock.DB.prepare(
+        "SELECT a FROM db_pages WHERE a IN ('s:CB:50:54', 's:CB:50:52', 's:CB:53:54') ORDER BY a",
+      ).all()
+    ).results.map((r: { a: string }) => r.a);
+    expect(parts).toEqual(["s:CB:50:52", "s:CB:53:54"]);
+    // Petite tranche : ses pages suivantes sont créées.
+    await call("POST", "/v1/db/players", {
+      a: "s:ST:80:84",
+      p: 1,
+      total: 60,
+      players: [],
+    });
+    const st = (
+      await mock.DB.prepare(
+        "SELECT p FROM db_pages WHERE a = 's:ST:80:84' ORDER BY p",
+      ).all()
+    ).results.map((r: { p: number }) => r.p);
+    expect(st).toEqual([1, 2, 3]);
+    // Tranche inconnue refusée comme page (les joueurs restent acceptés).
+    await call("POST", "/v1/db/players", {
+      a: "s:XX:1:2",
+      p: 1,
+      total: 5,
+      players: [],
+    });
+    expect(
+      (
+        await mock.DB.prepare(
+          "SELECT COUNT(*) AS n FROM db_pages WHERE a = 's:XX:1:2'",
+        ).first()
+      ).n,
+    ).toBe(0);
+    const stats = await call("GET", "/v1/db/stats");
+    expect(stats.body.totals.all).toBe(60);
+  });
+});
