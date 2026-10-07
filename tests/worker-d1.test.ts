@@ -771,3 +771,17 @@ describe("effectif à jour", () => {
     expect(byId).toEqual({ p1: 91, p2: 80 });
   });
 });
+
+describe("table des confrontations", () => {
+  it("compte chaque duel une fois par match et refuse les styles inconnus", async () => {
+    const { call } = setup();
+    const at = Date.now();
+    const duel = { matchId: "m1", winner: "Counter-attack", loser: "Fluid", seenAt: at, text: "x" };
+    const r = await call("POST", "/v1/matchups", {
+      items: [duel, duel, { ...duel, matchId: "m2" }, { ...duel, winner: "Bidon" }, { ...duel, loser: "Counter-attack" }],
+    });
+    expect(r.body).toEqual({ accepted: 3, rejected: 2 });
+    const g = await call("GET", "/v1/matchups");
+    expect(g.body.pairs).toEqual([{ winner: "Counter-attack", loser: "Fluid", n: 2, last: at }]);
+  });
+});
