@@ -66,4 +66,11 @@ describe("tactical export", () => {
       3,
     );
   });
+  it("can restore a normalized snapshot without losing stats, attributes or slots", () => {
+    const before = parseSquadExport(input());
+    const restored = parseSquadExport(JSON.parse(JSON.stringify(before)));
+    expect(restored.players).toEqual(before.players);
+    expect(restored.tactics).toEqual(before.tactics);
+    expect(squadCsv(restored)).toEqual(squadCsv(before));
+  });
 });

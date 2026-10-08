@@ -127,7 +127,6 @@ export default function SquadImport({
       )}
       {players.length > 0 ? (
         <>
-          <SquadExport players={players} />
           <SquadTable
             players={players}
             hrefPrefix="/player/local:"
@@ -154,6 +153,7 @@ export default function SquadImport({
           </p>
         </div>
       )}
+      {!embedded && <SquadExport players={players} />}
     </>
   );
 }

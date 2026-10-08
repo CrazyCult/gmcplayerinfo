@@ -175,12 +175,6 @@ export default async function SquadPage({
         </div>
       )}
 
-      <SquadExport
-        players={club?.players.map((p) => p.player) ?? []}
-        collectedAt={club?.fetchedAt ?? undefined}
-        clubName={club?.name ?? undefined}
-      />
-
       {club ? (
         club.players.length ? (
           <SquadTable
@@ -250,6 +244,13 @@ export default async function SquadPage({
         </summary>
         <SquadImport embedded />
       </details>
+      <SquadExport
+        key={club?.teamId || "site"}
+        scope={club?.teamId || "site"}
+        players={club?.players.map((p) => p.player) ?? []}
+        collectedAt={club?.fetchedAt ?? undefined}
+        clubName={club?.name ?? undefined}
+      />
     </>
   );
 }
