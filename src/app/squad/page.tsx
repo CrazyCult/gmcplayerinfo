@@ -46,6 +46,14 @@ export default async function SquadPage({
   if (!indexEnabled()) return <SquadImport />;
 
   const session = authEnabled() ? await getSession() : null;
+  // An explicit club does not depend on the account lookup. Start it now,
+  // retaining the account lookup for the existing link/unlink controls.
+  const askedClub = asked
+    ? getClub(asked).then(
+        (club) => ({ club, error: null }),
+        (error: unknown) => ({ club: null, error }),
+      )
+    : null;
   const premium = await isPremium(session);
   let linked: string | null = null,
     problem = "";
@@ -60,7 +68,13 @@ export default async function SquadPage({
   let club: ClubSquad | null = null;
   if (teamId) {
     try {
-      club = await getClub(teamId);
+      if (askedClub) {
+        const result = await askedClub;
+        if (result.error) throw result.error;
+        club = result.club;
+      } else {
+        club = await getClub(teamId);
+      }
     } catch (error) {
       problem =
         error instanceof IndexError && error.status === 404

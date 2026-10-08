@@ -28,6 +28,7 @@ import {
 } from "@/lib/colors";
 import TrainingSimulator from "./TrainingSimulator";
 import Fold from "./UI/Fold";
+import LazyFold from "./UI/LazyFold";
 import Gmc2 from "./UI/Gmc2";
 import { countryFr } from "@/lib/countries";
 import LoadFullButton from "./LoadFullButton";
@@ -537,26 +538,28 @@ export default function PlayerView({
       {!trainingOnly && (
         <>
           {!light && (
-            <Fold
+            <LazyFold
               title="Leviers d’OVR"
               summary={`Le sous-attribut le moins cher pour gagner +1 OVR · ${training.saved ? coachSummary(training) : "coachs niveau 5"}`}
             >
-              {ovrLevers(
-                { ...player, attributes: { ...player.attributes, subs } },
-                training.saved
-                  ? { coaches: training.coaches, center: training.center }
-                  : { coaches: MAX_COACHES, center: 5 },
-              )
-                .filter((lever) => lever.progresses)
-                .map((lever) => (
-                  <div className="drill-row" key={lever.key}>
-                    <strong>{subLabels[lever.key]}</strong>
-                    <small>
-                      +1 OVR · {lever.sessions} séances · {money(lever.cost)}
-                    </small>
-                  </div>
-                ))}
-            </Fold>
+              {() =>
+                ovrLevers(
+                  { ...player, attributes: { ...player.attributes, subs } },
+                  training.saved
+                    ? { coaches: training.coaches, center: training.center }
+                    : { coaches: MAX_COACHES, center: 5 },
+                )
+                  .filter((lever) => lever.progresses)
+                  .map((lever) => (
+                    <div className="drill-row" key={lever.key}>
+                      <strong>{subLabels[lever.key]}</strong>
+                      <small>
+                        +1 OVR · {lever.sessions} séances · {money(lever.cost)}
+                      </small>
+                    </div>
+                  ))
+              }
+            </LazyFold>
           )}
         </>
       )}

@@ -1,27 +1,23 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
-/** Partie de page repliable : titre et résumé toujours visibles. */
-export default function Fold({
+/** Compute content on first opening, then retain it and its local state. */
+export default function LazyFold({
   title,
   summary,
-  open = false,
-  onOpen,
   children,
 }: {
   title: string;
   summary?: ReactNode;
-  open?: boolean;
-  onOpen?: () => void;
-  children: ReactNode;
+  children: () => ReactNode;
 }) {
+  const [mounted, setMounted] = useState(false);
   return (
     <details
       className="card fold"
-      open={open}
       onToggle={(event) => {
-        if (event.currentTarget.open) onOpen?.();
+        if (event.currentTarget.open) setMounted(true);
       }}
     >
       <summary>
@@ -29,7 +25,7 @@ export default function Fold({
         {summary && <span className="fold-summary">{summary}</span>}
         <span className="fold-chevron" aria-hidden="true" />
       </summary>
-      <div className="fold-body">{children}</div>
+      <div className="fold-body">{mounted && children()}</div>
     </details>
   );
 }

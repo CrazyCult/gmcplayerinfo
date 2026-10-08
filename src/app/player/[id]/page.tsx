@@ -6,12 +6,7 @@ import MarketPanel from "@/components/MarketPanel";
 import OvrHistory from "@/components/OvrHistory";
 import Fold from "@/components/UI/Fold";
 import { parseOverallHistory } from "@/engine/progression";
-import {
-  getFullStatus,
-  getPlayer,
-  IndexError,
-  indexEnabled,
-} from "@/data/gmc-index";
+import { getPlayer, IndexError, indexEnabled } from "@/data/gmc-index";
 export async function generateMetadata({
   params,
 }: {
@@ -82,15 +77,7 @@ export default async function PlayerPage({
           player={snapshot.player}
           remote
           club={snapshot.club}
-          full={
-            snapshot.light
-              ? {
-                  requestedAt: await getFullStatus(id)
-                    .then((status) => status.requestedAt)
-                    .catch(() => null),
-                }
-              : undefined
-          }
+          full={snapshot.light ? {} : undefined}
         />
         <div className="stack" style={{ marginTop: 24 }}>
           <Fold title="Progression réelle" summary={historySummary(history)}>

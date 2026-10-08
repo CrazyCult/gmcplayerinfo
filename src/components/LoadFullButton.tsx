@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 const POLL_MS = 30_000,
   POLL_MAX_MS = 45 * 60_000;
-type State = "idle" | "sending" | "waiting" | "error";
+type State = "checking" | "idle" | "sending" | "waiting" | "error";
 
 /**
  * Fiche légère → complète. Le site ne lit jamais GameChase : il demande aux
@@ -21,9 +21,42 @@ export default function LoadFullButton({
   requestedAt?: number | null;
 }) {
   const router = useRouter();
-  const [state, setState] = useState<State>(requestedAt ? "waiting" : "idle");
+  const [state, setState] = useState<State>(
+    requestedAt === undefined ? "checking" : requestedAt ? "waiting" : "idle",
+  );
   const [message, setMessage] = useState("");
   const [since, setSince] = useState(() => requestedAt ?? 0);
+  useEffect(() => {
+    if (state !== "checking") return;
+    const controller = new AbortController();
+    async function check() {
+      try {
+        const response = await fetch(
+          `/api/player/${encodeURIComponent(playerId)}/status`,
+          { cache: "no-store", signal: controller.signal },
+        );
+        if (!response.ok) throw new Error("Status unavailable");
+        const data = await response.json();
+        if (controller.signal.aborted) return;
+        if (data.light === false) {
+          setState("idle");
+          router.refresh();
+        } else if (
+          typeof data.requestedAt === "number" &&
+          data.requestedAt > 0
+        ) {
+          setSince(data.requestedAt);
+          setState("waiting");
+        } else {
+          setState("idle");
+        }
+      } catch {
+        if (!controller.signal.aborted) setState("idle");
+      }
+    }
+    void check();
+    return () => controller.abort();
+  }, [state, playerId, router]);
   useEffect(() => {
     if (state !== "waiting") return;
     const started = Date.now();
@@ -81,13 +114,17 @@ export default function LoadFullButton({
         className="button primary"
         type="button"
         onClick={ask}
-        disabled={state === "sending" || state === "waiting"}
+        disabled={
+          state === "checking" || state === "sending" || state === "waiting"
+        }
       >
-        {state === "sending"
-          ? "Demande…"
-          : state === "waiting"
-            ? "Lecture demandée"
-            : "Charger la fiche complète"}
+        {state === "checking"
+          ? "Vérification de la demande…"
+          : state === "sending"
+            ? "Demande…"
+            : state === "waiting"
+              ? "Lecture demandée"
+              : "Charger la fiche complète"}
       </button>
       <a
         className="button"

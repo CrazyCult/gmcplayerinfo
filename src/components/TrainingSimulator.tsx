@@ -41,6 +41,7 @@ export default function TrainingSimulator({
   open?: boolean;
 }) {
   const club = useClubSettings();
+  const [activated, setActivated] = useState(open);
   const [age, setAge] = useState(player.age);
   const settings: Settings = useMemo(
     () => ({ coaches: club.coaches, center: club.center, age }),
@@ -64,8 +65,8 @@ export default function TrainingSimulator({
     [simulated, settings, state.fitness],
   );
   const variants = useMemo(
-    () => planVariants(simulated, settings),
-    [simulated, settings],
+    () => (activated ? planVariants(simulated, settings) : null),
+    [activated, simulated, settings],
   );
   const totals = state.sequence.reduce(
     (sum, session) => ({
@@ -148,6 +149,7 @@ export default function TrainingSimulator({
     <>
       <Fold
         open={open}
+        onOpen={() => setActivated(true)}
         title="Simulateur d’entraînement"
         summary={
           plan.incomplete || plan.to === undefined
@@ -327,14 +329,14 @@ export default function TrainingSimulator({
                 <span className="pill">×{count}</span>
               </div>
             ))}
-            {variants.unlocked && (
+            {variants?.unlocked && (
               <div className="notice">
                 Coachs niveau 5 : OVR {variants.unlocked.to} ·{" "}
                 {variants.unlocked.sessions} séances ·{" "}
                 {money(variants.unlocked.cost)}.
               </div>
             )}
-            {variants.afterBirthday && (
+            {variants?.afterBirthday && (
               <div className="notice">
                 Après anniversaire ({settings.age + 1} ans) : OVR{" "}
                 {variants.afterBirthday.to ?? "—"} ·{" "}

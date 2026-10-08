@@ -105,13 +105,7 @@ const SCHEMA = [
   // Compte du site → club rattaché. k = empreinte HMAC de l'identifiant Google,
   // calculée par le site : le serveur ne voit jamais l'identifiant lui-même.
   'CREATE TABLE IF NOT EXISTS site_users (k TEXT PRIMARY KEY, team_id TEXT, updated_at INTEGER NOT NULL)',
-  // Table des confrontations de styles de jeu, reconstituée à partir des
-  // phrases « X a l'avantage sur Y » de l'analyse de match du jeu.
-  // Une ligne par (match, gagnant, perdant) : un même match compte une fois.
-  'CREATE TABLE IF NOT EXISTS matchups (match_id TEXT NOT NULL, winner TEXT NOT NULL, loser TEXT NOT NULL, seen_at INTEGER NOT NULL, text TEXT, PRIMARY KEY (match_id, winner, loser))',
 ];
-const PLAYSTYLES = ['Balanced', 'Possession', 'Tiki-Taka', 'Direct', 'Counter-attack', 'Gegenpressing',
-  'High Tempo', 'Wing Play', 'Long Ball', 'Park the Bus', 'Catenaccio', 'Fluid'];
 const dbReady = new WeakSet();
 async function ensureDb(env) {
   if (dbReady.has(env.DB)) return;
@@ -825,23 +819,6 @@ async function extensionRequest(req, env, url, json) {
     }
     if (stmts.length) await runBatch(env, stmts);
     return json({ accepted: stmts.length, rejected: raw.length - stmts.length });
-  }
-
-  // Table des confrontations : envoi des duels lus dans les analyses de match.
-  if (req.method === 'POST' && url.pathname === '/v1/matchups') {
-    let body; try { body = await req.json(); } catch (_) { return json({ error: 'JSON invalide' }, 400); }
-    const raw = Array.isArray(body.items) ? body.items.slice(0, 50) : [];
-    const items = raw.filter(x => x && isStr(x.matchId, 80) && PLAYSTYLES.includes(x.winner) && PLAYSTYLES.includes(x.loser)
-      && x.winner !== x.loser && isInt(x.seenAt, 1.6e12, now + 5 * 60e3));
-    if (items.length) await runBatch(env, items.map(x => env.DB.prepare(
-      'INSERT OR IGNORE INTO matchups (match_id, winner, loser, seen_at, text) VALUES (?1, ?2, ?3, ?4, ?5)'
-    ).bind(x.matchId, x.winner, x.loser, x.seenAt, typeof x.text === 'string' ? x.text.slice(0, 300) : null)));
-    return json({ accepted: items.length, rejected: raw.length - items.length });
-  }
-  if (req.method === 'GET' && url.pathname === '/v1/matchups') {
-    const { results } = await env.DB.prepare(
-      'SELECT winner, loser, COUNT(*) AS n, MAX(seen_at) AS last FROM matchups GROUP BY winner, loser ORDER BY winner, loser').all();
-    return json({ pairs: results.map(r => ({ winner: r.winner, loser: r.loser, n: Number(r.n), last: Number(r.last) })) });
   }
 
   // Liste légère (identifiant + date) pour que chaque extension sache ce

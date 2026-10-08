@@ -92,6 +92,16 @@ async function request(
     process.env.GMC_INDEX_URL ||
     "https://gmc-companion-index.florian-chevalier68.workers.dev";
   let response: Response;
+  const started = performance.now();
+  const logTiming = (status: number) => {
+    if (process.env.GMC_PERF_LOGS !== "1") return;
+    // Only the route category: no player/account IDs, query or credentials.
+    console.info("GMC_INDEX_TIMING", {
+      route: path.split("?")[0].split("/").slice(0, 4).join("/"),
+      status,
+      durationMs: Math.round(performance.now() - started),
+    });
+  };
   try {
     response = await fetch(`${base}${path}`, {
       method: init.method ?? "GET",
@@ -108,14 +118,20 @@ async function request(
       signal: AbortSignal.timeout(15000),
     });
   } catch (error) {
+    logTiming(0);
     console.error("Index injoignable", path, error);
     throw new IndexError(502);
   }
   if (!response.ok) {
+    logTiming(response.status);
     console.error("Index : réponse", response.status, path);
     throw new IndexError(response.status);
   }
-  return response.json();
+  try {
+    return await response.json();
+  } finally {
+    logTiming(response.status);
+  }
 }
 export const playerTag = (id: string) => `player:${id}`.slice(0, 256);
 export const getPlayer = cache(async (id: string) => {
