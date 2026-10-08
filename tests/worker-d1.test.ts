@@ -783,5 +783,9 @@ describe("table des confrontations", () => {
     expect(r.body).toEqual({ accepted: 3, rejected: 2 });
     const g = await call("GET", "/v1/matchups");
     expect(g.body.pairs).toEqual([{ winner: "Counter-attack", loser: "Fluid", n: 2, last: at }]);
+    const f = await call("POST", "/v1/matchups", {
+      items: [{ ...duel, winner: "4-2-4", loser: "4-4-1-1" }, { ...duel, winner: "4-2-4", loser: "Fluid" }],
+    });
+    expect(f.body).toEqual({ accepted: 1, rejected: 1 });
   });
 });

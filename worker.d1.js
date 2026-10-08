@@ -831,7 +831,9 @@ async function extensionRequest(req, env, url, json) {
   if (req.method === 'POST' && url.pathname === '/v1/matchups') {
     let body; try { body = await req.json(); } catch (_) { return json({ error: 'JSON invalide' }, 400); }
     const raw = Array.isArray(body.items) ? body.items.slice(0, 50) : [];
-    const items = raw.filter(x => x && isStr(x.matchId, 80) && PLAYSTYLES.includes(x.winner) && PLAYSTYLES.includes(x.loser)
+    // Styles de jeu (liste fermée) ou formations (« 4-2-4 »), jamais mélangés.
+    const kind = (v) => PLAYSTYLES.includes(v) ? 'style' : (typeof v === 'string' && /^\d(-\d){2,4}$/.test(v) ? 'formation' : null);
+    const items = raw.filter(x => x && isStr(x.matchId, 80) && kind(x.winner) && kind(x.winner) === kind(x.loser)
       && x.winner !== x.loser && isInt(x.seenAt, 1.6e12, now + 5 * 60e3));
     if (items.length) await runBatch(env, items.map(x => env.DB.prepare(
       'INSERT OR IGNORE INTO matchups (match_id, winner, loser, seen_at, text) VALUES (?1, ?2, ?3, ?4, ?5)'
