@@ -90,6 +90,11 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS db_pages (a TEXT NOT NULL, p INTEGER NOT NULL, done_at INTEGER NOT NULL DEFAULT 0,
     leased_until INTEGER NOT NULL DEFAULT 0, leased_by TEXT, PRIMARY KEY (a, p))`,
   'CREATE INDEX IF NOT EXISTS db_pages_due ON db_pages(a, done_at)',
+  // Confirmations du protocole 2 : jamais déduites d'une simple observation.
+  `CREATE TABLE IF NOT EXISTS db_page_audits (a TEXT NOT NULL, p INTEGER NOT NULL, task_id TEXT NOT NULL,
+    confirmed_at INTEGER NOT NULL, collected_at INTEGER NOT NULL, total INTEGER NOT NULL,
+    raw_count INTEGER NOT NULL, ids TEXT NOT NULL, PRIMARY KEY (a, p))`,
+  'CREATE TABLE IF NOT EXISTS db_split_receipts (task_id TEXT PRIMARY KEY, a TEXT NOT NULL, completed_at INTEGER NOT NULL)',
   'CREATE TABLE IF NOT EXISTS db_meta (k TEXT PRIMARY KEY, v TEXT)',
   // Demandes du site : « lire ce club en priorité » (fiche légère → complète).
   'CREATE TABLE IF NOT EXISTS site_requests (team_id TEXT PRIMARY KEY, player_id TEXT, requested_at INTEGER NOT NULL)',
@@ -120,7 +125,8 @@ async function ensureDb(env) {
   await env.DB.batch(SCHEMA.map(q => env.DB.prepare(q)));
   // Colonnes ajoutées après coup (erreur ignorée si elles existent déjà).
   for (const q of ['ALTER TABLE site_clubs ADD COLUMN crest TEXT', 'ALTER TABLE site_players ADD COLUMN value INTEGER',
-    'ALTER TABLE site_players ADD COLUMN pos_gain INTEGER NOT NULL DEFAULT 0', 'ALTER TABLE site_players ADD COLUMN pos_best TEXT'])
+    'ALTER TABLE site_players ADD COLUMN pos_gain INTEGER NOT NULL DEFAULT 0', 'ALTER TABLE site_players ADD COLUMN pos_best TEXT',
+    'ALTER TABLE db_pages ADD COLUMN task_id TEXT'])
     try { await env.DB.prepare(q).run(); } catch (_) {}
   try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS sp_posgain ON site_players(pos_gain) WHERE pos_gain > 0').run(); } catch (_) {}
   await env.DB.batch(['transfer', 'loan'].map(a => env.DB.prepare('INSERT OR IGNORE INTO db_pages (a, p) VALUES (?1, 1)').bind(a)));
@@ -695,6 +701,7 @@ export default {
     if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
 
     const url = new URL(req.url);
+    if (req.method === 'GET' && url.pathname === '/health') return json({ ok: true, collectorProtocol: 2 });
     if (req.method === 'GET' && url.pathname === '/privacy') {
       return new Response(PRIVACY_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
     }
@@ -883,9 +890,35 @@ async function extensionRequest(req, env, url, json) {
     const p = isInt(body.p, 1, 100000) ? body.p : null;
     const raw = Array.isArray(body.players) ? body.players.slice(0, 60) : [];
     const players = raw.filter(validDbPlayer);
+    const protocol2 = body.protocol === 2;
+    const assigned = protocol2 && body.taskId != null;
+    const defer = reason => json({ status: 'retry_after', reason, accepted: 0, rejected: raw.length,
+      pageAcknowledged: false, retryAfterMs: 300000 });
+    if (protocol2) {
+      if (!Array.isArray(body.players) || body.players.length > MAX_PLAYERS || body.rawCount !== body.players.length
+        || players.length !== raw.length || new Set(players.map(x => x.id)).size !== players.length)
+        return defer('Page incomplète, doublons ou joueurs invalides.');
+      if (!isInt(body.collectedAt, now - 30 * 60000, now + 5 * 60000)) return defer('Date de lecture invalide ou trop ancienne.');
+      if (assigned) {
+        if (!a || !p || !isStr(body.taskId, 128) || !isInt(body.total, 0, 2000000)) return defer('Tâche ou total invalide.');
+        const lease = await env.DB.prepare('SELECT leased_until, leased_by, task_id FROM db_pages WHERE a = ?1 AND p = ?2').bind(a, p).first();
+        if (!lease || lease.task_id !== body.taskId || lease.leased_by !== (installId || null) || lease.leased_until <= now)
+          return defer('Réservation absente, expirée ou remplacée.');
+        if (body.collectedAt < lease.leased_until - DB_LEASE_MS - 60000) return defer('Lecture antérieure à la réservation.');
+        const expected = Math.min(DB_PAGE_SIZE, Math.max(0, body.total - (p - 1) * DB_PAGE_SIZE));
+        if (raw.length !== expected || (p > 1 && p > Math.max(1, Math.ceil(body.total / DB_PAGE_SIZE))))
+          return defer('Nombre de joueurs incompatible avec la page et le total.');
+        if (slice && players.some(x => x.position !== slice.pos || x.overall < slice.min || x.overall > slice.max))
+          return defer('Joueur hors de la tranche confiée.');
+        if ((a === 'transfer' && players.some(x => !(x.transfer_price > 0)))
+          || (a === 'loan' && players.some(x => !(x.loan_fee > 0)))) return defer('Joueur hors du marché confié.');
+      } else if (body.a != null || body.p != null) return defer('Une observation passive ne confirme pas une tâche.');
+    }
     if (!players.length && !(a && p)) return json({ error: 'données refusées' }, 400);
     // Budget du jour atteint : on garde le marché (prix), on suspend le reste.
     const over = (await writesToday(env)) >= writeBudget(env) && a !== 'transfer' && a !== 'loan';
+    if (protocol2 && over) return json({ status: 'retry_after', reason: 'Budget journalier atteint.', accepted: 0,
+      rejected: 0, paused: true, pageAcknowledged: false, retryAfterMs: 3600000 });
     const stmts = [];
     if (!over) {
       const clubs = new Map();
@@ -901,11 +934,41 @@ async function extensionRequest(req, env, url, json) {
     if (tooBig) {
       // Tranche trop grosse : coupée en deux (ses joueurs sont quand même gardés).
       const mid = Math.floor((slice.min + slice.max) / 2);
-      stmts.push(env.DB.prepare('DELETE FROM db_pages WHERE a = ?1').bind(a), env.DB.prepare('DELETE FROM db_meta WHERE k = ?1').bind('total:' + a));
-      for (const [lo, hi] of [[slice.min, mid], [mid + 1, slice.max]])
-        stmts.push(env.DB.prepare('INSERT OR IGNORE INTO db_pages (a, p) VALUES (?1, 1)').bind(sliceKey(slice.pos, lo, hi)));
+      if (assigned) {
+        const live = `a = ?1 AND p = 1 AND task_id = ?2 AND leased_by IS ?3
+          AND leased_until > CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)`;
+        // The server's database clock also protects a lease that expires during the upload.
+        stmts.push(env.DB.prepare(`UPDATE db_pages SET done_at = -1 WHERE ${live}`).bind(a, body.taskId, installId || null));
+        for (const [lo, hi] of [[slice.min, mid], [mid + 1, slice.max]])
+          stmts.push(env.DB.prepare(`INSERT OR IGNORE INTO db_pages (a, p) SELECT ?4, 1 FROM db_pages WHERE ${live} AND done_at = -1`)
+            .bind(a, body.taskId, installId || null, sliceKey(slice.pos, lo, hi)));
+        stmts.push(env.DB.prepare(`INSERT OR IGNORE INTO db_split_receipts (task_id, a, completed_at)
+          SELECT ?2, a, ?4 FROM db_pages WHERE ${live} AND done_at = -1`).bind(a, body.taskId, installId || null, now));
+        stmts.push(env.DB.prepare(`DELETE FROM db_meta WHERE k = ?4 AND EXISTS (SELECT 1 FROM db_pages WHERE ${live} AND done_at = -1)`)
+          .bind(a, body.taskId, installId || null, 'total:' + a));
+        stmts.push(env.DB.prepare(`DELETE FROM db_page_audits WHERE a = ?1 AND EXISTS (SELECT 1 FROM db_pages WHERE ${live} AND done_at = -1)`)
+          .bind(a, body.taskId, installId || null));
+        stmts.push(env.DB.prepare(`DELETE FROM db_pages WHERE ${live} AND done_at = -1`).bind(a, body.taskId, installId || null));
+      } else {
+        stmts.push(env.DB.prepare('DELETE FROM db_pages WHERE a = ?1').bind(a), env.DB.prepare('DELETE FROM db_meta WHERE k = ?1').bind('total:' + a),
+          env.DB.prepare('DELETE FROM db_page_audits WHERE a = ?1').bind(a));
+        for (const [lo, hi] of [[slice.min, mid], [mid + 1, slice.max]])
+          stmts.push(env.DB.prepare('INSERT OR IGNORE INTO db_pages (a, p) VALUES (?1, 1)').bind(sliceKey(slice.pos, lo, hi)));
+      }
     } else if (a && p) {
-      stmts.push(env.DB.prepare('INSERT INTO db_pages (a, p, done_at) VALUES (?1, ?2, ?3) ON CONFLICT(a, p) DO UPDATE SET done_at = excluded.done_at, leased_until = 0').bind(a, p, now));
+      if (assigned) {
+        stmts.push(env.DB.prepare(`UPDATE db_pages SET done_at = ?3, leased_until = 0
+          WHERE a = ?1 AND p = ?2 AND task_id = ?4 AND leased_by IS ?5
+            AND leased_until > CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)`).bind(a, p, now, body.taskId, installId || null));
+        stmts.push(env.DB.prepare(`INSERT INTO db_page_audits (a, p, task_id, confirmed_at, collected_at, total, raw_count, ids)
+          SELECT a, p, ?4, ?3, ?6, ?7, ?8, ?9 FROM db_pages
+          WHERE a = ?1 AND p = ?2 AND task_id = ?4 AND leased_by IS ?5 AND done_at = ?3 AND leased_until = 0
+          ON CONFLICT(a, p) DO UPDATE SET task_id = excluded.task_id, confirmed_at = excluded.confirmed_at,
+            collected_at = excluded.collected_at, total = excluded.total, raw_count = excluded.raw_count, ids = excluded.ids`)
+          .bind(a, p, now, body.taskId, installId || null, body.collectedAt, body.total, raw.length, JSON.stringify(players.map(x => x.id))));
+      } else {
+        stmts.push(env.DB.prepare('INSERT INTO db_pages (a, p, done_at) VALUES (?1, ?2, ?3) ON CONFLICT(a, p) DO UPDATE SET done_at = excluded.done_at, leased_until = 0').bind(a, p, now));
+      }
       if (isInt(body.total, 0, 2000000) && a !== 'free') {
         const pages = Math.max(1, Math.ceil(body.total / DB_PAGE_SIZE));
         const prev = await env.DB.prepare('SELECT v FROM db_meta WHERE k = ?1').bind('total:' + a).first();
@@ -913,12 +976,27 @@ async function extensionRequest(req, env, url, json) {
           stmts.push(env.DB.prepare(`WITH RECURSIVE s(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM s WHERE x < ?2)
             INSERT OR IGNORE INTO db_pages (a, p) SELECT ?1, x FROM s`).bind(a, pages));
           stmts.push(env.DB.prepare('DELETE FROM db_pages WHERE a = ?1 AND p > ?2').bind(a, pages));
+          stmts.push(env.DB.prepare('DELETE FROM db_page_audits WHERE a = ?1 AND p > ?2').bind(a, pages));
         }
         if (!prev || +prev.v !== body.total)
           stmts.push(env.DB.prepare('INSERT INTO db_meta (k, v) VALUES (?1, ?2) ON CONFLICT(k) DO UPDATE SET v = excluded.v').bind('total:' + a, String(body.total)));
       }
     }
     await runBatch(env, stmts);
+    statsCacheByDb.delete(env.DB);
+    if (protocol2) {
+      if (assigned && tooBig) {
+        const receipt = await env.DB.prepare('SELECT task_id FROM db_split_receipts WHERE task_id = ?1').bind(body.taskId).first();
+        const parent = await env.DB.prepare('SELECT a FROM db_pages WHERE a = ?1').bind(a).first();
+        if (!receipt || parent) return defer('Réservation remplacée pendant la subdivision.');
+      }
+      if (assigned && !tooBig) {
+        const proof = await env.DB.prepare('SELECT task_id FROM db_page_audits WHERE a = ?1 AND p = ?2').bind(a, p).first();
+        if (proof?.task_id !== body.taskId) return defer('Réservation remplacée pendant l’envoi.');
+      }
+      return json({ status: tooBig ? 'split' : 'completed', accepted: players.length, rejected: 0,
+        pageAcknowledged: assigned && !tooBig });
+    }
     return json({ accepted: over ? 0 : players.length, rejected: raw.length - players.length, paused: over || undefined });
   }
 
@@ -936,9 +1014,16 @@ async function extensionRequest(req, env, url, json) {
         ORDER BY done_at ASC, a ASC, p ASC LIMIT ?3`).bind(now - DB_FULL_MS, now, limit - tasks.length).all();
       tasks = tasks.concat(full.results.map(r => ({ a: r.a, p: r.p, kind: 'full' })));
     }
-    if (tasks.length) await runBatch(env, tasks.map(t => env.DB.prepare('UPDATE db_pages SET leased_until = ?3, leased_by = ?4 WHERE a = ?1 AND p = ?2')
-      .bind(t.a, t.p, now + DB_LEASE_MS, installId || null)));
-    return json({ tasks, budget: budgetOk ? undefined : 'atteint' });
+    if (tasks.length) {
+      tasks = tasks.map(t => ({ ...t, taskId: crypto.randomUUID(), leasedUntil: now + DB_LEASE_MS }));
+      await runBatch(env, tasks.map(t => env.DB.prepare(`UPDATE db_pages SET leased_until = ?3, leased_by = ?4, task_id = ?5
+        WHERE a = ?1 AND p = ?2 AND leased_until < ?6`).bind(t.a, t.p, t.leasedUntil, installId || null, t.taskId, now)));
+      const tokens = tasks.map(t => t.taskId), placeholders = tokens.map((_, i) => `?${i + 1}`).join(',');
+      const won = await env.DB.prepare(`SELECT task_id FROM db_pages WHERE task_id IN (${placeholders})`).bind(...tokens).all();
+      const ids = new Set(won.results.map(x => x.task_id));
+      tasks = tasks.filter(t => ids.has(t.taskId));
+    }
+    return json({ protocol: 2, tasks, budget: budgetOk ? undefined : 'atteint' });
   }
 
   // Recherche dans la base (extension) : mêmes requêtes indexées que le site.
@@ -976,21 +1061,42 @@ async function extensionRequest(req, env, url, json) {
   // Statistiques : calculées au plus toutes les 10 minutes (requêtes indexées).
   if (req.method === 'GET' && url.pathname === '/v1/db/stats') {
     const cached = statsCacheByDb.get(env.DB);
-    if (cached && now - cached.at < STATS_TTL) return json(cached.data);
+    if (cached && cached.data.protocol === 2 && now - cached.at < STATS_TTL) return json(cached.data);
     const saved = await env.DB.prepare('SELECT v FROM db_meta WHERE k = ?1').bind('stats').first();
-    if (saved) { const s = JSON.parse(saved.v); if (now - s.at < STATS_TTL) { statsCacheByDb.set(env.DB, s); return json(s.data); } }
+    if (saved) { const s = JSON.parse(saved.v); if (s.data.protocol === 2 && now - s.at < STATS_TTL) { statsCacheByDb.set(env.DB, s); return json(s.data); } }
     const players = (await env.DB.prepare('SELECT MAX(rowid) AS n FROM site_players').first())?.n || 0;
     const transfer = (await env.DB.prepare('SELECT COUNT(*) AS n FROM site_players WHERE transfer_price > 0').first()).n;
     const loan = (await env.DB.prepare('SELECT COUNT(*) AS n FROM site_players WHERE loan_fee > 0').first()).n;
-    const pg = await env.DB.prepare(`SELECT CASE WHEN a LIKE 's:%' THEN 'all' ELSE a END AS a, COUNT(*) AS pages, SUM(done_at > ?1) AS fresh,
-      MAX(done_at) AS last, COUNT(DISTINCT a) AS slices FROM db_pages GROUP BY 1`).bind(now - DB_FULL_MS).all();
+    const pg = await env.DB.prepare(`SELECT CASE WHEN d.a LIKE 's:%' THEN 'all' ELSE d.a END AS a, COUNT(*) AS pages,
+      SUM(c.confirmed_at = d.done_at AND c.confirmed_at > ?1) AS fresh,
+      MAX(CASE WHEN c.confirmed_at = d.done_at THEN c.confirmed_at ELSE 0 END) AS last, COUNT(DISTINCT d.a) AS slices
+      FROM db_pages d LEFT JOIN db_page_audits c ON c.a = d.a AND c.p = d.p GROUP BY 1`).bind(now - DB_FULL_MS).all();
     const meta = await env.DB.prepare("SELECT k, v FROM db_meta WHERE k LIKE 'total:%'").all();
     const totals = {};
     for (const r of meta.results) {
       const k = r.k.slice(6);
       if (k.startsWith('s:')) totals.all = (totals.all || 0) + (+r.v); else totals[k] = +r.v;
     }
-    const data = { players, transfer, loan, free: totals.free ?? null, pages: pg.results, totals,
+    const audit = await env.DB.prepare(`SELECT d.a, d.p, d.done_at, c.confirmed_at, c.ids FROM db_pages d
+      LEFT JOIN db_page_audits c ON c.a = d.a AND c.p = d.p WHERE d.a LIKE 's:%'`).all();
+    const coverageGroups = new Map();
+    for (const row of audit.results) {
+      let group = coverageGroups.get(row.a);
+      if (!group) {
+        const total = meta.results.find(r => r.k === 'total:' + row.a);
+        group = { a: row.a, expectedPages: total ? Math.max(1, Math.ceil(+total.v / DB_PAGE_SIZE)) : null,
+          confirmedPages: 0, missingPages: 0, stalePages: 0, failedPages: 0, rejectedPlayers: 0, ids: new Set() };
+        coverageGroups.set(row.a, group);
+      }
+      if (!row.confirmed_at || row.confirmed_at !== row.done_at) group.missingPages++;
+      else if (row.confirmed_at <= now - DB_FULL_MS) group.stalePages++;
+      else {
+        group.confirmedPages++;
+        try { for (const id of JSON.parse(row.ids)) group.ids.add(id); } catch (_) {}
+      }
+    }
+    const coverage = { globallyVerified: false, slices: [...coverageGroups.values()].map(({ ids, ...group }) => ({ ...group, uniqueIds: ids.size })), failures: [] };
+    const data = { protocol: 2, players, transfer, loan, free: totals.free ?? null, pages: pg.results, totals, coverage,
       writesToday: await writesToday(env), writeBudget: Number.isFinite(writeBudget(env)) ? writeBudget(env) : null };
     const entry = { at: now, data };
     statsCacheByDb.set(env.DB, entry);
