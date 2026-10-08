@@ -1,0 +1,576 @@
+/* Layout fixes shared by all appearances. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.appearance-control {
+  flex-shrink: 0;
+}
+.appearance-control select {
+  min-height: 40px;
+  max-width: 120px;
+  padding: 7px 12px;
+  font-size: 12px;
+}
+.catalog-filters {
+  display: grid;
+  grid-template-columns:
+    minmax(180px, 1.3fr) minmax(130px, 0.8fr) minmax(140px, 0.9fr)
+    minmax(180px, 1.4fr) auto;
+  align-items: stretch;
+  margin: 24px 0 0;
+  text-align: left;
+}
+.catalog-filters > * {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.catalog-filters input {
+  min-width: 0;
+}
+.catalog-filters .button {
+  white-space: normal;
+}
+.header {
+  height: auto;
+  min-height: 86px;
+  padding-block: 16px;
+  flex-wrap: wrap;
+}
+.nav {
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 16px;
+}
+.hero-actions {
+  flex-wrap: wrap;
+}
+.account-key {
+  overflow-wrap: anywhere;
+}
+.appearance-settings {
+  margin-top: 24px;
+}
+.appearance-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block: 14px;
+}
+.appearance-options label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+.appearance-options input {
+  min-height: auto;
+}
+.appearance-options label:has(:checked) {
+  border-color: var(--primary);
+}
+.appearance-save-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+@media (max-width: 1100px) {
+  .catalog-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .catalog-filters input {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 700px) {
+  .header .status {
+    display: inline-flex;
+  }
+  .nav {
+    gap: 10px 14px;
+  }
+  .nav .account-login {
+    margin-left: 0;
+    white-space: normal;
+  }
+}
+@media (max-width: 500px) {
+  .catalog-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Manga football: comic panels, ink, screentones and cel colours. */
+.feature-icon {
+  display: none;
+}
+:root[data-skin="manga"] {
+  --background: #f2ead8;
+  --card: #fffdf6;
+  --secondary: #e6eef2;
+  --border: #142534;
+  --line: #c6c6ba;
+  --foreground: #142534;
+  --muted: #475769;
+  --primary: #b84412;
+  --success: #147343;
+  --warning: #a8351f;
+  --rarity-common: #526272;
+  --rarity-uncommon: #05794f;
+  --rarity-rare: #c72335;
+  --rarity-epic: #936004;
+  --rarity-legendary: #087d98;
+  --rarity-galactico: #7738b6;
+  --attr-good: #158044;
+  --attr-warn: #ae6700;
+  --attr-bad: #c72335;
+  --stat-1: #027caf;
+  --stat-2: #c82c7c;
+  --stat-3: #733ec0;
+  --stat-4: #996600;
+  --stat-5: #087d50;
+  --stat-6: #c74b0a;
+  --manga-ink: #142534;
+  --manga-orange: #ff8c35;
+  color-scheme: light;
+}
+:root[data-skin="manga"] body {
+  background:
+    radial-gradient(#14253420 0.8px, transparent 0.8px) 0 0 / 6px 6px,
+    #f2ead8;
+}
+:root[data-skin="manga"] .shell {
+  max-width: 1440px;
+}
+:root[data-skin="manga"] .header {
+  min-height: 86px;
+  border-bottom: 4px solid var(--manga-ink);
+  background: #fffdf6;
+  padding-inline: 20px;
+  box-shadow: 0 5px 0 #ff8c35;
+}
+:root[data-skin="manga"] .brand-word {
+  font-weight: 950;
+  font-style: italic;
+  font-size: 25px;
+  color: var(--manga-ink);
+}
+:root[data-skin="manga"] .brand-word span {
+  color: #475769;
+  font-weight: 800;
+}
+:root[data-skin="manga"] .nav {
+  font-weight: 800;
+  gap: 16px;
+}
+:root[data-skin="manga"] .nav > a {
+  padding-block: 8px;
+  border-bottom: 3px solid transparent;
+}
+:root[data-skin="manga"] .nav > a:hover {
+  border-color: var(--manga-orange);
+  color: #142534;
+}
+:root[data-skin="manga"] .status {
+  border: 2px solid var(--manga-ink);
+  border-radius: 3px;
+  color: #142534;
+  background: #ffe49c;
+  font-weight: 800;
+}
+:root[data-skin="manga"] .main {
+  padding-top: 36px;
+}
+:root[data-skin="manga"] h1,
+:root[data-skin="manga"] h2,
+:root[data-skin="manga"] h3,
+:root[data-skin="manga"] .fold-title {
+  font-family: Impact, "Arial Narrow", var(--font-manrope), sans-serif;
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: #142534;
+}
+:root[data-skin="manga"] .section-head > div {
+  min-width: 0;
+}
+:root[data-skin="manga"] .main > .section-head {
+  padding: 0 210px 24px 0;
+  border-bottom: 3px solid #142534;
+  background: url("/skins/manga/football-burst.svg") right center / 200px auto
+    no-repeat;
+}
+:root[data-skin="manga"] .section-head h1 {
+  font-size: clamp(32px, 4vw, 58px);
+  line-height: 1.12;
+  text-shadow: 2px 2px 0 #ffbb65;
+  overflow-wrap: anywhere;
+}
+:root[data-skin="manga"] .eyebrow {
+  color: #142534;
+  background: #ffe49c;
+  border: 2px solid #142534;
+  box-shadow: 3px 3px 0 #142534;
+  padding: 6px 12px;
+  display: inline-flex;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  font-style: italic;
+  margin-bottom: 10px;
+}
+:root[data-skin="manga"] .card,
+:root[data-skin="manga"] .feature {
+  border: 3px solid #142534;
+  border-radius: 2px;
+  background: #fffdf6;
+  box-shadow: 6px 6px 0 #142534;
+}
+:root[data-skin="manga"] .card {
+  padding: 24px;
+}
+:root[data-skin="manga"] .card > h2,
+:root[data-skin="manga"] .card > .section-head,
+:root[data-skin="manga"] details.fold > summary {
+  border-bottom: 3px solid #142534;
+  padding-bottom: 14px;
+}
+:root[data-skin="manga"] .fold-title {
+  color: #142534;
+  font-size: 21px;
+}
+:root[data-skin="manga"] .fold-chevron {
+  color: #142534;
+}
+:root[data-skin="manga"] .notice,
+:root[data-skin="manga"] .empty {
+  border: 2px solid #142534;
+  border-left: 8px solid #ff8c35;
+  border-radius: 2px;
+  background: #fff5d6;
+  color: #142534;
+  box-shadow: 3px 3px 0 #142534;
+}
+:root[data-skin="manga"] input,
+:root[data-skin="manga"] select,
+:root[data-skin="manga"] textarea {
+  background: #fffdf6;
+  color: #142534;
+  border: 2px solid #142534;
+  border-radius: 3px;
+  box-shadow: inset 0 -3px 0 #e6e7de;
+}
+:root[data-skin="manga"] input::placeholder,
+:root[data-skin="manga"] textarea::placeholder {
+  color: #55606a;
+  opacity: 1;
+}
+:root[data-skin="manga"] .button {
+  border: 2px solid #142534;
+  background: #fffdf6;
+  color: #142534;
+  border-radius: 2px;
+  box-shadow: 3px 3px 0 #142534;
+  font-weight: 900;
+}
+:root[data-skin="manga"] .button.primary {
+  background: linear-gradient(165deg, #ffd366 0 28%, #ff8c35 28% 100%);
+  border-color: #142534;
+  color: #142534;
+}
+:root[data-skin="manga"] .button:hover {
+  background-color: #ffe49c;
+  box-shadow: 1px 1px 0 #142534;
+}
+:root[data-skin="manga"] .button:active {
+  box-shadow: none;
+}
+:root[data-skin="manga"] .dropzone {
+  border: 3px dashed #142534;
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    -35deg,
+    #c8e7f1 0 2px,
+    #eaf7fa 2px 15px
+  );
+  color: #142534;
+}
+:root[data-skin="manga"] .statline > div,
+:root[data-skin="manga"] .milestone,
+:root[data-skin="manga"] .training-summary {
+  border: 2px solid #142534;
+  background: #eaf4f5;
+  border-radius: 2px;
+  box-shadow: 3px 3px 0 #142534;
+}
+:root[data-skin="manga"] .statline strong {
+  font-style: italic;
+  font-weight: 950;
+  color: #142534;
+}
+:root[data-skin="manga"] .pill,
+:root[data-skin="manga"] .pos-badge {
+  background: #ffe49c;
+  color: #142534;
+  border: 2px solid #142534;
+  border-radius: 2px;
+  font-weight: 900;
+}
+:root[data-skin="manga"] .rating,
+:root[data-skin="manga"] .rating-chip {
+  border-radius: 2px;
+  box-shadow: 2px 2px 0 #142534;
+  font-weight: 950;
+  font-style: italic;
+}
+:root[data-skin="manga"] .table-wrap {
+  border: 2px solid #142534;
+  border-radius: 0;
+}
+:root[data-skin="manga"] thead {
+  background: #142534;
+  color: #fffdf6;
+}
+:root[data-skin="manga"] th {
+  color: #fffdf6;
+  font-weight: 900;
+  letter-spacing: 1px;
+  border-color: #142534;
+}
+:root[data-skin="manga"] .lineup-matrix th {
+  color: var(--foreground);
+  letter-spacing: 0;
+}
+:root[data-skin="manga"] tbody tr {
+  background: #fffdf6;
+}
+:root[data-skin="manga"] tbody tr:nth-child(even) {
+  background: #eaf4f5;
+}
+:root[data-skin="manga"] tbody tr:hover {
+  background: #fff0b9;
+}
+:root[data-skin="manga"] td {
+  border-bottom: 1px solid #a9b4b5;
+}
+:root[data-skin="manga"] td a {
+  font-weight: 900;
+}
+:root[data-skin="manga"] .footer {
+  border-top: 3px solid #142534;
+  color: #142534;
+  font-weight: 600;
+}
+:root[data-skin="manga"] :focus-visible {
+  outline: 3px solid #077eae;
+  outline-offset: 4px;
+}
+/* Homepage: the illustration is one drawn panel, alongside the content. */
+:root[data-skin="manga"] .home-content {
+  position: relative;
+}
+:root[data-skin="manga"] .home-content::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 35%;
+  height: 548px;
+  border: 4px solid #142534;
+  background:
+    url("/skins/manga/hero-stadium.webp") 15% top / auto 100% no-repeat,
+    #142534;
+  box-shadow: 6px 6px 0 #142534;
+  pointer-events: none;
+}
+:root[data-skin="manga"] .home-content .hero {
+  width: 62%;
+  margin: 0 0 32px auto;
+  min-height: 548px;
+  padding: 32px;
+  border: 4px solid #142534;
+  border-radius: 2px;
+  background:
+    radial-gradient(#14253416 0.8px, transparent 0.8px) 0 0 / 5px 5px,
+    #fffdf6;
+  box-shadow: 6px 6px 0 #142534;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+:root[data-skin="manga"] .hero h1 {
+  font-size: clamp(32px, 3.1vw, 49px);
+  line-height: 1.1;
+  letter-spacing: 0;
+  text-shadow: 2px 2px 0 #ffd366;
+}
+:root[data-skin="manga"] .hero h1 span {
+  color: #b84412;
+}
+:root[data-skin="manga"] .hero p {
+  color: #475769;
+  font-size: 16px;
+  line-height: 1.7;
+}
+:root[data-skin="manga"] .search-wrap {
+  width: 100%;
+}
+:root[data-skin="manga"] .search-icon {
+  color: #142534;
+}
+:root[data-skin="manga"] .hero-actions {
+  flex-wrap: wrap;
+}
+:root[data-skin="manga"] .search-results {
+  background: #fffdf6;
+  border: 3px solid #142534;
+  border-radius: 2px;
+  box-shadow: 4px 4px 0 #142534;
+}
+:root[data-skin="manga"] .feature-grid {
+  gap: 22px;
+  margin-top: 20px;
+}
+:root[data-skin="manga"] .feature {
+  position: relative;
+  overflow: hidden;
+  min-height: 238px;
+  padding: 24px;
+}
+:root[data-skin="manga"] .feature-icon {
+  display: block;
+  position: absolute;
+  right: 20px;
+  top: 23px;
+  width: 32px;
+  height: 32px;
+  color: #142534;
+  stroke-width: 2;
+}
+:root[data-skin="manga"] .feature-number {
+  display: inline-block;
+  padding: 6px 10px;
+  background: #ff8c35;
+  border: 2px solid #142534;
+  color: #142534;
+  font-weight: 900;
+  font-style: italic;
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 12px;
+  margin-bottom: 25px;
+  box-shadow: 3px 3px 0 #142534;
+}
+:root[data-skin="manga"] .feature h3 {
+  font-size: 25px;
+  margin-bottom: 12px;
+}
+:root[data-skin="manga"] .feature p {
+  color: #475769;
+  font-size: 14px;
+}
+:root[data-skin="manga"] .feature::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 70px;
+  height: 60px;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 7px,
+    #142534 7px 9px
+  );
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  opacity: 0.2;
+}
+:root[data-skin="manga"] .feature-training {
+  background: #eaf4f5;
+}
+:root[data-skin="manga"] .feature-decide {
+  background: #fff0c2;
+}
+:root[data-skin="manga"] .home-content > .notice {
+  margin-top: 28px;
+  text-align: center;
+}
+@media (max-width: 1100px) {
+  :root[data-skin="manga"] .home-content::before {
+    width: 29%;
+    height: 590px;
+  }
+  :root[data-skin="manga"] .home-content .hero {
+    width: 68%;
+    min-height: 590px;
+    padding: 24px;
+  }
+}
+@media (max-width: 700px) {
+  :root[data-skin="manga"] .main > .section-head {
+    padding-right: 0;
+    background: none;
+  }
+  :root[data-skin="manga"] .header {
+    padding-inline: 12px;
+  }
+  :root[data-skin="manga"] .brand-word {
+    font-size: 21px;
+  }
+  :root[data-skin="manga"] .nav {
+    gap: 10px 14px;
+  }
+  :root[data-skin="manga"] .home-content {
+    padding-top: 228px;
+  }
+  :root[data-skin="manga"] .home-content::before {
+    width: 100%;
+    height: 206px;
+    background-image: url("/skins/manga/hero-stadium-mobile.webp");
+    background-size: cover;
+    background-position: left 28%;
+  }
+  :root[data-skin="manga"] .home-content .hero {
+    width: 100%;
+    min-height: 0;
+    padding: 26px 18px;
+  }
+  :root[data-skin="manga"] .hero h1 {
+    font-size: clamp(28px, 7.4vw, 40px);
+  }
+  :root[data-skin="manga"] .hero-actions .button {
+    width: 100%;
+  }
+  :root[data-skin="manga"] .card {
+    padding: 16px;
+  }
+  :root[data-skin="manga"] .feature-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  :root[data-skin="manga"] .feature {
+    min-height: 210px;
+    padding: 20px;
+  }
+  :root[data-skin="manga"] .feature h3 {
+    font-size: 23px;
+  }
+  :root[data-skin="manga"] .statline {
+    gap: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-skin="manga"] * {
+    scroll-behavior: auto;
+  }
+}

@@ -1,62 +1,69 @@
 "use client";
-
-import { useSyncExternalStore } from "react";
-import { MoonIcon, SunIcon } from "@heroicons/react/24/outline";
-
-type Theme = "light" | "dark";
-const KEY = "gmc-theme";
-
-function current(): Theme {
-  const set = document.documentElement.dataset.theme;
-  if (set === "light" || set === "dark") return set;
-  return window.matchMedia("(prefers-color-scheme: light)").matches
-    ? "light"
-    : "dark";
-}
-
-const EVENT = "gmc-theme-change";
-function subscribe(onChange: () => void) {
-  const media = window.matchMedia("(prefers-color-scheme: light)");
-  media.addEventListener("change", onChange);
-  window.addEventListener(EVENT, onChange);
-  return () => {
-    media.removeEventListener("change", onChange);
-    window.removeEventListener(EVENT, onChange);
-  };
-}
-
-/** Passe le site en clair ou en sombre (choix gardé dans ce navigateur). */
+import { useEffect, useSyncExternalStore } from "react";
+import {
+  APPEARANCES,
+  APPEARANCE_LABELS,
+  isAppearance,
+  type Appearance,
+} from "@/lib/appearance";
+import {
+  applyAppearance,
+  appearanceRevision,
+  currentAppearance,
+  subscribeAppearance,
+} from "@/lib/appearance-store";
+/** Local appearance, with an optional preference saved to the signed-in account. */
 export default function ThemeToggle() {
-  const theme = useSyncExternalStore<Theme | null>(
-    subscribe,
-    current,
+  const appearance = useSyncExternalStore<Appearance | null>(
+    subscribeAppearance,
+    currentAppearance,
     () => null,
   );
-  function toggle() {
-    const next: Theme = current() === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
-    try {
-      localStorage.setItem(KEY, next);
-    } catch {
-      /* stockage indisponible : le choix vaut pour cette page */
+  useEffect(() => {
+    const controller = new AbortController(),
+      revision = appearanceRevision();
+    async function restore() {
+      try {
+        const response = await fetch("/api/preferences/appearance", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (
+          !controller.signal.aborted &&
+          appearanceRevision() === revision &&
+          isAppearance(data.appearance)
+        )
+          applyAppearance(data.appearance, false);
+      } catch {
+        /* Account service failure does not block local themes. */
+      }
     }
-    window.dispatchEvent(new Event(EVENT));
-  }
-  const label =
-    theme === "dark" ? "Passer en thème clair" : "Passer en thème sombre";
+    void restore();
+    return () => controller.abort();
+  }, []);
   return (
-    <button
-      type="button"
-      className="theme-toggle"
-      onClick={toggle}
-      aria-label={label}
-      title={label}
-    >
-      {theme === "dark" ? (
-        <SunIcon width={18} aria-hidden="true" />
-      ) : (
-        <MoonIcon width={18} aria-hidden="true" />
-      )}
-    </button>
+    <label className="appearance-control">
+      <span className="sr-only">Apparence du site</span>
+      <select
+        aria-label="Apparence du site"
+        title="Jour, Nuit ou Manga"
+        value={appearance ?? ""}
+        onChange={(event) => {
+          if (isAppearance(event.target.value))
+            applyAppearance(event.target.value);
+        }}
+      >
+        <option value="" disabled>
+          Apparence
+        </option>
+        {APPEARANCES.map((value) => (
+          <option key={value} value={value}>
+            {APPEARANCE_LABELS[value]}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

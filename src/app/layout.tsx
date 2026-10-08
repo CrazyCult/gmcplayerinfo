@@ -8,7 +8,9 @@ import localFont from "next/font/local";
 import { Toaster } from "sonner";
 import { text } from "@/lib/i18n";
 import { indexEnabled } from "@/data/gmc-index";
+import { APPEARANCE_BOOTSTRAP } from "@/lib/appearance";
 import "./globals.css";
+import "./manga.css";
 
 const manrope = localFont({
   src: "../../node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2",
@@ -42,8 +44,7 @@ export default function RootLayout({
         {/* Applique le thème choisi avant l’affichage (pas de flash). */}
         <script
           dangerouslySetInnerHTML={{
-            __html:
-              "try{var t=localStorage.getItem('gmc-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}",
+            __html: APPEARANCE_BOOTSTRAP,
           }}
         />
       </head>

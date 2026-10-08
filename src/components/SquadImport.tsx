@@ -5,6 +5,7 @@ import { ArrowUpTrayIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { toast } from "sonner";
 import { clearSquad, importSquad, useSquad } from "@/lib/local-squad";
 import SquadTable from "./SquadTable";
+import SquadExport from "./SquadExport";
 
 export default function SquadImport({
   embedded = false,
@@ -125,22 +126,25 @@ export default function SquadImport({
         </div>
       )}
       {players.length > 0 ? (
-        <SquadTable
-          players={players}
-          hrefPrefix="/player/local:"
-          action={
-            <button
-              className="button subtle"
-              onClick={() => {
-                void clearSquad().catch(() =>
-                  toast.error("Suppression impossible."),
-                );
-              }}
-            >
-              Effacer l’import
-            </button>
-          }
-        />
+        <>
+          <SquadExport players={players} />
+          <SquadTable
+            players={players}
+            hrefPrefix="/player/local:"
+            action={
+              <button
+                className="button subtle"
+                onClick={() => {
+                  void clearSquad().catch(() =>
+                    toast.error("Suppression impossible."),
+                  );
+                }}
+              >
+                Effacer l’import
+              </button>
+            }
+          />
+        </>
       ) : (
         <div className="empty">
           <h2>Votre analyse commence ici.</h2>

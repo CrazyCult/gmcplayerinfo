@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { accountKey, authEnabled, getSession, isPremium } from "@/lib/session";
+import AccountAppearance from "@/components/AccountAppearance";
 
 export const metadata = { title: "Mon compte" };
 
@@ -32,6 +33,7 @@ export default async function AccountPage() {
         modules réservés) :
       </p>
       <code className="account-key">{key}</code>
+      <AccountAppearance />
     </section>
   );
 }

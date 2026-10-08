@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { sqliteBindings } from "./sqlite-bindings";
 
 type Arg = { type: string; value?: string | number; base64?: string };
 const value = (a: Arg) =>
@@ -39,7 +40,7 @@ export function turso(token = "tok-turso") {
         return { type: "ok", response: { type: "close" } };
       try {
         const st = db.prepare(r.stmt!.sql);
-        const args = r.stmt!.args.map(value) as never[];
+        const args = sqliteBindings(r.stmt!.sql, r.stmt!.args.map(value));
         const cols = st
           .columns()
           .map((c) => ({ name: c.name, decltype: null }));

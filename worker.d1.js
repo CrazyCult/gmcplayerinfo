@@ -105,6 +105,8 @@ const SCHEMA = [
   // Compte du site → club rattaché. k = empreinte HMAC de l'identifiant Google,
   // calculée par le site : le serveur ne voit jamais l'identifiant lui-même.
   'CREATE TABLE IF NOT EXISTS site_users (k TEXT PRIMARY KEY, team_id TEXT, updated_at INTEGER NOT NULL)',
+  // Site appearance, independent of the club link (unlinking must preserve it).
+  'CREATE TABLE IF NOT EXISTS site_preferences (k TEXT PRIMARY KEY, appearance TEXT NOT NULL, updated_at INTEGER NOT NULL)',
   // Table des confrontations de styles de jeu, reconstituée à partir des
   // phrases « X a l'avantage sur Y » de l'analyse de match du jeu.
   // Une ligne par (match, gagnant, perdant) : un même match compte une fois.
@@ -410,8 +412,9 @@ async function siteRequest(req, env, url, json) {
     return json({ error: 'Accès site non autorisé' }, 401);
   const requestPrefix = '/v1/site/request/', statusPrefix = '/v1/site/status/', playerPrefix = '/v1/site/player/';
   const isRequest = url.pathname.startsWith(requestPrefix);
+  const isPreferences = url.pathname.startsWith('/v1/site/preferences/');
   const isClub = url.pathname.startsWith('/v1/site/me/') || url.pathname === '/v1/site/clubs' || url.pathname.startsWith('/v1/site/club/');
-  if (!isClub && req.method !== (isRequest ? 'POST' : 'GET')) return json({ error: isRequest ? 'POST attendu' : 'Lecture seule' }, 405);
+  if (!isClub && !isPreferences && req.method !== (isRequest ? 'POST' : 'GET')) return json({ error: isRequest ? 'POST attendu' : 'Lecture seule' }, 405);
   if (env.SITE_RATE_LIMITER) {
     try {
       const { success } = await env.SITE_RATE_LIMITER.limit({ key: req.headers.get('CF-Connecting-IP') || 'site' });
@@ -419,6 +422,7 @@ async function siteRequest(req, env, url, json) {
     } catch (_) { /* limiteur indisponible : on continue */ }
   }
   if (isClub) return siteClubRequest(req, env, url, json);
+  if (isPreferences) return sitePreferencesRequest(req, env, url, json);
   await ensureDb(env);
   const idFrom = (prefix) => { try { const id = decodeURIComponent(url.pathname.slice(prefix.length)); return isStr(id, 128) ? id : null; } catch { return null; } };
 
@@ -487,6 +491,24 @@ async function siteRequest(req, env, url, json) {
     fetchedAt: row.src_at || 0, teamId: row.team_id || '', light: !!row.light, market: marketOf(row),
     value: row.value ?? null, posGain: row.pos_gain || 0, posBest: row.pos_best || null,
   })), total: c.total, capped: c.capped, page: c.page, pages: c.pages });
+}
+
+async function sitePreferencesRequest(req, env, url, json) {
+  let k; try { k = decodeURIComponent(url.pathname.slice('/v1/site/preferences/'.length)); } catch (_) { k = ''; }
+  if (!/^[A-Za-z0-9_-]{20,128}$/.test(k)) return json({ error: 'Clé invalide' }, 400);
+  if (!['GET', 'PUT'].includes(req.method)) return json({ error: 'GET ou PUT attendu' }, 405);
+  await ensureDb(env);
+  if (req.method === 'GET') {
+    const row = await env.DB.prepare('SELECT appearance FROM site_preferences WHERE k = ?').bind(k).first();
+    return json({ appearance: row?.appearance ?? null });
+  }
+  let body; try { body = await req.json(); } catch (_) { return json({ error: 'JSON invalide' }, 400); }
+  if (!body || !Object.hasOwn(body, 'appearance') || ![null, 'light', 'dark', 'manga'].includes(body.appearance))
+    return json({ error: 'Apparence invalide' }, 400);
+  if (body.appearance === null) await env.DB.prepare('DELETE FROM site_preferences WHERE k = ?').bind(k).run();
+  else await env.DB.prepare(`INSERT INTO site_preferences (k, appearance, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(k) DO UPDATE SET appearance = excluded.appearance, updated_at = excluded.updated_at`).bind(k, body.appearance, Date.now()).run();
+  return json({ appearance: body.appearance });
 }
 
 // --- « Mon effectif » : clubs et compte du site ------------------------------------

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import SquadImport from "@/components/SquadImport";
 import SquadTable from "@/components/SquadTable";
+import SquadExport from "@/components/SquadExport";
 import {
   IndexError,
   getAccountClub,
@@ -43,7 +44,12 @@ export default async function SquadPage({
     changing = one("changer") === "1",
     loginError = LOGIN_ERRORS[one("connexion")];
 
-  if (!indexEnabled()) return <SquadImport />;
+  if (!indexEnabled())
+    return (
+      <>
+        <SquadImport />
+      </>
+    );
 
   const session = authEnabled() ? await getSession() : null;
   // An explicit club does not depend on the account lookup. Start it now,
@@ -168,6 +174,12 @@ export default async function SquadPage({
           )}
         </div>
       )}
+
+      <SquadExport
+        players={club?.players.map((p) => p.player) ?? []}
+        collectedAt={club?.fetchedAt ?? undefined}
+        clubName={club?.name ?? undefined}
+      />
 
       {club ? (
         club.players.length ? (

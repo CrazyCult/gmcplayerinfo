@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { sqliteBindings } from "./sqlite-bindings";
 
 /** D1 minimal sur SQLite (node:sqlite) : prepare/bind/run/all/first/batch + meta.changes. */
 export function d1() {
@@ -9,19 +10,19 @@ export function d1() {
     const s = {
       bind: (...values: unknown[]) => ((args = values), s),
       run: async () => {
-        const r = db.prepare(query).run(...(args as never[]));
+        const r = db.prepare(query).run(...sqliteBindings(query, args));
         return {
           meta: { changes: Number(r.changes), rows_written: Number(r.changes) },
         };
       },
       all: async () => {
-        const results = db.prepare(query).all(...(args as never[]));
+        const results = db.prepare(query).all(...sqliteBindings(query, args));
         reads += results.length;
         return { results };
       },
       first: async () => {
         reads += 1;
-        return db.prepare(query).get(...(args as never[])) ?? null;
+        return db.prepare(query).get(...sqliteBindings(query, args)) ?? null;
       },
     };
     return s;

@@ -1,5 +1,116 @@
 @import "tailwindcss";
 
+.lineup-actions {
+  margin-bottom: 24px;
+}
+.lineup-import {
+  margin-bottom: 24px;
+}
+.lineup-import summary {
+  cursor: pointer;
+}
+.lineup-import p {
+  margin-top: 16px;
+}
+.lineup-import small {
+  display: block;
+  margin-top: 16px;
+}
+.lineup-paste {
+  margin-top: 16px;
+}
+.lineup-paste textarea {
+  margin-block: 12px;
+}
+.lineup-section {
+  margin-top: 24px;
+}
+.lineup-scroll {
+  overflow: auto;
+  max-height: 76vh;
+  position: relative;
+  border: 1px solid var(--border);
+}
+.lineup-matrix {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: max-content;
+  min-width: 100%;
+}
+.lineup-matrix th,
+.lineup-matrix td {
+  min-width: 104px;
+  width: 104px;
+  padding: 10px 8px;
+  white-space: normal;
+  border-right: 1px solid var(--line);
+  text-align: center;
+}
+.lineup-matrix thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--card);
+  color: var(--foreground);
+  vertical-align: top;
+  text-transform: none;
+}
+.lineup-matrix th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--card);
+  min-width: 160px;
+  text-align: left;
+}
+.lineup-matrix thead th:first-child {
+  z-index: 3;
+}
+.lineup-name {
+  display: block;
+  width: 88px;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 800;
+}
+.lineup-matrix thead small {
+  display: block;
+  margin-top: 6px;
+}
+.lineup-matrix tbody th {
+  text-transform: none;
+  color: var(--foreground);
+}
+.lineup-matrix td {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.lineup-weaknesses span {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+}
+.lineup-group th:first-child {
+  background: var(--secondary);
+  padding-block: 12px;
+  font-weight: 800;
+}
+.lineup-low {
+  margin-left: 5px;
+  color: var(--warning);
+  font-weight: 900;
+}
+@media print {
+  .lineup-actions,
+  .lineup-import {
+    display: none;
+  }
+  .lineup-scroll {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
 :root {
   --background: #0b1120;
   --card: #111827;

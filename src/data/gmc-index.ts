@@ -262,3 +262,25 @@ export async function setAccountClub(key: string, teamId: string | null) {
     }),
   ).teamId;
 }
+
+const appearanceSchema = z.object({
+  appearance: z.enum(["light", "dark", "manga"]).nullable(),
+});
+export async function getAccountAppearance(key: string) {
+  return appearanceSchema.parse(
+    await request(`/v1/site/preferences/${encodeURIComponent(key)}`, {
+      fresh: true,
+    }),
+  ).appearance;
+}
+export async function setAccountAppearance(
+  key: string,
+  appearance: "light" | "dark" | "manga" | null,
+) {
+  return appearanceSchema.parse(
+    await request(`/v1/site/preferences/${encodeURIComponent(key)}`, {
+      method: "PUT",
+      body: { appearance },
+    }),
+  ).appearance;
+}

@@ -60,7 +60,7 @@ export default async function PlayersPage({
           OVR, potentiel et prix demandés), relue chaque jour ; le marché est
           relu chaque heure.
         </p>
-        <form action="/players" className="hero-actions">
+        <form action="/players" className="filters catalog-filters">
           <input
             name="q"
             aria-label="Nom ou identifiant du joueur"

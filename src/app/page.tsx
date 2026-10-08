@@ -2,13 +2,16 @@ import Link from "next/link";
 import {
   ArrowUpTrayIcon,
   ArrowsRightLeftIcon,
+  ChartBarIcon,
+  ArrowTrendingUpIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import Search from "@/components/Search";
 import { indexEnabled } from "@/data/gmc-index";
 
 export default function Home() {
   return (
-    <>
+    <div className="home-content">
       <section className="hero">
         <div className="eyebrow">
           <span className="status-dot" />
@@ -42,7 +45,8 @@ export default function Home() {
         </small>
       </section>
       <div className="feature-grid">
-        <section className="feature">
+        <section className="feature feature-analyze">
+          <ChartBarIcon className="feature-icon" aria-hidden="true" />
           <div className="feature-number">01 / ANALYSER</div>
           <h3>Au-delà de la note globale</h3>
           <p>
@@ -50,7 +54,8 @@ export default function Home() {
             la place de chaque joueur.
           </p>
         </section>
-        <section className="feature">
+        <section className="feature feature-training">
+          <ArrowTrendingUpIcon className="feature-icon" aria-hidden="true" />
           <div className="feature-number">02 / DÉVELOPPER</div>
           <h3>Chaque séance compte</h3>
           <p>
@@ -58,7 +63,8 @@ export default function Home() {
             Anticipez votre budget en GMC2.
           </p>
         </section>
-        <section className="feature">
+        <section className="feature feature-decide">
+          <UserGroupIcon className="feature-icon" aria-hidden="true" />
           <div className="feature-number">03 / DÉCIDER</div>
           <h3>Un effectif, une vue claire</h3>
           <p>
@@ -72,6 +78,6 @@ export default function Home() {
           ? "Index GMC Companion · Tous les joueurs déjà collectés par l’extension, mis à jour au fil des collectes."
           : "Mode import local · La connexion communautaire doit être activée sur le serveur."}
       </div>
-    </>
+    </div>
   );
 }
