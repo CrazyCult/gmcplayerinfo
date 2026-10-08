@@ -1,0 +1,1106 @@
+[
+  {
+    "appearance": "manga",
+    "page": "/",
+    "requestedWidth": 320,
+    "client": 305,
+    "controls": [],
+    "scroll": 305,
+    "skin": "manga",
+    "theme": "dark"
+  },
+  {
+    "appearance": "manga",
+    "page": "/",
+    "requestedWidth": 375,
+    "client": 360,
+    "controls": [],
+    "scroll": 360,
+    "skin": "manga",
+    "theme": "dark"
+  },
+  {
+    "appearance": "manga",
+    "page": "/",
+    "requestedWidth": 390,
+    "client": 375,
+    "controls": [],
+    "scroll": 375,
+    "skin": "manga",
+    "theme": "dark"
+  },
+  {
+    "appearance": "manga",
+    "page": "/",
+    "requestedWidth": 768,
+    "client": 753,
+    "controls": [],
+    "scroll": 753,
+    "skin": "manga",
+    "theme": "dark"
+  },
+  {
+    "appearance": "manga",
+    "page": "/",
+    "requestedWidth": 1024,
+    "client": 1009,
+    "controls": [],
+    "scroll": 1009,
+    "skin": "manga",
+    "theme": "dark"
+  },
+  {
+    "appearance": "manga",
+    "page": "/",
+    "requestedWidth": 1280,
+    "client": 1265,
+    "controls": [],
+    "scroll": 1265,
+    "skin": "manga",
+    "theme": "dark"
+  },
+  {
+    "appearance": "manga",
+    "page": "/",
+    "requestedWidth": 1536,
+    "client": 1521,
+    "controls": [],
+    "scroll": 1521,
+    "skin": "manga",
+    "theme": "dark"
+  },
+  {
+    "appearance": "manga",
+    "page": "/",
+    "requestedWidth": 1920,
+    "client": 1905,
+    "controls": [],
+    "scroll": 1905,
+    "skin": "manga",
+    "theme": "dark"
+  },
+  {
+    "appearance": "manga",
+    "page": "/players",
+    "requestedWidth": 320,
+    "client": 305,
+    "controls": [
+      {
+        "left": 35,
+        "right": 270,
+        "width": 235
+      },
+      {
+        "left": 35,
+        "right": 270,
+        "width": 235
+      },
+      {
+        "left": 35,
+        "right": 270,
+        "width": 235
+      },
+      {
+        "left": 35,
+        "right": 270,
+        "width": 235
+      },
+      {
+        "left": 35,
+        "right": 270,
+        "width": 235
+      }
+    ],
+    "scroll": 305,
+    "skin": "manga",
+    "theme": "dark"
+  },
+  {
+    "appearance": "manga",
+    "page": "/players",
+    "requestedWidth": 375,
+    "client": 360,
+    "controls": [
+      {
+        "left": 35,
+        "right": 325,
+        "width": 290
+      },
+      {
+        "left": 35,
+        "right": 325,
+        "width": 290
+      },
+      {
+        "left": 35,
+        "right": 325,
+        "width": 290
+      },
+      {
+        "left": 35,
+        "right": 325,
+        "width": 290
+      },
+      {
+        "left": 35,
+        "right": 325,
+        "width": 290
+      }
+    ],
+    "scroll": 360,
+    "skin": "manga",
+    "theme": "dark"
+  },
+  {
+    "appearance": "manga",
+    "page": "/players",
+    "requestedWidth": 390,
+    "client": 375,
+    "controls": [
+      {
+        "left": 35,
+        "right": 340,
+        "width": 305
+      },
+      {
+        "left": 35,
+        "right": 340,
+        "width": 305
+      },
+      {
+        "left": 35,
+        "right": 340,
+        "width": 305
+      },
+      {
+        "left": 35,
+        "right": 340,
+        "width": 305
+      },
+      {
+        "left": 35,
+        "right": 340,
+        "width": 305
+      }
+    ],
+    "scroll": 375,
+    "skin": "manga",
+    "theme": "dark"
+  },
+  {
+    "appearance": "manga",
+    "page": "/players",
+    "requestedWidth": 768,
+    "client": 768,
+    "controls": [
+      {
+        "left": 45,
+        "right": 723,
+        "width": 678
+      },
+      {
+        "left": 45,
+        "right": 378,
+        "width": 333
+      },
+      {
+        "left": 390,
+        "right": 723,
+        "width": 333
+      },
+      {
+        "left": 45,
+        "right": 378,
+        "width": 333
+      },
+      {
+        "left": 390,
+        "right": 723,
+        "width": 333
+      }
+    ],
+    "scroll": 768,
+    "skin": "manga",
+    "theme": "dark"
+  },
+  {
+    "appearance": "manga",
+    "page": "/players",
+    "requestedWidth": 1024,
+    "client": 1024,
+    "controls": [
+      {
+        "left": 45,
+        "right": 979,
+        "width": 934
+      },
+      {
+        "left": 45,
+        "right": 506,
+        "width": 461
+      },
+      {
+        "left": 518,
+        "right": 979,
+        "width": 461
+      },
+      {
+        "left": 45,
+        "right": 506,
+        "width": 461
+      },
+      {
+        "left": 518,
+        "right": 979,
+        "width": 461
+      }
+    ],
+    "scroll": 1024,
+    "skin": "manga",
+    "theme": "dark"
+  },
+  {
+    "appearance": "manga",
+    "page": "/players",
+    "requestedWidth": 1280,
+    "client": 1280,
+    "controls": [
+      {
+        "left": 45,
+        "right": 350.9609375,
+        "width": 305.9609375
+      },
+      {
+        "left": 362.9609375,
+        "right": 551.25,
+        "width": 188.2890625
+      },
+      {
+        "left": 563.25,
+        "right": 775.078125,
+        "width": 211.828125
+      },
+      {
+        "left": 787.078125,
+        "right": 1116.578125,
+        "width": 329.5
+      },
+      {
+        "left": 1128.578125,
+        "right": 1235,
+        "width": 106.421875
+      }
+    ],
+    "scroll": 1280,
+    "skin": "manga",
+    "theme": "dark"
+  },
+  {
+    "appearance": "manga",
+    "page": "/players",
+    "requestedWidth": 1536,
+    "client": 1536,
+    "controls": [
+      {
+        "left": 93,
+        "right": 446.234375,
+        "width": 353.234375
+      },
+      {
+        "left": 458.234375,
+        "right": 675.6171875,
+        "width": 217.3828125
+      },
+      {
+        "left": 687.6171875,
+        "right": 932.171875,
+        "width": 244.5546875
+      },
+      {
+        "left": 944.171875,
+        "right": 1324.578125,
+        "width": 380.40625
+      },
+      {
+        "left": 1336.578125,
+        "right": 1443,
+        "width": 106.421875
+      }
+    ],
+    "scroll": 1536,
+    "skin": "manga",
+    "theme": "dark"
+  },
+  {
+    "appearance": "manga",
+    "page": "/players",
+    "requestedWidth": 1920,
+    "client": 1920,
+    "controls": [
+      {
+        "left": 285,
+        "right": 638.234375,
+        "width": 353.234375
+      },
+      {
+        "left": 650.234375,
+        "right": 867.6171875,
+        "width": 217.3828125
+      },
+      {
+        "left": 879.6171875,
+        "right": 1124.171875,
+        "width": 244.5546875
+      },
+      {
+        "left": 1136.171875,
+        "right": 1516.578125,
+        "width": 380.40625
+      },
+      {
+        "left": 1528.578125,
+        "right": 1635,
+        "width": 106.421875
+      }
+    ],
+    "scroll": 1920,
+    "skin": "manga",
+    "theme": "dark"
+  },
+  {
+    "appearance": "light",
+    "page": "/",
+    "requestedWidth": 320,
+    "client": 305,
+    "controls": [],
+    "scroll": 305,
+    "skin": "classic",
+    "theme": "light"
+  },
+  {
+    "appearance": "light",
+    "page": "/",
+    "requestedWidth": 375,
+    "client": 360,
+    "controls": [],
+    "scroll": 360,
+    "skin": "classic",
+    "theme": "light"
+  },
+  {
+    "appearance": "light",
+    "page": "/",
+    "requestedWidth": 390,
+    "client": 375,
+    "controls": [],
+    "scroll": 375,
+    "skin": "classic",
+    "theme": "light"
+  },
+  {
+    "appearance": "light",
+    "page": "/",
+    "requestedWidth": 768,
+    "client": 753,
+    "controls": [],
+    "scroll": 753,
+    "skin": "classic",
+    "theme": "light"
+  },
+  {
+    "appearance": "light",
+    "page": "/",
+    "requestedWidth": 1024,
+    "client": 1009,
+    "controls": [],
+    "scroll": 1009,
+    "skin": "classic",
+    "theme": "light"
+  },
+  {
+    "appearance": "light",
+    "page": "/",
+    "requestedWidth": 1280,
+    "client": 1265,
+    "controls": [],
+    "scroll": 1265,
+    "skin": "classic",
+    "theme": "light"
+  },
+  {
+    "appearance": "light",
+    "page": "/",
+    "requestedWidth": 1536,
+    "client": 1521,
+    "controls": [],
+    "scroll": 1521,
+    "skin": "classic",
+    "theme": "light"
+  },
+  {
+    "appearance": "light",
+    "page": "/",
+    "requestedWidth": 1920,
+    "client": 1905,
+    "controls": [],
+    "scroll": 1905,
+    "skin": "classic",
+    "theme": "light"
+  },
+  {
+    "appearance": "light",
+    "page": "/players",
+    "requestedWidth": 320,
+    "client": 305,
+    "controls": [
+      {
+        "left": 35,
+        "right": 270,
+        "width": 235
+      },
+      {
+        "left": 35,
+        "right": 270,
+        "width": 235
+      },
+      {
+        "left": 35,
+        "right": 270,
+        "width": 235
+      },
+      {
+        "left": 35,
+        "right": 270,
+        "width": 235
+      },
+      {
+        "left": 35,
+        "right": 270,
+        "width": 235
+      }
+    ],
+    "scroll": 305,
+    "skin": "classic",
+    "theme": "light"
+  },
+  {
+    "appearance": "light",
+    "page": "/players",
+    "requestedWidth": 375,
+    "client": 360,
+    "controls": [
+      {
+        "left": 35,
+        "right": 325,
+        "width": 290
+      },
+      {
+        "left": 35,
+        "right": 325,
+        "width": 290
+      },
+      {
+        "left": 35,
+        "right": 325,
+        "width": 290
+      },
+      {
+        "left": 35,
+        "right": 325,
+        "width": 290
+      },
+      {
+        "left": 35,
+        "right": 325,
+        "width": 290
+      }
+    ],
+    "scroll": 360,
+    "skin": "classic",
+    "theme": "light"
+  },
+  {
+    "appearance": "light",
+    "page": "/players",
+    "requestedWidth": 390,
+    "client": 375,
+    "controls": [
+      {
+        "left": 35,
+        "right": 340,
+        "width": 305
+      },
+      {
+        "left": 35,
+        "right": 340,
+        "width": 305
+      },
+      {
+        "left": 35,
+        "right": 340,
+        "width": 305
+      },
+      {
+        "left": 35,
+        "right": 340,
+        "width": 305
+      },
+      {
+        "left": 35,
+        "right": 340,
+        "width": 305
+      }
+    ],
+    "scroll": 375,
+    "skin": "classic",
+    "theme": "light"
+  },
+  {
+    "appearance": "light",
+    "page": "/players",
+    "requestedWidth": 768,
+    "client": 768,
+    "controls": [
+      {
+        "left": 45,
+        "right": 723,
+        "width": 678
+      },
+      {
+        "left": 45,
+        "right": 378,
+        "width": 333
+      },
+      {
+        "left": 390,
+        "right": 723,
+        "width": 333
+      },
+      {
+        "left": 45,
+        "right": 378,
+        "width": 333
+      },
+      {
+        "left": 390,
+        "right": 723,
+        "width": 333
+      }
+    ],
+    "scroll": 768,
+    "skin": "classic",
+    "theme": "light"
+  },
+  {
+    "appearance": "light",
+    "page": "/players",
+    "requestedWidth": 1024,
+    "client": 1024,
+    "controls": [
+      {
+        "left": 45,
+        "right": 979,
+        "width": 934
+      },
+      {
+        "left": 45,
+        "right": 506,
+        "width": 461
+      },
+      {
+        "left": 518,
+        "right": 979,
+        "width": 461
+      },
+      {
+        "left": 45,
+        "right": 506,
+        "width": 461
+      },
+      {
+        "left": 518,
+        "right": 979,
+        "width": 461
+      }
+    ],
+    "scroll": 1024,
+    "skin": "classic",
+    "theme": "light"
+  },
+  {
+    "appearance": "light",
+    "page": "/players",
+    "requestedWidth": 1280,
+    "client": 1280,
+    "controls": [
+      {
+        "left": 85,
+        "right": 367.328125,
+        "width": 282.328125
+      },
+      {
+        "left": 379.328125,
+        "right": 553.0703125,
+        "width": 173.7421875
+      },
+      {
+        "left": 565.0703125,
+        "right": 760.53125,
+        "width": 195.4609375
+      },
+      {
+        "left": 772.53125,
+        "right": 1076.578125,
+        "width": 304.046875
+      },
+      {
+        "left": 1088.578125,
+        "right": 1195,
+        "width": 106.421875
+      }
+    ],
+    "scroll": 1280,
+    "skin": "classic",
+    "theme": "light"
+  },
+  {
+    "appearance": "light",
+    "page": "/players",
+    "requestedWidth": 1536,
+    "client": 1536,
+    "controls": [
+      {
+        "left": 213,
+        "right": 495.328125,
+        "width": 282.328125
+      },
+      {
+        "left": 507.328125,
+        "right": 681.0703125,
+        "width": 173.7421875
+      },
+      {
+        "left": 693.0703125,
+        "right": 888.53125,
+        "width": 195.4609375
+      },
+      {
+        "left": 900.53125,
+        "right": 1204.578125,
+        "width": 304.046875
+      },
+      {
+        "left": 1216.578125,
+        "right": 1323,
+        "width": 106.421875
+      }
+    ],
+    "scroll": 1536,
+    "skin": "classic",
+    "theme": "light"
+  },
+  {
+    "appearance": "light",
+    "page": "/players",
+    "requestedWidth": 1920,
+    "client": 1920,
+    "controls": [
+      {
+        "left": 405,
+        "right": 687.328125,
+        "width": 282.328125
+      },
+      {
+        "left": 699.328125,
+        "right": 873.0703125,
+        "width": 173.7421875
+      },
+      {
+        "left": 885.0703125,
+        "right": 1080.53125,
+        "width": 195.4609375
+      },
+      {
+        "left": 1092.53125,
+        "right": 1396.578125,
+        "width": 304.046875
+      },
+      {
+        "left": 1408.578125,
+        "right": 1515,
+        "width": 106.421875
+      }
+    ],
+    "scroll": 1920,
+    "skin": "classic",
+    "theme": "light"
+  },
+  {
+    "appearance": "dark",
+    "page": "/",
+    "requestedWidth": 320,
+    "client": 305,
+    "controls": [],
+    "scroll": 305,
+    "skin": "classic",
+    "theme": "dark"
+  },
+  {
+    "appearance": "dark",
+    "page": "/",
+    "requestedWidth": 375,
+    "client": 360,
+    "controls": [],
+    "scroll": 360,
+    "skin": "classic",
+    "theme": "dark"
+  },
+  {
+    "appearance": "dark",
+    "page": "/",
+    "requestedWidth": 390,
+    "client": 375,
+    "controls": [],
+    "scroll": 375,
+    "skin": "classic",
+    "theme": "dark"
+  },
+  {
+    "appearance": "dark",
+    "page": "/",
+    "requestedWidth": 768,
+    "client": 753,
+    "controls": [],
+    "scroll": 753,
+    "skin": "classic",
+    "theme": "dark"
+  },
+  {
+    "appearance": "dark",
+    "page": "/",
+    "requestedWidth": 1024,
+    "client": 1009,
+    "controls": [],
+    "scroll": 1009,
+    "skin": "classic",
+    "theme": "dark"
+  },
+  {
+    "appearance": "dark",
+    "page": "/",
+    "requestedWidth": 1280,
+    "client": 1265,
+    "controls": [],
+    "scroll": 1265,
+    "skin": "classic",
+    "theme": "dark"
+  },
+  {
+    "appearance": "dark",
+    "page": "/",
+    "requestedWidth": 1536,
+    "client": 1521,
+    "controls": [],
+    "scroll": 1521,
+    "skin": "classic",
+    "theme": "dark"
+  },
+  {
+    "appearance": "dark",
+    "page": "/",
+    "requestedWidth": 1920,
+    "client": 1905,
+    "controls": [],
+    "scroll": 1905,
+    "skin": "classic",
+    "theme": "dark"
+  },
+  {
+    "appearance": "dark",
+    "page": "/players",
+    "requestedWidth": 320,
+    "client": 305,
+    "controls": [
+      {
+        "left": 35,
+        "right": 270,
+        "width": 235
+      },
+      {
+        "left": 35,
+        "right": 270,
+        "width": 235
+      },
+      {
+        "left": 35,
+        "right": 270,
+        "width": 235
+      },
+      {
+        "left": 35,
+        "right": 270,
+        "width": 235
+      },
+      {
+        "left": 35,
+        "right": 270,
+        "width": 235
+      }
+    ],
+    "scroll": 305,
+    "skin": "classic",
+    "theme": "dark"
+  },
+  {
+    "appearance": "dark",
+    "page": "/players",
+    "requestedWidth": 375,
+    "client": 360,
+    "controls": [
+      {
+        "left": 35,
+        "right": 325,
+        "width": 290
+      },
+      {
+        "left": 35,
+        "right": 325,
+        "width": 290
+      },
+      {
+        "left": 35,
+        "right": 325,
+        "width": 290
+      },
+      {
+        "left": 35,
+        "right": 325,
+        "width": 290
+      },
+      {
+        "left": 35,
+        "right": 325,
+        "width": 290
+      }
+    ],
+    "scroll": 360,
+    "skin": "classic",
+    "theme": "dark"
+  },
+  {
+    "appearance": "dark",
+    "page": "/players",
+    "requestedWidth": 390,
+    "client": 375,
+    "controls": [
+      {
+        "left": 35,
+        "right": 340,
+        "width": 305
+      },
+      {
+        "left": 35,
+        "right": 340,
+        "width": 305
+      },
+      {
+        "left": 35,
+        "right": 340,
+        "width": 305
+      },
+      {
+        "left": 35,
+        "right": 340,
+        "width": 305
+      },
+      {
+        "left": 35,
+        "right": 340,
+        "width": 305
+      }
+    ],
+    "scroll": 375,
+    "skin": "classic",
+    "theme": "dark"
+  },
+  {
+    "appearance": "dark",
+    "page": "/players",
+    "requestedWidth": 768,
+    "client": 768,
+    "controls": [
+      {
+        "left": 45,
+        "right": 723,
+        "width": 678
+      },
+      {
+        "left": 45,
+        "right": 378,
+        "width": 333
+      },
+      {
+        "left": 390,
+        "right": 723,
+        "width": 333
+      },
+      {
+        "left": 45,
+        "right": 378,
+        "width": 333
+      },
+      {
+        "left": 390,
+        "right": 723,
+        "width": 333
+      }
+    ],
+    "scroll": 768,
+    "skin": "classic",
+    "theme": "dark"
+  },
+  {
+    "appearance": "dark",
+    "page": "/players",
+    "requestedWidth": 1024,
+    "client": 1024,
+    "controls": [
+      {
+        "left": 45,
+        "right": 979,
+        "width": 934
+      },
+      {
+        "left": 45,
+        "right": 506,
+        "width": 461
+      },
+      {
+        "left": 518,
+        "right": 979,
+        "width": 461
+      },
+      {
+        "left": 45,
+        "right": 506,
+        "width": 461
+      },
+      {
+        "left": 518,
+        "right": 979,
+        "width": 461
+      }
+    ],
+    "scroll": 1024,
+    "skin": "classic",
+    "theme": "dark"
+  },
+  {
+    "appearance": "dark",
+    "page": "/players",
+    "requestedWidth": 1280,
+    "client": 1280,
+    "controls": [
+      {
+        "left": 85,
+        "right": 367.328125,
+        "width": 282.328125
+      },
+      {
+        "left": 379.328125,
+        "right": 553.0703125,
+        "width": 173.7421875
+      },
+      {
+        "left": 565.0703125,
+        "right": 760.53125,
+        "width": 195.4609375
+      },
+      {
+        "left": 772.53125,
+        "right": 1076.578125,
+        "width": 304.046875
+      },
+      {
+        "left": 1088.578125,
+        "right": 1195,
+        "width": 106.421875
+      }
+    ],
+    "scroll": 1280,
+    "skin": "classic",
+    "theme": "dark"
+  },
+  {
+    "appearance": "dark",
+    "page": "/players",
+    "requestedWidth": 1536,
+    "client": 1536,
+    "controls": [
+      {
+        "left": 213,
+        "right": 495.328125,
+        "width": 282.328125
+      },
+      {
+        "left": 507.328125,
+        "right": 681.0703125,
+        "width": 173.7421875
+      },
+      {
+        "left": 693.0703125,
+        "right": 888.53125,
+        "width": 195.4609375
+      },
+      {
+        "left": 900.53125,
+        "right": 1204.578125,
+        "width": 304.046875
+      },
+      {
+        "left": 1216.578125,
+        "right": 1323,
+        "width": 106.421875
+      }
+    ],
+    "scroll": 1536,
+    "skin": "classic",
+    "theme": "dark"
+  },
+  {
+    "appearance": "dark",
+    "page": "/players",
+    "requestedWidth": 1920,
+    "client": 1920,
+    "controls": [
+      {
+        "left": 405,
+        "right": 687.328125,
+        "width": 282.328125
+      },
+      {
+        "left": 699.328125,
+        "right": 873.0703125,
+        "width": 173.7421875
+      },
+      {
+        "left": 885.0703125,
+        "right": 1080.53125,
+        "width": 195.4609375
+      },
+      {
+        "left": 1092.53125,
+        "right": 1396.578125,
+        "width": 304.046875
+      },
+      {
+        "left": 1408.578125,
+        "right": 1515,
+        "width": 106.421875
+      }
+    ],
+    "scroll": 1920,
+    "skin": "classic",
+    "theme": "dark"
+  }
+]

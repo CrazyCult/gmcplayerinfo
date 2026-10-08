@@ -1,0 +1,142 @@
+[
+  {
+    "background": "linear-gradient(rgba(0, 0, 0, 0) 55%, rgba(2, 13, 28, 0.6)), url(\"http://localhost:3211/skins/manga/hero-stadium-mobile.webp\")",
+    "controls": [],
+    "overflow": false,
+    "page": "/",
+    "width": 320
+  },
+  {
+    "background": "linear-gradient(rgba(0, 0, 0, 0) 55%, rgba(2, 13, 28, 0.6)), url(\"http://localhost:3211/skins/manga/hero-stadium-mobile.webp\")",
+    "controls": [],
+    "overflow": false,
+    "page": "/",
+    "width": 390
+  },
+  {
+    "background": "linear-gradient(rgba(0, 0, 0, 0) 55%, rgba(2, 13, 28, 0.6)), url(\"http://localhost:3211/skins/manga/hero-stadium-mobile.webp\")",
+    "controls": [],
+    "overflow": false,
+    "page": "/",
+    "width": 768
+  },
+  {
+    "background": "linear-gradient(rgba(0, 0, 0, 0) 65%, rgba(2, 13, 28, 0.6)), url(\"http://localhost:3211/skins/manga/hero-stadium.webp\")",
+    "controls": [],
+    "overflow": false,
+    "page": "/",
+    "width": 1024
+  },
+  {
+    "background": "linear-gradient(rgba(0, 0, 0, 0) 65%, rgba(2, 13, 28, 0.6)), url(\"http://localhost:3211/skins/manga/hero-stadium.webp\")",
+    "controls": [],
+    "overflow": false,
+    "page": "/",
+    "width": 1280
+  },
+  {
+    "background": "linear-gradient(rgba(0, 0, 0, 0) 65%, rgba(2, 13, 28, 0.6)), url(\"http://localhost:3211/skins/manga/hero-stadium.webp\")",
+    "controls": [],
+    "overflow": false,
+    "page": "/",
+    "width": 1536
+  },
+  {
+    "background": "linear-gradient(rgba(0, 0, 0, 0) 65%, rgba(2, 13, 28, 0.6)), url(\"http://localhost:3211/skins/manga/hero-stadium.webp\")",
+    "controls": [],
+    "overflow": false,
+    "page": "/",
+    "width": 1920
+  },
+  {
+    "background": "linear-gradient(rgba(0, 0, 0, 0) 55%, rgba(2, 13, 28, 0.6)), url(\"http://localhost:3211/skins/manga/hero-stadium-mobile.webp\")",
+    "controls": [
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "overflow": false,
+    "page": "/players",
+    "width": 320
+  },
+  {
+    "background": "linear-gradient(rgba(0, 0, 0, 0) 55%, rgba(2, 13, 28, 0.6)), url(\"http://localhost:3211/skins/manga/hero-stadium-mobile.webp\")",
+    "controls": [
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "overflow": false,
+    "page": "/players",
+    "width": 390
+  },
+  {
+    "background": "linear-gradient(rgba(0, 0, 0, 0) 55%, rgba(2, 13, 28, 0.6)), url(\"http://localhost:3211/skins/manga/hero-stadium-mobile.webp\")",
+    "controls": [
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "overflow": false,
+    "page": "/players",
+    "width": 768
+  },
+  {
+    "background": "linear-gradient(rgba(0, 0, 0, 0) 65%, rgba(2, 13, 28, 0.6)), url(\"http://localhost:3211/skins/manga/hero-stadium.webp\")",
+    "controls": [
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "overflow": false,
+    "page": "/players",
+    "width": 1024
+  },
+  {
+    "background": "linear-gradient(rgba(0, 0, 0, 0) 65%, rgba(2, 13, 28, 0.6)), url(\"http://localhost:3211/skins/manga/hero-stadium.webp\")",
+    "controls": [
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "overflow": false,
+    "page": "/players",
+    "width": 1280
+  },
+  {
+    "background": "linear-gradient(rgba(0, 0, 0, 0) 65%, rgba(2, 13, 28, 0.6)), url(\"http://localhost:3211/skins/manga/hero-stadium.webp\")",
+    "controls": [
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "overflow": false,
+    "page": "/players",
+    "width": 1536
+  },
+  {
+    "background": "linear-gradient(rgba(0, 0, 0, 0) 65%, rgba(2, 13, 28, 0.6)), url(\"http://localhost:3211/skins/manga/hero-stadium.webp\")",
+    "controls": [
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "overflow": false,
+    "page": "/players",
+    "width": 1920
+  }
+]

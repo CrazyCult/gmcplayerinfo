@@ -1,0 +1,332 @@
+[
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/",
+    "width": 320
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/",
+    "width": 390
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/",
+    "width": 768
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/",
+    "width": 1024
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/",
+    "width": 1440
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/",
+    "width": 1920
+  },
+  {
+    "controls": [
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/players",
+    "width": 320
+  },
+  {
+    "controls": [
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/players",
+    "width": 390
+  },
+  {
+    "controls": [
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/players",
+    "width": 768
+  },
+  {
+    "controls": [
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/players",
+    "width": 1024
+  },
+  {
+    "controls": [
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/players",
+    "width": 1440
+  },
+  {
+    "controls": [
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/players",
+    "width": 1920
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/squad",
+    "width": 320
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/squad",
+    "width": 390
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/squad",
+    "width": 768
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/squad",
+    "width": 1024
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/squad",
+    "width": 1440
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/squad",
+    "width": 1920
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/compare",
+    "width": 320
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/compare",
+    "width": 390
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/compare",
+    "width": 768
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/compare",
+    "width": 1024
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/compare",
+    "width": 1440
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/compare",
+    "width": 1920
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/player/fixture-full",
+    "width": 320
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/player/fixture-full",
+    "width": 390
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/player/fixture-full",
+    "width": 768
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/player/fixture-full",
+    "width": 1024
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/player/fixture-full",
+    "width": 1440
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/player/fixture-full",
+    "width": 1920
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/player/fixture-full/training",
+    "width": 320
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/player/fixture-full/training",
+    "width": 390
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/player/fixture-full/training",
+    "width": 768
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/player/fixture-full/training",
+    "width": 1024
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/player/fixture-full/training",
+    "width": 1440
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/player/fixture-full/training",
+    "width": 1920
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/compte",
+    "width": 320
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/compte",
+    "width": 390
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/compte",
+    "width": 768
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/compte",
+    "width": 1024
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/compte",
+    "width": 1440
+  },
+  {
+    "controls": [],
+    "ink": "rgb(20, 37, 52)",
+    "overflow": false,
+    "url": "/compte",
+    "width": 1920
+  }
+]

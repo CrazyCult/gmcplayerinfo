@@ -1,0 +1,242 @@
+[
+  {
+    "page": "/squad?club=fixture-club",
+    "requestedWidth": 320,
+    "client": 305,
+    "scroll": 305
+  },
+  {
+    "page": "/squad?club=fixture-club",
+    "requestedWidth": 375,
+    "client": 360,
+    "scroll": 360
+  },
+  {
+    "page": "/squad?club=fixture-club",
+    "requestedWidth": 390,
+    "client": 375,
+    "scroll": 375
+  },
+  {
+    "page": "/squad?club=fixture-club",
+    "requestedWidth": 768,
+    "client": 753,
+    "scroll": 753
+  },
+  {
+    "page": "/squad?club=fixture-club",
+    "requestedWidth": 1024,
+    "client": 1009,
+    "scroll": 1009
+  },
+  {
+    "page": "/squad?club=fixture-club",
+    "requestedWidth": 1280,
+    "client": 1265,
+    "scroll": 1265
+  },
+  {
+    "page": "/squad?club=fixture-club",
+    "requestedWidth": 1536,
+    "client": 1521,
+    "scroll": 1521
+  },
+  {
+    "page": "/squad?club=fixture-club",
+    "requestedWidth": 1920,
+    "client": 1905,
+    "scroll": 1905
+  },
+  {
+    "page": "/compare?player1=fixture-full&player2=fixture-light",
+    "requestedWidth": 320,
+    "client": 305,
+    "scroll": 305
+  },
+  {
+    "page": "/compare?player1=fixture-full&player2=fixture-light",
+    "requestedWidth": 375,
+    "client": 360,
+    "scroll": 360
+  },
+  {
+    "page": "/compare?player1=fixture-full&player2=fixture-light",
+    "requestedWidth": 390,
+    "client": 375,
+    "scroll": 375
+  },
+  {
+    "page": "/compare?player1=fixture-full&player2=fixture-light",
+    "requestedWidth": 768,
+    "client": 753,
+    "scroll": 753
+  },
+  {
+    "page": "/compare?player1=fixture-full&player2=fixture-light",
+    "requestedWidth": 1024,
+    "client": 1009,
+    "scroll": 1009
+  },
+  {
+    "page": "/compare?player1=fixture-full&player2=fixture-light",
+    "requestedWidth": 1280,
+    "client": 1265,
+    "scroll": 1265
+  },
+  {
+    "page": "/compare?player1=fixture-full&player2=fixture-light",
+    "requestedWidth": 1536,
+    "client": 1521,
+    "scroll": 1521
+  },
+  {
+    "page": "/compare?player1=fixture-full&player2=fixture-light",
+    "requestedWidth": 1920,
+    "client": 1905,
+    "scroll": 1905
+  },
+  {
+    "page": "/player/fixture-full",
+    "requestedWidth": 320,
+    "client": 305,
+    "scroll": 305
+  },
+  {
+    "page": "/player/fixture-full",
+    "requestedWidth": 375,
+    "client": 360,
+    "scroll": 360
+  },
+  {
+    "page": "/player/fixture-full",
+    "requestedWidth": 390,
+    "client": 375,
+    "scroll": 375
+  },
+  {
+    "page": "/player/fixture-full",
+    "requestedWidth": 768,
+    "client": 753,
+    "scroll": 753
+  },
+  {
+    "page": "/player/fixture-full",
+    "requestedWidth": 1024,
+    "client": 1009,
+    "scroll": 1009
+  },
+  {
+    "page": "/player/fixture-full",
+    "requestedWidth": 1280,
+    "client": 1265,
+    "scroll": 1265
+  },
+  {
+    "page": "/player/fixture-full",
+    "requestedWidth": 1536,
+    "client": 1521,
+    "scroll": 1521
+  },
+  {
+    "page": "/player/fixture-full",
+    "requestedWidth": 1920,
+    "client": 1905,
+    "scroll": 1905
+  },
+  {
+    "page": "/player/fixture-full/training",
+    "requestedWidth": 320,
+    "client": 305,
+    "scroll": 305
+  },
+  {
+    "page": "/player/fixture-full/training",
+    "requestedWidth": 375,
+    "client": 360,
+    "scroll": 360
+  },
+  {
+    "page": "/player/fixture-full/training",
+    "requestedWidth": 390,
+    "client": 375,
+    "scroll": 375
+  },
+  {
+    "page": "/player/fixture-full/training",
+    "requestedWidth": 768,
+    "client": 753,
+    "scroll": 753
+  },
+  {
+    "page": "/player/fixture-full/training",
+    "requestedWidth": 1024,
+    "client": 1009,
+    "scroll": 1009
+  },
+  {
+    "page": "/player/fixture-full/training",
+    "requestedWidth": 1280,
+    "client": 1265,
+    "scroll": 1265
+  },
+  {
+    "page": "/player/fixture-full/training",
+    "requestedWidth": 1536,
+    "client": 1521,
+    "scroll": 1521
+  },
+  {
+    "page": "/player/fixture-full/training",
+    "requestedWidth": 1920,
+    "client": 1905,
+    "scroll": 1905
+  },
+  {
+    "page": "/compte",
+    "requestedWidth": 320,
+    "client": 305,
+    "scroll": 305
+  },
+  {
+    "page": "/compte",
+    "requestedWidth": 375,
+    "client": 360,
+    "scroll": 360
+  },
+  {
+    "page": "/compte",
+    "requestedWidth": 390,
+    "client": 375,
+    "scroll": 375
+  },
+  {
+    "page": "/compte",
+    "requestedWidth": 768,
+    "client": 768,
+    "scroll": 768
+  },
+  {
+    "page": "/compte",
+    "requestedWidth": 1024,
+    "client": 1024,
+    "scroll": 1024
+  },
+  {
+    "page": "/compte",
+    "requestedWidth": 1280,
+    "client": 1280,
+    "scroll": 1280
+  },
+  {
+    "page": "/compte",
+    "requestedWidth": 1536,
+    "client": 1536,
+    "scroll": 1536
+  },
+  {
+    "page": "/compte",
+    "requestedWidth": 1920,
+    "client": 1920,
+    "scroll": 1920
+  }
+]
