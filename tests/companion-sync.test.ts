@@ -55,7 +55,7 @@ it("explains missing extension rather than leaving an inert button", async () =>
 it("acknowledgement waits for data, then times out and clears the listener", async () => {
   const result = expect(requestCompanionSquad()).rejects.toThrow(/expiré/);
   response({ type: "ack" });
-  await vi.advanceTimersByTimeAsync(70000);
+  await vi.advanceTimersByTimeAsync(100000);
   await result;
   expect(page.removeEventListener).toHaveBeenCalled();
 });

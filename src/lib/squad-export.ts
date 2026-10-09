@@ -34,6 +34,7 @@ export interface SquadExportData {
   source: string;
   tactics: TacticsExport | null;
   players: Player[];
+  clubSync?: { teamId: string; fetchedAt: number };
 }
 export function parseSquadExport(raw: unknown): SquadExportData {
   const envelope = z
@@ -42,6 +43,12 @@ export function parseSquadExport(raw: unknown): SquadExportData {
       collectedAt: z.string().datetime().nullable(),
       players: z.array(z.unknown()).min(1).max(100),
       tactics: z.record(z.string(), z.unknown()).nullable(),
+      clubSync: z
+        .object({
+          teamId: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/),
+          fetchedAt: z.number().int().positive(),
+        })
+        .optional(),
     })
     .parse(raw);
   const { players } = parseSquad(envelope.players);
@@ -75,6 +82,7 @@ export function parseSquadExport(raw: unknown): SquadExportData {
     source: "import-gamechase",
     players,
     tactics,
+    ...(envelope.clubSync ? { clubSync: envelope.clubSync } : {}),
   };
 }
 const stats = [

@@ -24,6 +24,18 @@ const input = () => ({
   players: [player("a"), player("b"), player("reserve")],
 });
 describe("tactical export", () => {
+  it("keeps the confirmed club refresh alongside every player and their full attributes", () => {
+    const raw = {
+      ...input(),
+      clubSync: { teamId: "test-club", fetchedAt: Date.now() },
+    };
+    const data = parseSquadExport(raw);
+    expect(data.clubSync).toEqual(raw.clubSync);
+    expect(parseSquadExport(JSON.parse(JSON.stringify(data))).clubSync).toEqual(
+      raw.clubSync,
+    );
+    expect(data.players[2].attributes.subs.finishing).toBe(0);
+  });
   it("retains reserves, exact slots, tactics and real zero counts", () => {
     const data = parseSquadExport(input());
     expect(data.players).toHaveLength(3);

@@ -1,7 +1,7 @@
 const CHANNEL = "gmc-squad-sync-v1";
 
 /** Only accepts the response to this click, from our own page's bridge. */
-export function requestCompanionSquad(): Promise<unknown> {
+export function requestCompanionSquad(teamId?: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const requestId = crypto.randomUUID();
     let acknowledged = false;
@@ -20,7 +20,7 @@ export function requestCompanionSquad(): Promise<unknown> {
             "L’actualisation a expiré. Vérifie l’onglet GameChase puis réessaie.",
           ),
         ),
-      70000,
+      100000,
     );
     function finish(error?: Error, payload?: unknown) {
       clearTimeout(missing);
@@ -54,7 +54,7 @@ export function requestCompanionSquad(): Promise<unknown> {
     }
     window.addEventListener("message", receive);
     window.postMessage(
-      { channel: CHANNEL, type: "request", requestId },
+      { channel: CHANNEL, type: "request", requestId, teamId },
       window.location.origin,
     );
   });

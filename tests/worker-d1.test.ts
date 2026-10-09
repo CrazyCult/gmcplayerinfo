@@ -52,6 +52,47 @@ const light = (id: string, extra = {}) => ({
   ...extra,
 });
 
+it("club refresh replaces the entire squad and updates every full player card", async () => {
+  const { call } = setup();
+  const first = Date.now() - 60000;
+  await call("POST", "/v1/clubs", {
+    clubs: [
+      {
+        teamId: "own",
+        fetchedAt: first,
+        players: [full("xi"), full("departed")],
+      },
+    ],
+  });
+  const fetchedAt = Date.now();
+  const players = ["xi", "bench", "reserve"].map((id) =>
+    full(id, 82, {
+      attributes: { pac: 80, finishing: 93 },
+      matches_played: 0,
+      wage: 200,
+      contract_end: "2027-01-01",
+    }),
+  );
+  const ack = await call("POST", "/v1/clubs", {
+    clubs: [{ teamId: "own", fetchedAt, players }],
+  });
+  expect(ack.body).toEqual({ accepted: 1, rejected: 0 });
+  const squad = await call("GET", "/v1/site/club/own", undefined, true);
+  expect(squad.body.fetchedAt).toBe(fetchedAt);
+  expect(
+    squad.body.players.map((p: { player: { id: string } }) => p.player.id),
+  ).toEqual(["xi", "bench", "reserve"]);
+  for (const id of ["xi", "bench", "reserve"]) {
+    const card = await call("GET", `/v1/site/player/${id}`, undefined, true);
+    expect(card.body.light).toBe(false);
+    expect(card.body.player.overall).toBe(82);
+    expect(card.body.player.attributes.finishing).toBe(93);
+    expect(card.body.player.matches_played).toBe(0);
+    expect(card.body.player.wage).toBe(200);
+    expect(card.body.player.contract_end).toBe("2027-01-01");
+  }
+});
+
 describe("accès et confidentialité", () => {
   it("refuse l’accès site sans secret, sans toucher à D1", async () => {
     const prepare = vi.fn();
@@ -776,15 +817,32 @@ describe("table des confrontations", () => {
   it("compte chaque duel une fois par match et refuse les styles inconnus", async () => {
     const { call } = setup();
     const at = Date.now();
-    const duel = { matchId: "m1", winner: "Counter-attack", loser: "Fluid", seenAt: at, text: "x" };
+    const duel = {
+      matchId: "m1",
+      winner: "Counter-attack",
+      loser: "Fluid",
+      seenAt: at,
+      text: "x",
+    };
     const r = await call("POST", "/v1/matchups", {
-      items: [duel, duel, { ...duel, matchId: "m2" }, { ...duel, winner: "Bidon" }, { ...duel, loser: "Counter-attack" }],
+      items: [
+        duel,
+        duel,
+        { ...duel, matchId: "m2" },
+        { ...duel, winner: "Bidon" },
+        { ...duel, loser: "Counter-attack" },
+      ],
     });
     expect(r.body).toEqual({ accepted: 3, rejected: 2 });
     const g = await call("GET", "/v1/matchups");
-    expect(g.body.pairs).toEqual([{ winner: "Counter-attack", loser: "Fluid", n: 2, last: at }]);
+    expect(g.body.pairs).toEqual([
+      { winner: "Counter-attack", loser: "Fluid", n: 2, last: at },
+    ]);
     const f = await call("POST", "/v1/matchups", {
-      items: [{ ...duel, winner: "4-2-4", loser: "4-4-1-1" }, { ...duel, winner: "4-2-4", loser: "Fluid" }],
+      items: [
+        { ...duel, winner: "4-2-4", loser: "4-4-1-1" },
+        { ...duel, winner: "4-2-4", loser: "Fluid" },
+      ],
     });
     expect(f.body).toEqual({ accepted: 1, rejected: 1 });
   });
