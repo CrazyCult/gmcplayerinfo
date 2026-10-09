@@ -84,6 +84,7 @@ async function request(
     method?: "GET" | "POST" | "PUT";
     tags?: string[];
     fresh?: boolean;
+    revalidate?: number;
     body?: unknown;
   } = {},
 ) {
@@ -114,7 +115,7 @@ async function request(
       ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
       ...(init.fresh || (init.method && init.method !== "GET")
         ? { cache: "no-store" as const }
-        : { next: { revalidate: 900, tags: init.tags } }),
+        : { next: { revalidate: init.revalidate ?? 900, tags: init.tags } }),
       signal: AbortSignal.timeout(15000),
     });
   } catch (error) {
@@ -234,11 +235,17 @@ const clubSchema = z.object({
   players: z.array(z.object({ player: playerSchema, light: z.boolean() })),
 });
 export type ClubSquad = z.infer<typeof clubSchema>;
-/** Effectif d’un club (sans cache : l’instantané peut arriver à tout moment). */
-export async function getClub(teamId: string) {
+export const clubTag = (teamId: string) => `club:${teamId}`.slice(0, 256);
+/** Brief navigation cache; an explicit Companion refresh always bypasses it. */
+export async function getClub(
+  teamId: string,
+  { fresh = false }: { fresh?: boolean } = {},
+) {
   const parsed = clubSchema.safeParse(
     await request(`/v1/site/club/${encodeURIComponent(teamId)}`, {
-      fresh: true,
+      fresh,
+      revalidate: 30,
+      tags: [clubTag(teamId)],
     }),
   );
   if (!parsed.success) {

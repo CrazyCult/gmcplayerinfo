@@ -150,6 +150,112 @@ describe("Worker sur Turso (API HTTP)", () => {
     await call("GET", "/v1/site/players", undefined, true);
     const before = t.requests();
     await call("GET", "/v1/site/players", undefined, true);
-    expect(t.requests() - before).toBeLessThanOrEqual(2);
+    expect(t.requests() - before).toBe(1);
+  });
+  it("loads an entire full player card in three database round trips and a squad in one", async () => {
+    const { call } = setup();
+    await call("POST", "/v1/clubs", {
+      clubs: [{ teamId: "t1", fetchedAt: Date.now(), players: [full("a")] }],
+    });
+    let before = t.requests();
+    const card = await call("GET", "/v1/site/player/a", undefined, true);
+    expect(card.status).toBe(200);
+    expect(card.body.player.attributes.vision).toBe(81);
+    expect(card.body).toMatchObject({
+      prices: [],
+      comparables: [],
+      history: null,
+      light: false,
+    });
+    expect(t.requests() - before).toBe(3);
+    before = t.requests();
+    const club = await call("GET", "/v1/site/club/t1", undefined, true);
+    expect(club.body.players[0].player.id).toBe("a");
+    expect(t.requests() - before).toBe(1);
+  });
+  it("a new isolate uses the durable migration marker, keeping the data and protocol 2 schema", async () => {
+    const { env, call } = setup();
+    await call("POST", "/v1/clubs", {
+      clubs: [{ teamId: "t1", fetchedAt: Date.now(), players: [full("a")] }],
+    });
+    const before = t.requests();
+    vi.resetModules();
+    const fresh = (await import("../worker.js")).default;
+    const response = await fresh.fetch(
+      new Request("https://index.test/v1/site/players", {
+        headers: { Authorization: "Bearer tok" },
+      }),
+      env,
+    );
+    expect((await response.json()).players[0].player.id).toBe("a");
+    expect(t.requests() - before).toBe(2);
+    expect(
+      t.db
+        .prepare("PRAGMA table_info(db_pages)")
+        .all()
+        .some((c) => c.name === "task_id"),
+    ).toBe(true);
+    expect(
+      t.db.prepare("SELECT count(*) AS n FROM db_page_audits").get()?.n,
+    ).toBe(0);
+  });
+  it("concurrent first reads share initialization instead of running migrations twice", async () => {
+    const { call } = setup();
+    const statements: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const request = JSON.parse(String(init?.body));
+        statements.push(
+          ...request.requests.flatMap((r: { stmt?: { sql: string } }) =>
+            r.stmt ? [r.stmt.sql] : [],
+          ),
+        );
+        return t.fetchMock(input, init);
+      },
+    );
+    const responses = await Promise.all([
+      call("GET", "/v1/site/players", undefined, true),
+      call("GET", "/v1/site/players", undefined, true),
+    ]);
+    expect(responses.every((r) => r.status === 200)).toBe(true);
+    expect(
+      statements.filter((sql) =>
+        sql.startsWith("CREATE TABLE IF NOT EXISTS clubs "),
+      ),
+    ).toHaveLength(1);
+  });
+  it("a failed migration is retried without a durable success marker", async () => {
+    const { call } = setup();
+    let fail = true;
+    vi.stubGlobal(
+      "fetch",
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (
+          fail &&
+          String(init?.body).includes("ALTER TABLE db_pages ADD COLUMN task_id")
+        ) {
+          fail = false;
+          return new Response("temporary unavailable", { status: 503 });
+        }
+        return t.fetchMock(input, init);
+      },
+    );
+    expect(
+      (await call("GET", "/v1/site/players", undefined, true)).status,
+    ).toBe(500);
+    expect(
+      t.db
+        .prepare("SELECT v FROM db_meta WHERE k = 'schema:site-perf:v1'")
+        .get(),
+    ).toBeUndefined();
+    expect(
+      (await call("GET", "/v1/site/players", undefined, true)).status,
+    ).toBe(200);
+    expect(
+      t.db
+        .prepare("SELECT v FROM db_meta WHERE k = 'schema:site-perf:v1'")
+        .get()?.v,
+    ).toBe("1");
   });
 });

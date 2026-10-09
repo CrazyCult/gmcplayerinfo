@@ -1,5 +1,39 @@
 # Navigation et chargement
 
+## Correction du 9 octobre 2026
+
+Les mesures HTTP initiales du site public ont montré une première lecture du
+catalogue à 2,4 s, puis 0,18 s après réutilisation du cache ; l’effectif explicite
+prenait environ 0,55 s à chaque lecture, et la première ouverture mesurée dans
+Chrome atteignait 2,4 s. Ce sont des mesures sans session Google, depuis une
+seule machine ; elles ne garantissent pas la même durée sur tous les appareils.
+
+Le worker mémorise désormais la version du schéma dans la base. Un nouvel
+isolat vérifie cette version en une lecture au lieu de renvoyer tout le schéma
+et cinq ALTER déjà appliqués. Les initialisations concurrentes partagent une
+promesse ; une migration interrompue n’est pas marquée comme terminée et reste
+réessayable. Toute future migration doit changer `SCHEMA_VERSION`.
+
+Les lectures indépendantes d’une fiche sont regroupées en pipelines Turso :
+3 échanges pour la fiche complète, contre 7 auparavant. Le catalogue utilise
+1 échange contre 2. L’effectif complet, son nom et les fiches individuelles
+plus récentes sont lus dans une seule requête, bornée à l’effectif du club.
+Les filtres, limites, attributs et protections de collecte restent vérifiés.
+
+Les navigations sur Mon effectif utilisent un cache Next révalidé après 30 s,
+avec une balise propre à chaque club. « Actualiser depuis GMC Companion » le
+contourne toujours, vérifie l’instantané récent puis invalide les balises du
+club et de tous ses joueurs. Les droits du compte et son rattachement ne sont
+pas mis en cache. Les collectes automatiques peuvent apparaître avec un court
+délai de revalidation ; le bouton permet de demander immédiatement la dernière
+version. Aucune nouvelle version de l’extension n’est requise pour ces corrections.
+
+Vérification : 70 tests ciblés, TypeScript, ESLint, compilation de production,
+parcours navigateur local d’une actualisation après mise en cache. Un profil
+fictif de 40 joueurs a demandé environ 100 ms de calcul en exécution isolée
+(environ 240 ms pendant les contrôles parallèles), sans blocage de plusieurs
+secondes dans les navigations publiques observées.
+
 La navigation affiche désormais un état de chargement, sans attendre les
 réponses de l’index. Les fiches légères chargent leur statut de demande côté
 client via l’API existante, après affichage de la fiche. Le bouton reste

@@ -10,7 +10,13 @@ export function d1() {
     const s = {
       bind: (...values: unknown[]) => ((args = values), s),
       run: async () => {
-        const r = db.prepare(query).run(...sqliteBindings(query, args));
+        const statement = db.prepare(query);
+        if (statement.columns().length) {
+          const results = statement.all(...sqliteBindings(query, args));
+          reads += results.length;
+          return { results, meta: { changes: 0, rows_written: 0 } };
+        }
+        const r = statement.run(...sqliteBindings(query, args));
         return {
           meta: { changes: Number(r.changes), rows_written: Number(r.changes) },
         };

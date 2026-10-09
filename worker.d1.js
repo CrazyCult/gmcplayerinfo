@@ -120,16 +120,40 @@ const SCHEMA = [
 const PLAYSTYLES = ['Balanced', 'Possession', 'Tiki-Taka', 'Direct', 'Counter-attack', 'Gegenpressing',
   'High Tempo', 'Wing Play', 'Long Ball', 'Park the Bus', 'Catenaccio', 'Fluid'];
 const dbReady = new WeakSet();
+const dbInitializing = new WeakMap();
+const SCHEMA_VERSION = 'schema:site-perf:v1';
+// D1 batches and Turso pipelines both return SELECT results in order.
+async function readBatch(env, statements) {
+  return (await env.DB.batch(statements)).map(r => r.results || []);
+}
 async function ensureDb(env) {
   if (dbReady.has(env.DB)) return;
+  if (!dbInitializing.has(env.DB)) dbInitializing.set(env.DB, initializeDb(env).finally(() => dbInitializing.delete(env.DB)));
+  await dbInitializing.get(env.DB);
+}
+async function initializeDb(env) {
+  // The schema version is durable: a new isolate needs one read, not all DDL
+  // and failed ALTERs on every first visit. A new migration must bump this key.
+  let version;
+  try { version = await env.DB.prepare('SELECT v FROM db_meta WHERE k = ?1').bind(SCHEMA_VERSION).first(); }
+  catch (error) { if (!/no such table/i.test(String(error?.message || error))) throw error; }
+  if (version?.v === '1') { dbReady.add(env.DB); return; }
   await env.DB.batch(SCHEMA.map(q => env.DB.prepare(q)));
-  // Colonnes ajoutées après coup (erreur ignorée si elles existent déjà).
-  for (const q of ['ALTER TABLE site_clubs ADD COLUMN crest TEXT', 'ALTER TABLE site_players ADD COLUMN value INTEGER',
-    'ALTER TABLE site_players ADD COLUMN pos_gain INTEGER NOT NULL DEFAULT 0', 'ALTER TABLE site_players ADD COLUMN pos_best TEXT',
-    'ALTER TABLE db_pages ADD COLUMN task_id TEXT'])
-    try { await env.DB.prepare(q).run(); } catch (_) {}
-  try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS sp_posgain ON site_players(pos_gain) WHERE pos_gain > 0').run(); } catch (_) {}
-  await env.DB.batch(['transfer', 'loan'].map(a => env.DB.prepare('INSERT OR IGNORE INTO db_pages (a, p) VALUES (?1, 1)').bind(a)));
+  const tables = ['site_clubs', 'site_players', 'db_pages'];
+  const columns = await readBatch(env, tables.map(table => env.DB.prepare(`PRAGMA table_info(${table})`)));
+  for (const [table, name, definition] of [['site_clubs', 'crest', 'TEXT'], ['site_players', 'value', 'INTEGER'],
+    ['site_players', 'pos_gain', 'INTEGER NOT NULL DEFAULT 0'], ['site_players', 'pos_best', 'TEXT'], ['db_pages', 'task_id', 'TEXT']]) {
+    if (columns[tables.indexOf(table)].some(c => c.name === name)) continue;
+    try { await env.DB.prepare(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`).run(); }
+    catch (error) {
+      // Another isolate can install the same column concurrently. Other errors
+      // must not certify a partial migration as complete.
+      const actual = (await env.DB.prepare(`PRAGMA table_info(${table})`).all()).results;
+      if (!actual.some(c => c.name === name)) throw error;
+    }
+  }
+  await env.DB.batch([env.DB.prepare('CREATE INDEX IF NOT EXISTS sp_posgain ON site_players(pos_gain) WHERE pos_gain > 0'),
+    ...['transfer', 'loan'].map(a => env.DB.prepare('INSERT OR IGNORE INTO db_pages (a, p) VALUES (?1, 1)').bind(a))]);
   // Passage aux tranches (une seule fois) : la lecture page par page de toute
   // la base (« all ») est remplacée par une page 1 par tranche.
   if (!(await env.DB.prepare("SELECT v FROM db_meta WHERE k = 'slices:v1'").first())) {
@@ -139,6 +163,7 @@ async function ensureDb(env) {
     stmts.push(env.DB.prepare("INSERT OR IGNORE INTO db_meta (k, v) VALUES ('slices:v1', '1')"));
     await env.DB.batch(stmts);
   }
+  await env.DB.prepare('INSERT OR IGNORE INTO db_meta (k, v) VALUES (?1, ?2)').bind(SCHEMA_VERSION, '1').run();
   dbReady.add(env.DB);
 }
 
@@ -353,12 +378,16 @@ async function findPlayer(env, id) {
   const s = await env.DB.prepare('SELECT * FROM site_players WHERE id = ?1').bind(id).first();
   if (s && !s.light) {
     let best = null;
+    const [clubs, full] = await readBatch(env, [
+      env.DB.prepare('SELECT fetched_at, players FROM clubs WHERE team_id = ?1').bind(s.team_id || ''),
+      env.DB.prepare('SELECT team_id, fetched_at, data FROM full_players WHERE id = ?1').bind(id),
+    ]);
     if (s.team_id) {
-      const c = await env.DB.prepare('SELECT fetched_at, players FROM clubs WHERE team_id = ?1').bind(s.team_id).first();
+      const c = clubs[0];
       const raw = c ? JSON.parse(c.players).find(p => p && p.id === id) : null;
       if (raw) best = { raw, at: c.fetched_at, team: s.team_id };
     }
-    const f = await env.DB.prepare('SELECT team_id, fetched_at, data FROM full_players WHERE id = ?1').bind(id).first();
+    const f = full[0];
     if (f && (!best || f.fetched_at > best.at)) best = { raw: JSON.parse(f.data), at: f.fetched_at, team: f.team_id || s.team_id };
     if (best) return { s, player: publicPlayer({ data: best.raw, team_id: best.team }), fetchedAt: best.at, light: false };
   }
@@ -402,13 +431,15 @@ async function catalog(env, params, limit) {
   const { W, args, order, filtered } = catalogWhere(params);
   const page = Math.min(CATALOG_MAX_PAGES, Math.max(1, parseInt(params.page || '1', 10) || 1));
   let total, capped = false;
-  if (!filtered) total = (await env.DB.prepare('SELECT MAX(rowid) AS n FROM site_players').first())?.n || 0;
-  else {
-    total = (await env.DB.prepare(`SELECT COUNT(*) AS n FROM (SELECT 1 FROM site_players ${W} LIMIT ${COUNT_CAP + 1})`).bind(...args).first()).n;
+  const [count, results] = await readBatch(env, [
+    filtered ? env.DB.prepare(`SELECT COUNT(*) AS n FROM (SELECT 1 FROM site_players ${W} LIMIT ${COUNT_CAP + 1})`).bind(...args)
+      : env.DB.prepare('SELECT MAX(rowid) AS n FROM site_players'),
+    env.DB.prepare(`SELECT * FROM site_players ${W} ORDER BY ${order}, id LIMIT ${limit} OFFSET ${(page - 1) * limit}`).bind(...args),
+  ]);
+  total = count[0]?.n || 0;
+  if (filtered) {
     if (total > COUNT_CAP) { total = COUNT_CAP; capped = true; }
   }
-  const { results } = await env.DB.prepare(`SELECT * FROM site_players ${W} ORDER BY ${order}, id LIMIT ${limit} OFFSET ${(page - 1) * limit}`)
-    .bind(...args).all();
   return { results, total, capped: capped || (!filtered && total > CATALOG_MAX_PAGES * limit), page,
     pages: Math.min(CATALOG_MAX_PAGES, Math.ceil(total / limit)) };
 }
@@ -468,19 +499,24 @@ async function siteRequest(req, env, url, json) {
     const found = await findPlayer(env, id);
     if (!found) return json({ error: 'Joueur introuvable' }, 404);
     const { s, player } = found;
-    const prices = (await env.DB.prepare(`SELECT kind, price, overall, potential, age, first_seen, last_seen FROM db_prices
-      WHERE player_id = ?1 ORDER BY first_seen DESC LIMIT 50`).bind(id).all()).results;
-    // Prix demandés de joueurs comparables (même poste, OVR ±2, âge ±2, 30 derniers jours).
-    const comparables = Number.isFinite(player.overall) && Number.isFinite(player.age) ? (await env.DB.prepare(`SELECT kind, price, overall, potential, age, last_seen
-      FROM db_prices WHERE position = ?1 AND overall BETWEEN ?2 AND ?3 AND age BETWEEN ?4 AND ?5 AND last_seen > ?6 AND player_id != ?7
-      ORDER BY last_seen DESC LIMIT 300`).bind(String(player.position), player.overall - 2, player.overall + 2, player.age - 2, player.age + 2,
-      Date.now() - 30 * 864e5, id).all()).results : [];
-    const h = await env.DB.prepare('SELECT fetched_at, data FROM player_history WHERE player_id = ?1').bind(id).first();
-    let history = null; try { history = h ? JSON.parse(h.data) : null; } catch (_) {}
-    // Club actuel : nom connu par la base du jeu (agent libre : pas de club).
     const teamId = (s && s.team_id) || player.club_id || '';
     const freeAgent = !!((s && s.free_agent) || (found.d && found.d.free_agent));
-    const c = teamId && !freeAgent ? await env.DB.prepare('SELECT name, crest FROM site_clubs WHERE team_id = ?1').bind(teamId).first() : null;
+    const validComparable = Number.isFinite(player.overall) && Number.isFinite(player.age);
+    // Prix demandés de joueurs comparables (même poste, OVR ±2, âge ±2, 30 derniers jours).
+    const [prices, comparables, histories, clubs] = await readBatch(env, [
+      env.DB.prepare(`SELECT kind, price, overall, potential, age, first_seen, last_seen FROM db_prices
+        WHERE player_id = ?1 ORDER BY first_seen DESC LIMIT 50`).bind(id),
+      validComparable ? env.DB.prepare(`SELECT kind, price, overall, potential, age, last_seen
+      FROM db_prices WHERE position = ?1 AND overall BETWEEN ?2 AND ?3 AND age BETWEEN ?4 AND ?5 AND last_seen > ?6 AND player_id != ?7
+      ORDER BY last_seen DESC LIMIT 300`).bind(String(player.position), player.overall - 2, player.overall + 2, player.age - 2, player.age + 2,
+        Date.now() - 30 * 864e5, id) : env.DB.prepare('SELECT kind FROM db_prices WHERE 0'),
+      env.DB.prepare('SELECT fetched_at, data FROM player_history WHERE player_id = ?1').bind(id),
+      env.DB.prepare('SELECT name, crest FROM site_clubs WHERE team_id = ?1').bind(!freeAgent ? teamId : ''),
+    ]);
+    const h = histories[0];
+    let history = null; try { history = h ? JSON.parse(h.data) : null; } catch (_) {}
+    // Club actuel : nom connu par la base du jeu (agent libre : pas de club).
+    const c = clubs[0];
     const clubName = freeAgent ? null : (c && c.name) || (s && s.club_name) || (found.d && found.d.club_name) || player.club_name || null;
     return json({ player, fetchedAt: found.fetchedAt, teamId, light: found.light,
       club: freeAgent ? { id: '', name: null, freeAgent: true, crest: null } : teamId || clubName ? { id: teamId, name: clubName, freeAgent: false, crest: (c && c.crest) || null } : null,
@@ -575,10 +611,19 @@ async function siteClubRequest(req, env, url, json) {
   // jour : le club passe en tête de ce qui est confié aux extensions.
   const teamId = tail('/v1/site/club/');
   if (!isStr(teamId, 64)) return json({ error: 'Identifiant invalide' }, 400);
-  const [c, n] = await Promise.all([
-    env.DB.prepare('SELECT fetched_at, players FROM clubs WHERE team_id = ?1').bind(teamId).first(),
-    env.DB.prepare('SELECT name, crest FROM site_clubs WHERE team_id = ?1').bind(teamId).first(),
-  ]);
+  // The snapshot, club name and any newer individual cards share one database
+  // round trip. json_each is bounded by the club snapshot (at most 60 players).
+  const row = await env.DB.prepare(`SELECT c.fetched_at, c.players, n.name, n.crest,
+      (SELECT json_group_array(json_object('id', f.id, 'data', f.data)) FROM full_players f
+       WHERE f.fetched_at > c.fetched_at AND f.id IN (
+         SELECT json_extract(CASE WHEN p.type = 'object' THEN p.value ELSE '{}' END, '$.id')
+         FROM json_each(CASE WHEN json_valid(c.players) THEN c.players ELSE '[]' END) p
+       )) AS newer
+    FROM (SELECT ?1 AS team_id) wanted
+    LEFT JOIN clubs c ON c.team_id = wanted.team_id
+    LEFT JOIN site_clubs n ON n.team_id = wanted.team_id`).bind(teamId).first();
+  const c = row?.fetched_at != null ? row : null;
+  const n = row?.name != null ? row : null;
   let players = [];
   if (c) {
     let raws = [];
@@ -587,19 +632,14 @@ async function siteClubRequest(req, env, url, json) {
     // préfère (sinon l'effectif montre un OVR, des sous-attributs et des coûts
     // d'entraînement en retard sur la fiche du joueur).
     const newer = new Map();
-    for (let i = 0; i < raws.length; i += 90) {
-      const part = raws.slice(i, i + 90).map(r => r.id);
-      (await env.DB.prepare(`SELECT id, data FROM full_players WHERE fetched_at > ?1 AND id IN (${part.map((_, k) => '?' + (k + 2)).join(',')})`)
-        .bind(c.fetched_at, ...part).all()).results.forEach(r => { try { newer.set(r.id, JSON.parse(r.data)); } catch (_) {} });
-    }
+    for (const r of JSON.parse(row.newer || '[]'))
+      try { newer.set(r.id, JSON.parse(r.data)); } catch (_) {}
     players = raws.map(raw => ({ player: publicPlayer({ data: newer.get(raw.id) || raw, team_id: teamId }), light: false }));
   }
   if (!players.length) {
-    const ids = (await env.DB.prepare('SELECT id FROM site_players WHERE team_id = ?1 LIMIT 80').bind(teamId).all()).results.map(r => r.id);
-    if (ids.length) {
-      const rows = (await env.DB.prepare(`SELECT * FROM db_players WHERE id IN (${ids.map((_, i) => '?' + (i + 1)).join(',')})`).bind(...ids).all()).results;
-      players = rows.map(d => ({ player: dbPublicPlayer(d), light: true }));
-    }
+    const rows = (await env.DB.prepare(`SELECT d.* FROM site_players s JOIN db_players d ON d.id = s.id
+      WHERE s.id IN (SELECT id FROM site_players WHERE team_id = ?1 LIMIT 80)`).bind(teamId).all()).results;
+    players = rows.map(d => ({ player: dbPublicPlayer(d), light: true }));
   }
   if (!c && !n && !players.length) return json({ error: 'Club inconnu' }, 404);
   let requestedAt = null;

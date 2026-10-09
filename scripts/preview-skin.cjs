@@ -10,7 +10,7 @@ const sign=s=>createHmac('sha256',SECRET).update(s).digest('base64url');
 const account=id=>sign('account:'+id);
 require('node:fs').mkdirSync('.tmp',{recursive:true});
 const db=new DatabaseSync('.tmp/skin-local.sqlite');
-const prepare=query=>{let args=[];const params=()=>{const names=[...new Set(query.match(/\?\d+/g)||[])];return names.length?[Object.fromEntries(names.map(n=>[n,args[+n.slice(1)-1]]))]:args};const s={bind:(...v)=>(args=v,s),run:async()=>({meta:{changes:Number(db.prepare(query).run(...params()).changes)}}),all:async()=>({results:db.prepare(query).all(...params())}),first:async()=>db.prepare(query).get(...params())??null};return s;};
+const prepare=query=>{let args=[];const params=()=>{const names=[...new Set(query.match(/\?\d+/g)||[])];return names.length?[Object.fromEntries(names.map(n=>[n,args[+n.slice(1)-1]]))]:args};const s={bind:(...v)=>(args=v,s),run:async()=>{const stmt=db.prepare(query);return stmt.columns().length?{results:stmt.all(...params()),meta:{changes:0}}:{meta:{changes:Number(stmt.run(...params()).changes)}}},all:async()=>({results:db.prepare(query).all(...params())}),first:async()=>db.prepare(query).get(...params())??null};return s;};
 const DB={prepare,batch:async list=>{const r=[];for(const s of list)r.push(await s.run());return r;}};
 const player={id:'fixture-full',name:'Pasero — test local',position:'GK',age:23,overall:96,potential:103,value:100000,traits:[],attributes:{subs:{gkDiving:103,gkHandling:102,gkKicking:103,gkReflexes:103,gkPositioningSub:103,gkSprintSpeed:64,gkAcceleration:60}}};
 const light={...player,id:'fixture-light',name:'Joueur léger — test local',attributes:{div:90,han:90,kic:90,ref:90,pos:90,spe:60,subs:{}}};

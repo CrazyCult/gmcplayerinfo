@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidateTag } from "next/cache";
-import { getClub, playerTag, setAccountClub } from "@/data/gmc-index";
+import { clubTag, getClub, playerTag, setAccountClub } from "@/data/gmc-index";
 import { accountKey, getSession } from "@/lib/session";
 
 /** Rattache le club affiché au compte Google connecté. */
@@ -34,7 +34,7 @@ export async function refreshSyncedClub(teamId: string, fetchedAt: number) {
     fetchedAt > Date.now() + 5 * 60_000
   )
     throw new Error("Actualisation de l’effectif non reconnue.");
-  const club = await getClub(teamId);
+  const club = await getClub(teamId, { fresh: true });
   if (
     !club.fetchedAt ||
     club.fetchedAt < fetchedAt ||
@@ -45,4 +45,5 @@ export async function refreshSyncedClub(teamId: string, fetchedAt: number) {
     );
   for (const { player } of club.players)
     revalidateTag(playerTag(player.id), { expire: 0 });
+  revalidateTag(clubTag(teamId), { expire: 0 });
 }

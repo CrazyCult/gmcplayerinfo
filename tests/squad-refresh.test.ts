@@ -6,6 +6,7 @@ vi.mock("@/lib/session", () => ({ accountKey: vi.fn(), getSession: vi.fn() }));
 vi.mock("@/data/gmc-index", () => ({
   getClub: mocks.getClub,
   playerTag: (id: string) => `player:${id}`,
+  clubTag: (id: string) => `club:${id}`,
   setAccountClub: vi.fn(),
 }));
 import { refreshSyncedClub } from "@/app/squad/actions";
@@ -20,10 +21,11 @@ it("verifies the uploaded club and expires cards for starters, bench and reserve
     })),
   });
   await refreshSyncedClub("test-club", fetchedAt);
-  expect(mocks.getClub).toHaveBeenCalledWith("test-club");
-  expect(mocks.revalidateTag.mock.calls).toEqual(
-    ["xi", "bench", "reserve"].map((id) => [`player:${id}`, { expire: 0 }]),
-  );
+  expect(mocks.getClub).toHaveBeenCalledWith("test-club", { fresh: true });
+  expect(mocks.revalidateTag.mock.calls).toEqual([
+    ...["xi", "bench", "reserve"].map((id) => [`player:${id}`, { expire: 0 }]),
+    ["club:test-club", { expire: 0 }],
+  ]);
 });
 it("does not claim success or invalidate cards for stale or light snapshots", async () => {
   const fetchedAt = Date.now();
