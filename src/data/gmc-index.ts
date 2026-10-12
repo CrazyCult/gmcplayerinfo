@@ -236,6 +236,21 @@ const clubSchema = z.object({
 });
 export type ClubSquad = z.infer<typeof clubSchema>;
 export const clubTag = (teamId: string) => `club:${teamId}`.slice(0, 256);
+/** Priority refresh of the whole club, also usable without a local extension. */
+export async function requestClub(teamId: string) {
+  return z
+    .object({
+      teamId: z.string(),
+      requestedAt: z.number(),
+      fetchedAt: z.number().nullable(),
+      status: z.string(),
+    })
+    .parse(
+      await request(`/v1/site/club/${encodeURIComponent(teamId)}`, {
+        method: "POST",
+      }),
+    );
+}
 /** Brief navigation cache; an explicit Companion refresh always bypasses it. */
 export async function getClub(
   teamId: string,

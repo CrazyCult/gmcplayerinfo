@@ -2,6 +2,7 @@ import Link from "next/link";
 import SquadImport from "@/components/SquadImport";
 import SquadTable from "@/components/SquadTable";
 import SquadExport from "@/components/SquadExport";
+import SquadUpdateButton from "@/components/SquadUpdateButton";
 import {
   IndexError,
   getAccountClub,
@@ -167,11 +168,11 @@ export default async function SquadPage({
               Chercher un autre club
             </Link>
           )}
-          {club.requestedAt && (
-            <small className="muted">
-              Mise à jour demandée aux extensions le {date(club.requestedAt)}.
-            </small>
-          )}
+          <SquadUpdateButton
+            key={`${club.teamId}:${club.requestedAt}:${club.fetchedAt}`}
+            teamId={club.teamId}
+            requestedAt={club.requestedAt}
+          />
         </div>
       )}
 

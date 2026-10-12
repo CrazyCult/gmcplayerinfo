@@ -14,7 +14,8 @@ const prepare=query=>{let args=[];const params=()=>{const names=[...new Set(quer
 const DB={prepare,batch:async list=>{const r=[];for(const s of list)r.push(await s.run());return r;}};
 const player={id:'fixture-full',name:'Pasero — test local',position:'GK',age:23,overall:96,potential:103,value:100000,traits:[],attributes:{subs:{gkDiving:103,gkHandling:102,gkKicking:103,gkReflexes:103,gkPositioningSub:103,gkSprintSpeed:64,gkAcceleration:60}}};
 const light={...player,id:'fixture-light',name:'Joueur léger — test local',attributes:{div:90,han:90,kic:90,ref:90,pos:90,spe:60,subs:{}}};
-let refreshedSquad=null;
+let refreshedSquad=null, requestedAt=null;
+const fixtureFetchedAt=Date.now()-60000;
 (async()=>{
 const worker=(await import(pathToFileURL(path.resolve('worker.d1.js')).href)).default;
 const env={DB,SITE_TOKEN:'local-only'};
@@ -41,7 +42,12 @@ http.createServer(async(req,res)=>{
   if(url.pathname.startsWith('/v1/site/player/')){const p=refreshedSquad?.players.find(p=>url.pathname.endsWith('/'+p.id))||(url.pathname.endsWith('fixture-light')?light:player);data={player:p,light:!refreshedSquad&&p===light,fetchedAt:refreshedSquad?.fetchedAt||Date.now(),teamId:'fixture-club'};}
   else if(url.pathname.startsWith('/v1/site/status/'))data={light:true,requestedAt:null};
   else if(url.pathname==='/v1/site/clubs')data={clubs:[{teamId:'fixture-club',name:'Club test local',fetchedAt:Date.now()}]};
-  else if(url.pathname.startsWith('/v1/site/club/'))data={teamId:'fixture-club',name:'Club test local',fetchedAt:refreshedSquad?.fetchedAt||Date.now(),requestedAt:null,players:refreshedSquad?refreshedSquad.players.map(player=>({player,light:false})):[{player,light:false},{player:light,light:true}]};
+  else if(url.pathname.startsWith('/v1/site/club/')) {
+    const fetchedAt=refreshedSquad?.fetchedAt||fixtureFetchedAt;
+    if(requestedAt && fetchedAt>=requestedAt)requestedAt=null;
+    if(req.method==='POST') {requestedAt=requestedAt||Date.now();data={teamId:'fixture-club',fetchedAt,requestedAt,status:'demande'};}
+    else data={teamId:'fixture-club',name:'Club test local',fetchedAt,requestedAt,players:refreshedSquad?refreshedSquad.players.map(player=>({player,light:false})):[{player,light:false},{player:light,light:true}]};
+  }
   else data={players:[{player,light:false,teamId:'fixture-club',fetchedAt:Date.now()}],total:1,page:1,pages:1};
   res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify(data));
  }catch(e){res.writeHead(500);res.end(JSON.stringify({error:e.message}));}

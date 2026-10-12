@@ -1,4 +1,5 @@
 const CHANNEL = "gmc-squad-sync-v1";
+export class CompanionUnavailableError extends Error {}
 
 /** Only accepts the response to this click, from our own page's bridge. */
 export function requestCompanionSquad(teamId?: string): Promise<unknown> {
@@ -8,8 +9,8 @@ export function requestCompanionSquad(teamId?: string): Promise<unknown> {
     const missing = setTimeout(() => {
       if (!acknowledged)
         finish(
-          new Error(
-            "GMC Companion 2.38.7 requis dans ce navigateur. Recharge l’extension puis cette page et l’onglet GameChase.",
+          new CompanionUnavailableError(
+            "GMC Companion 2.38.9 ou plus récent requis dans ce navigateur. Recharge l’extension puis cette page et l’onglet GameChase.",
           ),
         );
     }, 2000);

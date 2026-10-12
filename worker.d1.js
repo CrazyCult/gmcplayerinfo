@@ -577,7 +577,8 @@ async function siteClubRequest(req, env, url, json) {
       ON CONFLICT(k) DO UPDATE SET team_id = excluded.team_id, updated_at = excluded.updated_at`).bind(k, teamId, now).run();
     return json({ teamId });
   }
-  if (req.method !== 'GET') return json({ error: 'Lecture seule' }, 405);
+  if (req.method !== 'GET' && !(req.method === 'POST' && url.pathname.startsWith('/v1/site/club/')))
+    return json({ error: 'Lecture seule' }, 405);
 
   // Recherche de club par nom.
   if (url.pathname === '/v1/site/clubs') {
@@ -613,7 +614,7 @@ async function siteClubRequest(req, env, url, json) {
   if (!isStr(teamId, 64)) return json({ error: 'Identifiant invalide' }, 400);
   // The snapshot, club name and any newer individual cards share one database
   // round trip. json_each is bounded by the club snapshot (at most 60 players).
-  const row = await env.DB.prepare(`SELECT c.fetched_at, c.players, n.name, n.crest,
+  const row = await env.DB.prepare(`SELECT c.fetched_at, c.players, n.name, n.crest, r.requested_at AS request_at, r.player_id AS request_player_id,
       (SELECT json_group_array(json_object('id', f.id, 'data', f.data)) FROM full_players f
        WHERE f.fetched_at > c.fetched_at AND f.id IN (
          SELECT json_extract(CASE WHEN p.type = 'object' THEN p.value ELSE '{}' END, '$.id')
@@ -621,7 +622,8 @@ async function siteClubRequest(req, env, url, json) {
        )) AS newer
     FROM (SELECT ?1 AS team_id) wanted
     LEFT JOIN clubs c ON c.team_id = wanted.team_id
-    LEFT JOIN site_clubs n ON n.team_id = wanted.team_id`).bind(teamId).first();
+    LEFT JOIN site_clubs n ON n.team_id = wanted.team_id
+    LEFT JOIN site_requests r ON r.team_id = wanted.team_id`).bind(teamId).first();
   const c = row?.fetched_at != null ? row : null;
   const n = row?.name != null ? row : null;
   let players = [];
@@ -643,14 +645,25 @@ async function siteClubRequest(req, env, url, json) {
   }
   if (!c && !n && !players.length) return json({ error: 'Club inconnu' }, 404);
   let requestedAt = null;
-  if (!c || now - c.fetched_at > CLUB_STALE_MS) {
-    const r = await env.DB.prepare('SELECT requested_at FROM site_requests WHERE team_id = ?1').bind(teamId).first();
-    if (r && now - r.requested_at < REQUEST_TTL) requestedAt = r.requested_at;
-    else {
+  const r = row?.request_at != null ? { requested_at: row.request_at, player_id: row.request_player_id } : null;
+  const pending = r && now - r.requested_at < REQUEST_TTL && (!c || c.fetched_at < r.requested_at);
+  if (pending) requestedAt = r.requested_at;
+  if (req.method === 'POST') {
+    if (pending && r.player_id === null)
+      return json({ teamId, fetchedAt: c?.fetched_at ?? null, requestedAt, status: 'deja-demande' });
+    const count = await env.DB.prepare(`SELECT COUNT(*) AS n FROM (SELECT 1 FROM site_requests r LEFT JOIN clubs c ON c.team_id = r.team_id
+      WHERE r.requested_at > ?1 AND (c.fetched_at IS NULL OR c.fetched_at < r.requested_at) LIMIT ${REQUEST_MAX_PENDING})`)
+      .bind(now - REQUEST_TTL).first();
+    if (!pending && count.n >= REQUEST_MAX_PENDING) return json({ error: 'Trop de demandes en attente' }, 429);
+    requestedAt = Math.max(now, (c?.fetched_at ?? 0) + 1);
+    await env.DB.prepare(`INSERT INTO site_requests (team_id, player_id, requested_at) VALUES (?1, NULL, ?2)
+      ON CONFLICT(team_id) DO UPDATE SET player_id = NULL, requested_at = excluded.requested_at`).bind(teamId, requestedAt).run();
+    return json({ teamId, fetchedAt: c?.fetched_at ?? null, requestedAt, status: 'demande' });
+  }
+  if ((!c || now - c.fetched_at > CLUB_STALE_MS) && !pending) {
       await env.DB.prepare(`INSERT INTO site_requests (team_id, player_id, requested_at) VALUES (?1, NULL, ?2)
         ON CONFLICT(team_id) DO UPDATE SET player_id = NULL, requested_at = excluded.requested_at`).bind(teamId, now).run();
       requestedAt = now;
-    }
   }
   return json({ teamId, name: (n && n.name) || null, crest: (n && n.crest) || null, fetchedAt: c ? c.fetched_at : null, requestedAt, players });
 }

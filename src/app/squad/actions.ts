@@ -2,7 +2,14 @@
 
 import { redirect } from "next/navigation";
 import { revalidateTag } from "next/cache";
-import { clubTag, getClub, playerTag, setAccountClub } from "@/data/gmc-index";
+import {
+  IndexError,
+  clubTag,
+  getClub,
+  playerTag,
+  requestClub,
+  setAccountClub,
+} from "@/data/gmc-index";
 import { accountKey, getSession } from "@/lib/session";
 
 /** Rattache le club affiché au compte Google connecté. */
@@ -23,6 +30,25 @@ export async function unlinkClub() {
   const session = await getSession();
   if (session) await setAccountClub(await accountKey(session.sub), null);
   redirect("/squad?changer=1");
+}
+
+/** Public request to the shared collectors; no GameChase account write. */
+export async function requestClubUpdate(teamId: string) {
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(teamId))
+    return { ok: false as const, error: "Club invalide." };
+  try {
+    const result = await requestClub(teamId);
+    revalidateTag(clubTag(teamId), { expire: 0 });
+    return { ok: true as const, requestedAt: result.requestedAt };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error:
+        error instanceof IndexError && error.status === 429
+          ? "Trop de demandes en attente. Réessaie plus tard."
+          : "Demande impossible pour l’instant. Réessaie plus tard.",
+    };
+  }
 }
 
 /** Verify the extension upload before invalidating the individual player cards. */

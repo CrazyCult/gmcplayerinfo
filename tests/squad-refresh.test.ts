@@ -1,16 +1,43 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ getClub: vi.fn(), revalidateTag: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  getClub: vi.fn(),
+  revalidateTag: vi.fn(),
+  requestClub: vi.fn(),
+}));
 vi.mock("next/cache", () => ({ revalidateTag: mocks.revalidateTag }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/session", () => ({ accountKey: vi.fn(), getSession: vi.fn() }));
 vi.mock("@/data/gmc-index", () => ({
+  IndexError: class extends Error {
+    constructor(public status: number) {
+      super("Index unavailable");
+    }
+  },
   getClub: mocks.getClub,
+  requestClub: mocks.requestClub,
   playerTag: (id: string) => `player:${id}`,
   clubTag: (id: string) => `club:${id}`,
   setAccountClub: vi.fn(),
 }));
-import { refreshSyncedClub } from "@/app/squad/actions";
+import { refreshSyncedClub, requestClubUpdate } from "@/app/squad/actions";
 beforeEach(() => vi.clearAllMocks());
+it("queues a whole club without a local extension and expires its displayed request state", async () => {
+  mocks.requestClub.mockResolvedValue({ requestedAt: 123 });
+  expect(await requestClubUpdate("club")).toEqual({
+    ok: true,
+    requestedAt: 123,
+  });
+  expect(mocks.requestClub).toHaveBeenCalledWith("club");
+  expect(mocks.revalidateTag).toHaveBeenCalledWith("club:club", { expire: 0 });
+  expect(mocks.getClub).not.toHaveBeenCalled();
+});
+it("invalid club and failed queue do not claim an update or invalidate cache", async () => {
+  expect((await requestClubUpdate("../other")).ok).toBe(false);
+  expect(mocks.requestClub).not.toHaveBeenCalled();
+  mocks.requestClub.mockRejectedValue(new Error("worker unavailable"));
+  expect((await requestClubUpdate("club")).ok).toBe(false);
+  expect(mocks.revalidateTag).not.toHaveBeenCalled();
+});
 it("verifies the uploaded club and expires cards for starters, bench and reserves", async () => {
   const fetchedAt = Date.now();
   mocks.getClub.mockResolvedValue({

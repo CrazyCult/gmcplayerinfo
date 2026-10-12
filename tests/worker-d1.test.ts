@@ -52,6 +52,64 @@ const light = (id: string, extra = {}) => ({
   ...extra,
 });
 
+it("explicit squad request queues a recently read full club, deduplicates and clears after upload", async () => {
+  const { call } = setup();
+  await call("POST", "/v1/clubs", {
+    clubs: [
+      { teamId: "own", fetchedAt: Date.now() - 1000, players: [full("xi")] },
+    ],
+  });
+  const requested = await call("POST", "/v1/site/club/own", undefined, true);
+  expect(requested.status).toBe(200);
+  expect(requested.body.status).toBe("demande");
+  const repeated = await call("POST", "/v1/site/club/own", undefined, true);
+  expect(repeated.body).toMatchObject({
+    status: "deja-demande",
+    requestedAt: requested.body.requestedAt,
+  });
+  expect(
+    (await call("GET", "/v1/site/club/own", undefined, true)).body.requestedAt,
+  ).toBe(requested.body.requestedAt);
+  expect(
+    (
+      await call("POST", "/v1/assign", {
+        limit: 5,
+        players: true,
+        candidates: [],
+      })
+    ).body.assigned,
+  ).toContain("own");
+  await call("POST", "/v1/clubs", {
+    clubs: [
+      {
+        teamId: "own",
+        fetchedAt: requested.body.requestedAt + 1,
+        players: [full("xi", 82)],
+      },
+    ],
+  });
+  expect(
+    (await call("GET", "/v1/site/club/own", undefined, true)).body.requestedAt,
+  ).toBeNull();
+  expect(
+    (await call("POST", "/v1/site/club/own", undefined, true)).body.status,
+  ).toBe("demande");
+});
+
+it("squad requests require site authentication and a known club, never fabricate a club", async () => {
+  const { call, mock } = setup();
+  expect((await call("POST", "/v1/site/club/unknown")).status).toBe(401);
+  expect(
+    (await call("POST", "/v1/site/club/unknown", undefined, true)).status,
+  ).toBe(404);
+  expect(
+    (await call("PUT", "/v1/site/club/unknown", undefined, true)).status,
+  ).toBe(405);
+  expect(
+    mock.db.prepare("SELECT COUNT(*) AS n FROM site_requests").get()!.n,
+  ).toBe(0);
+});
+
 it("club refresh replaces the entire squad and updates every full player card", async () => {
   const { call } = setup();
   const first = Date.now() - 60000;

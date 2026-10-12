@@ -2,8 +2,11 @@
 import { useEffect, useState } from "react";
 import { get, set, del } from "idb-keyval";
 import { useRouter } from "next/navigation";
-import { refreshSyncedClub } from "@/app/squad/actions";
-import { requestCompanionSquad } from "@/lib/companion-sync";
+import { refreshSyncedClub, requestClubUpdate } from "@/app/squad/actions";
+import {
+  CompanionUnavailableError,
+  requestCompanionSquad,
+} from "@/lib/companion-sync";
 import type { Player } from "@/types";
 import {
   parseSquadExport,
@@ -103,6 +106,24 @@ export default function SquadExport({
           "Export tactique actualisé. Pour actualiser aussi le tableau et les fiches du site, installe GMC Companion 2.38.9.",
         );
     } catch (e) {
+      if (
+        e instanceof CompanionUnavailableError &&
+        scope !== "site" &&
+        scope !== "local"
+      ) {
+        try {
+          const result = await requestClubUpdate(scope);
+          if (result.ok) {
+            setMessage(
+              "Extension absente sur cet appareil : mise à jour de tout l’effectif demandée aux GMC Companion actifs. Le XI et le banc nécessitent une lecture depuis ton compte GameChase.",
+            );
+            router.refresh();
+          } else setError(result.error);
+        } catch {
+          setError("Demande impossible pour l’instant. Réessaie plus tard.");
+        }
+        return;
+      }
       setError(
         e instanceof Error && !e.message.startsWith("[")
           ? e.message

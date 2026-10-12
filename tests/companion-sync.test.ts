@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { requestCompanionSquad } from "@/lib/companion-sync";
+import {
+  CompanionUnavailableError,
+  requestCompanionSquad,
+} from "@/lib/companion-sync";
 
 let receive: (event: unknown) => void;
 let request: { channel: string; requestId: string };
@@ -45,8 +48,8 @@ it("returns only the matching response from the current page and removes its lis
   expect(vi.getTimerCount()).toBe(0);
 });
 it("explains missing extension rather than leaving an inert button", async () => {
-  const result = expect(requestCompanionSquad()).rejects.toThrow(
-    /2.38.7 requis/,
+  const result = expect(requestCompanionSquad()).rejects.toBeInstanceOf(
+    CompanionUnavailableError,
   );
   await vi.advanceTimersByTimeAsync(2000);
   await result;
