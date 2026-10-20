@@ -230,13 +230,18 @@ function upsertFull(env, p, teamId, fetchedAt) {
 }
 // --- Gain d'OVR en changeant de poste (carte de poste) ----------------------------
 // Même formule que le jeu : OVR = floor((Σ poids% × stat + 50) / 100) avec les
-// poids de la famille du poste. On compare la famille actuelle à la meilleure.
+// poids de la famille du poste. Une carte ne fait passer qu'à un poste VOISIN
+// (paires du manuel, identiques à src/engine/tables.ts). Le gain retenu est le
+// plus prudent des deux arrondis (stats arrondies / moyennes non arrondies) :
+// vérifié sur 615 annonces, les écarts au jeu tombent presque tous à ±0,05 d'un
+// demi-point.
 const POS_WEIGHTS = {
   CB: [11, 3, 13, 4, 37, 32], FB: [25, 5, 15, 15, 25, 15], CDM: [10, 5, 25, 10, 30, 20], CM: [13, 13, 27, 17, 17, 13],
   CAM: [13, 18, 27, 24, 9, 9], WM: [24, 13, 20, 24, 10, 9], W: [28, 19, 14, 28, 5, 6], ST: [25, 30, 10, 20, 3, 12],
 };
 const POS_FAMILY = { CB: 'CB', LB: 'FB', RB: 'FB', LWB: 'FB', RWB: 'FB', CDM: 'CDM', CM: 'CM', CAM: 'CAM', LM: 'WM', RM: 'WM', LW: 'W', RW: 'W', CF: 'ST', ST: 'ST' };
-const FAMILY_LABEL = { CB: 'CB', FB: 'LB/RB', CDM: 'CDM', CM: 'CM', CAM: 'CAM', WM: 'LM/RM', W: 'LW/RW', ST: 'ST' };
+const CARD_PAIRS = [['LB', 'LWB'], ['RB', 'RWB'], ['CDM', 'CM'], ['CM', 'CAM'], ['LM', 'LW'], ['RM', 'RW'], ['CAM', 'ST'], ['CF', 'ST'],
+  ['CB', 'CDM'], ['LM', 'CM'], ['RM', 'CM'], ['LW', 'RW'], ['LM', 'RM']];
 const STAT_SUBS = {
   pac: ['acceleration', 'sprintSpeed'], sho: ['finishing', 'shotPower', 'longShots', 'volleys', 'penalties', 'attackingPositioning'],
   pas: ['vision', 'crossing', 'fkAccuracy', 'shortPassing', 'longPassing', 'curve'],
@@ -245,19 +250,26 @@ const STAT_SUBS = {
   phy: ['jumping', 'stamina', 'strength', 'aggression'],
 };
 export function positionGain(attrs, position) {
-  const fam = POS_FAMILY[String(position || '')];
+  const pos = String(position || ''), fam = POS_FAMILY[pos];
   if (!fam || !attrs || typeof attrs !== 'object') return { gain: 0, best: null };
-  const stats = Object.entries(STAT_SUBS).map(([k, subs]) => {
-    if (isNum(attrs[k], 0, 250)) return attrs[k];
+  const statsOf = (fine) => Object.entries(STAT_SUBS).map(([k, subs]) => {
     const v = subs.map(s => attrs[s]).filter(x => isNum(x, 0, 250));
-    return v.length === subs.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
+    if (v.length === subs.length) { const m = v.reduce((a, b) => a + b, 0) / v.length; return fine ? m : Math.round(m); }
+    return isNum(attrs[k], 0, 250) ? attrs[k] : null;
   });
+  const stats = statsOf(false), fine = statsOf(true);
   if (stats.some(v => v == null)) return { gain: 0, best: null };
-  const ovr = (f) => Math.floor((POS_WEIGHTS[f].reduce((sum, w, i) => sum + w * stats[i], 0) + 50) / 100);
-  const own = ovr(fam);
-  let best = fam, top = own;
-  for (const f of Object.keys(POS_WEIGHTS)) if (ovr(f) > top) { top = ovr(f); best = f; }
-  return top > own ? { gain: top - own, best: FAMILY_LABEL[best] } : { gain: 0, best: null };
+  const ovr = (f, st) => Math.floor((POS_WEIGHTS[f].reduce((sum, w, i) => sum + w * st[i], 0) + 50) / 100);
+  const safe = (f) => Math.min(ovr(f, stats), ovr(f, fine));
+  const own = ovr(fam, stats);
+  let best = null, top = own;
+  for (const [a, b] of CARD_PAIRS) {
+    const target = a === pos ? b : b === pos ? a : null;
+    if (!target || POS_FAMILY[target] === fam) continue;
+    const v = safe(POS_FAMILY[target]);
+    if (v > top) { top = v; best = target; }
+  }
+  return best ? { gain: top - own, best } : { gain: 0, best: null };
 }
 
 // Nom de club (n'écrit que s'il change).

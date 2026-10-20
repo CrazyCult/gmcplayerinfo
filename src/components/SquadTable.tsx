@@ -4,7 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { compact, money } from "@/lib/format";
 import { ovrLevers, planTraining } from "@/engine/planner";
-import { positionRatings } from "@/engine/positionFit";
+import { cardGain } from "@/engine/positionFit";
 import { projectValue } from "@/engine/value";
 import { MAX_COACHES } from "@/engine/tables";
 import { coachSummary, useClubSettings } from "@/lib/trainingSettings";
@@ -79,22 +79,12 @@ export default function SquadTable({
           plusOneSessions: number | undefined,
           plusOneNet: number | undefined;
         if (premium) {
-          const table = positionRatings(player).filter((r) =>
-            player.position === "GK"
-              ? r.position === "GK"
-              : r.position !== "GK",
-          );
-          const own = table.find((r) => r.position === player.position)?.raw;
-          const best = table.reduce<(typeof table)[number] | undefined>(
-            (top, r) =>
-              r.raw !== undefined && (top?.raw === undefined || r.raw > top.raw)
-                ? r
-                : top,
-            undefined,
-          );
-          if (own !== undefined && best?.raw !== undefined) {
-            posGain = best.raw - own;
-            posBest = posGain > 0 ? best.position : undefined;
+          // Carte de poste : postes voisins seulement, gain compté avec
+          // l'arrondi le plus prudent (voir cardGain).
+          const card = cardGain(player);
+          if (card.gain > 0) {
+            posGain = card.gain;
+            posBest = card.best + (card.edge ? " ⚠" : "");
           }
           if (!light.has(player.id)) {
             const cheapest = ovrLevers(player, options)
