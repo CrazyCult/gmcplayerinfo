@@ -4,7 +4,8 @@ import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { compact, money } from "@/lib/format";
 import { ovrLevers, planTraining } from "@/engine/planner";
-import { positionRatings } from "@/engine/positionFit";
+import { cardGain } from "@/engine/positionFit";
+import { routeCards, routeLabel } from "@/engine/positionCards";
 import { projectValue } from "@/engine/value";
 import { MAX_COACHES } from "@/engine/tables";
 import { coachSummary, useClubSettings } from "@/lib/trainingSettings";
@@ -75,26 +76,20 @@ export default function SquadTable({
         // +1 OVR le moins cher (coachs niveau 5), avec la plus-value estimée.
         let posGain: number | undefined,
           posBest: string | undefined,
+          posCost: number | undefined,
+          posPath: string | undefined,
           plusOneCost: number | undefined,
           plusOneSessions: number | undefined,
           plusOneNet: number | undefined;
         if (premium) {
-          const table = positionRatings(player).filter((r) =>
-            player.position === "GK"
-              ? r.position === "GK"
-              : r.position !== "GK",
-          );
-          const own = table.find((r) => r.position === player.position)?.raw;
-          const best = table.reduce<(typeof table)[number] | undefined>(
-            (top, r) =>
-              r.raw !== undefined && (top?.raw === undefined || r.raw > top.raw)
-                ? r
-                : top,
-            undefined,
-          );
-          if (own !== undefined && best?.raw !== undefined) {
-            posGain = best.raw - own;
-            posBest = posGain > 0 ? best.position : undefined;
+          // Carte de poste : meilleur poste atteignable (cartes enchaînées),
+          // gain compté avec l'arrondi le plus prudent (voir cardGain).
+          const card = cardGain(player);
+          if (card.gain > 0 && card.route) {
+            posGain = card.gain;
+            posBest = card.best + (card.edge ? " ⚠" : "");
+            posCost = card.route.cost;
+            posPath = `${routeLabel(card.route)} · ${routeCards(card.route)}`;
           }
           if (!light.has(player.id)) {
             const cheapest = ovrLevers(player, options)
@@ -119,6 +114,8 @@ export default function SquadTable({
           ...player,
           posGain,
           posBest,
+          posCost,
+          posPath,
           plusOneCost,
           plusOneSessions,
           plusOneNet,
@@ -325,9 +322,17 @@ export default function SquadTable({
                     <>
                       <td>
                         {player.posGain && player.posGain > 0 ? (
-                          <strong style={{ color: "var(--attr-good)" }}>
-                            {player.posBest} +{player.posGain}
-                          </strong>
+                          <span title={player.posPath}>
+                            <strong style={{ color: "var(--attr-good)" }}>
+                              {player.posBest} +{player.posGain}
+                            </strong>
+                            {player.posCost !== undefined && (
+                              <small className="muted">
+                                {" "}
+                                · {compact(player.posCost)}
+                              </small>
+                            )}
+                          </span>
                         ) : (
                           "—"
                         )}

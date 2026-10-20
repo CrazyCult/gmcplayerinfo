@@ -788,15 +788,64 @@ describe("base du jeu lue par tranches", () => {
 });
 
 describe("modules réservés : poste et affaires", () => {
-  it("calcule le gain d’OVR en changeant de famille de poste", async () => {
+  it("calcule le gain d’OVR des cartes de poste (enchaînées, prix du jeu)", async () => {
     const { positionGain } = await import("../worker.d1.js");
-    // Ailier très rapide et bon dribbleur, placé en CB : bien meilleur ailier.
+    // Profil d'ailier placé en LM : la carte vers LW (voisin) fait gagner 3.
+    expect(
+      positionGain(
+        { pac: 95, sho: 70, pas: 70, dri: 90, def: 50, phy: 60 },
+        "LM",
+      ),
+    ).toEqual({ gain: 3, best: "LW" });
+    // Le même profil en CB : les cartes s'enchaînent (LB → LM → LW).
     expect(
       positionGain(
         { pac: 95, sho: 70, pas: 70, dri: 90, def: 50, phy: 60 },
         "CB",
-      ),
-    ).toEqual({ gain: expect.any(Number), best: "LW/RW" });
+      ).best,
+    ).toMatch(/^(LW|RW)$/);
+    const { cardCosts } = await import("../worker.d1.js");
+    expect(cardCosts("CB").get("CDM")).toBe(120000);
+    expect(cardCosts("CB").get("ST")).toBe(190000);
+    expect(cardCosts("GK").size).toBe(0);
+    // Cas limite : PAC 84 vient de 84/83 (83,5). Stats arrondies → 79,51 en W
+    // (80), moyennes exactes → 79,37 (79) : on retient 79, donc aucun gain.
+    expect(
+      positionGain(
+        {
+          acceleration: 84,
+          sprintSpeed: 83,
+          finishing: 79,
+          shotPower: 79,
+          longShots: 79,
+          volleys: 79,
+          penalties: 79,
+          attackingPositioning: 79,
+          vision: 79,
+          crossing: 79,
+          fkAccuracy: 79,
+          shortPassing: 79,
+          longPassing: 79,
+          curve: 79,
+          agility: 79,
+          balance: 79,
+          reactions: 79,
+          ballControl: 79,
+          dribblingSub: 79,
+          composure: 79,
+          interceptions: 72,
+          headingAccuracy: 72,
+          defensiveAwareness: 72,
+          standingTackle: 72,
+          slidingTackle: 72,
+          jumping: 70,
+          stamina: 70,
+          strength: 70,
+          aggression: 70,
+        },
+        "LM",
+      ).gain,
+    ).toBe(0);
     expect(
       positionGain(
         { pac: 95, sho: 70, pas: 70, dri: 90, def: 50, phy: 60 },
@@ -810,7 +859,7 @@ describe("modules réservés : poste et affaires", () => {
     await call("POST", "/v1/db/players", {
       players: [
         light("a", {
-          position: "CB",
+          position: "LM",
           attributes: { pac: 95, sho: 70, pas: 70, dri: 90, def: 50, phy: 60 },
           value: 900000,
           transfer_price: 400000,
@@ -828,7 +877,7 @@ describe("modules réservés : poste et affaires", () => {
     expect(
       pos.body.players.map((r: { player: { id: string } }) => r.player.id),
     ).toEqual(["a"]);
-    expect(pos.body.players[0]).toMatchObject({ posBest: "LW/RW" });
+    expect(pos.body.players[0]).toMatchObject({ posBest: "LW" });
     const deals = await call(
       "GET",
       "/v1/site/players?sort=bargain",

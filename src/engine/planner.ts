@@ -1,5 +1,5 @@
 import type { FieldStat, Player, SubKey, Subs } from "../types";
-import { familyOf, modelOvr } from "./ovr";
+import { familyOf, modelOvr, safeModelOvr } from "./ovr";
 import {
   DEFAULT_COACHES,
   EXERCISES,
@@ -172,8 +172,17 @@ export function ovrLevers(player: Player, options: PlanOptions = {}) {
       cost = 0,
       sessions = 0;
     const from = modelOvr(player);
+    // « +1 OVR » : compté depuis l'OVR affiché par le jeu, et atteint avec les
+    // deux arrondis possibles (sinon le jeu peut rester sur l'ancienne note).
+    const goal =
+      from === undefined ? undefined : Math.max(from, player.overall) + 1;
     let to = from;
-    while (from !== undefined && to === from && sessions < 400) {
+    while (
+      from !== undefined &&
+      goal !== undefined &&
+      (safeModelOvr(player, subs) ?? -1) < goal &&
+      sessions < 400
+    ) {
       const result = trainSession(player, exercise.key, {
         ...options,
         subs,
@@ -190,7 +199,8 @@ export function ovrLevers(player: Player, options: PlanOptions = {}) {
       sessions,
       cost,
       to,
-      progresses: from !== undefined && to !== undefined && to > from,
+      progresses:
+        goal !== undefined && (safeModelOvr(player, subs) ?? -1) >= goal,
     };
   }).sort(
     (a, b) => Number(b.progresses) - Number(a.progresses) || a.cost - b.cost,
