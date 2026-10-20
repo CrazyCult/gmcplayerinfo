@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { modelOvr, safeModelOvr, safeOvrAt } from "../../src/engine/ovr";
 import { cardGain, cardTargets } from "../../src/engine/positionFit";
+import { cardRoute, routeLabel } from "../../src/engine/positionCards";
 import { ovrLevers } from "../../src/engine/planner";
 import { MAX_COACHES } from "../../src/engine/tables";
 import type { Player, Subs } from "../../src/types";
@@ -101,14 +102,22 @@ describe("arrondis : calcul sûr et cas limites", () => {
   });
 });
 
-describe("carte de poste : postes voisins seulement", () => {
-  it("liste les voisins du manuel", () => {
-    expect(cardTargets("CB")).toEqual(["CDM"]);
-    expect(new Set(cardTargets("CM"))).toEqual(
-      new Set(["CDM", "CAM", "LM", "RM"]),
-    );
+describe("cartes de poste : déplacements du jeu, enchaînés", () => {
+  it("chemin le moins cher vers chaque poste", () => {
+    expect(cardTargets("CB")).not.toContain("GK");
+    // CB ne va qu'en LB/RB ; CDM s'atteint par LB → LM → CM → CDM.
+    expect(cardRoute("CB", "LB")).toMatchObject({ cost: 20000, cards: 1 });
+    expect(cardRoute("CB", "CDM")).toMatchObject({ cost: 120000, cards: 4 });
+    expect(routeLabel(cardRoute("CB", "CDM")!)).toBe("CB → LB → LM → CM → CDM");
+    // CB → ST : LB → LM (2 × 20 000) puis LM → LW → ST (2 × 75 000).
+    expect(cardRoute("CB", "ST")).toMatchObject({ cost: 190000, cards: 4 });
+    // CM → ST : CAM puis ST (40 000 + 75 000), moins cher que par l'aile.
+    expect(routeLabel(cardRoute("CM", "ST")!)).toBe("CM → CAM → ST");
+    expect(cardTargets("GK")).toEqual([]);
+    expect(cardTargets("CF")).toEqual([]);
+    expect(new Set(cardTargets("ST"))).not.toContain("GK");
   });
-  it("prend le meilleur voisin avec l'arrondi prudent", () => {
+  it("prend le meilleur poste atteignable avec l'arrondi prudent", () => {
     const winger = subs([95, 95], {
       sho: 70,
       pas: 70,
@@ -120,9 +129,12 @@ describe("carte de poste : postes voisins seulement", () => {
       gain: 3,
       best: "LW",
       edge: false,
+      route: { cost: 75000, cards: 1 },
     });
-    // En CB, l'ailier est hors carte : seul CDM compte.
-    expect(cardGain(player("CB", winger, 64)).best).toBe("CDM");
+    // En CB, l'ailier passe ailier en 3 cartes (LB → LM → LW).
+    const cb = cardGain(player("CB", winger, 64));
+    expect(cb.best).toMatch(/^(LW|RW)$/);
+    expect(cb.route).toMatchObject({ cost: 115000, cards: 3 });
     // Cas limite : 80 « optimiste » mais 79 sûr → aucun gain depuis LM (79).
     const edge = player(
       "LM",

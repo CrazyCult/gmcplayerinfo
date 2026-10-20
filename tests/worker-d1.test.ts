@@ -788,7 +788,7 @@ describe("base du jeu lue par tranches", () => {
 });
 
 describe("modules réservés : poste et affaires", () => {
-  it("calcule le gain d’OVR d’une carte de poste (postes voisins seulement)", async () => {
+  it("calcule le gain d’OVR des cartes de poste (enchaînées, prix du jeu)", async () => {
     const { positionGain } = await import("../worker.d1.js");
     // Profil d'ailier placé en LM : la carte vers LW (voisin) fait gagner 3.
     expect(
@@ -797,13 +797,17 @@ describe("modules réservés : poste et affaires", () => {
         "LM",
       ),
     ).toEqual({ gain: 3, best: "LW" });
-    // Le même profil en CB : seul CDM est voisin, l'ailier est hors carte.
+    // Le même profil en CB : les cartes s'enchaînent (LB → LM → LW).
     expect(
       positionGain(
         { pac: 95, sho: 70, pas: 70, dri: 90, def: 50, phy: 60 },
         "CB",
-      ),
-    ).toEqual({ gain: 4, best: "CDM" });
+      ).best,
+    ).toMatch(/^(LW|RW)$/);
+    const { cardCosts } = await import("../worker.d1.js");
+    expect(cardCosts("CB").get("CDM")).toBe(120000);
+    expect(cardCosts("CB").get("ST")).toBe(190000);
+    expect(cardCosts("GK").size).toBe(0);
     // Cas limite : PAC 84 vient de 84/83 (83,5). Stats arrondies → 79,51 en W
     // (80), moyennes exactes → 79,37 (79) : on retient 79, donc aucun gain.
     expect(

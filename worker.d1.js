@@ -228,20 +228,40 @@ function upsertFull(env, p, teamId, fetchedAt) {
     .bind(p.id, teamId, fetchedAt, p.name, normName(p.name), lastToken(p.name), String(p.position || ''), int(p.age), int(p.overall), int(p.potential),
       value, pg.gain, pg.best);
 }
-// --- Gain d'OVR en changeant de poste (carte de poste) ----------------------------
+// --- Gain d'OVR en changeant de poste (cartes de poste) ---------------------------
 // Même formule que le jeu : OVR = floor((Σ poids% × stat + 50) / 100) avec les
-// poids de la famille du poste. Une carte ne fait passer qu'à un poste VOISIN
-// (paires du manuel, identiques à src/engine/tables.ts). Le gain retenu est le
-// plus prudent des deux arrondis (stats arrondies / moyennes non arrondies) :
-// vérifié sur 615 annonces, les écarts au jeu tombent presque tous à ±0,05 d'un
-// demi-point.
+// poids de la famille du poste. Déplacements et prix relevés dans
+// /api/store/position-cards (identiques à src/engine/positionCards.ts) ; les
+// cartes s'enchaînent, on cherche donc tous les postes atteignables. Le gain
+// retenu est le plus prudent des deux arrondis (stats arrondies / moyennes non
+// arrondies) ; à gain égal, le chemin le moins cher l'emporte.
 const POS_WEIGHTS = {
   CB: [11, 3, 13, 4, 37, 32], FB: [25, 5, 15, 15, 25, 15], CDM: [10, 5, 25, 10, 30, 20], CM: [13, 13, 27, 17, 17, 13],
   CAM: [13, 18, 27, 24, 9, 9], WM: [24, 13, 20, 24, 10, 9], W: [28, 19, 14, 28, 5, 6], ST: [25, 30, 10, 20, 3, 12],
 };
 const POS_FAMILY = { CB: 'CB', LB: 'FB', RB: 'FB', LWB: 'FB', RWB: 'FB', CDM: 'CDM', CM: 'CM', CAM: 'CAM', LM: 'WM', RM: 'WM', LW: 'W', RW: 'W', CF: 'ST', ST: 'ST' };
-const CARD_PAIRS = [['LB', 'LWB'], ['RB', 'RWB'], ['CDM', 'CM'], ['CM', 'CAM'], ['LM', 'LW'], ['RM', 'RW'], ['CAM', 'ST'], ['CF', 'ST'],
-  ['CB', 'CDM'], ['LM', 'CM'], ['RM', 'CM'], ['LW', 'RW'], ['LM', 'RM']];
+const POSITION_CARDS = [
+  [20000, { LB: ['LWB', 'LM', 'CB'], LWB: ['LB'], CB: ['LB', 'RB'], RB: ['RWB', 'RM', 'CB'], RWB: ['RB'], LM: ['LB'], RM: ['RB'] }],
+  [40000, { CDM: ['CM'], CM: ['CDM', 'CAM', 'LM', 'RM'], CAM: ['CM'], LM: ['CM'], RM: ['CM'] }],
+  [75000, { CAM: ['ST'], ST: ['CAM', 'LW', 'RW'], LM: ['LW'], LW: ['LM', 'ST'], RM: ['RW'], RW: ['RM', 'ST'] }],
+];
+// Coût minimal (GMC2) de chaque poste atteignable depuis `from` (Dijkstra).
+export function cardCosts(from) {
+  const cost = new Map([[from, 0]]), done = new Set();
+  for (;;) {
+    let cur = null;
+    for (const [p, c] of cost) if (!done.has(p) && (cur == null || c < cost.get(cur))) cur = p;
+    if (cur == null) break;
+    done.add(cur);
+    for (const [price, tr] of POSITION_CARDS)
+      for (const to of tr[cur] || []) {
+        const c = cost.get(cur) + price;
+        if (!cost.has(to) || c < cost.get(to)) cost.set(to, c);
+      }
+  }
+  cost.delete(from);
+  return cost;
+}
 const STAT_SUBS = {
   pac: ['acceleration', 'sprintSpeed'], sho: ['finishing', 'shotPower', 'longShots', 'volleys', 'penalties', 'attackingPositioning'],
   pas: ['vision', 'crossing', 'fkAccuracy', 'shortPassing', 'longPassing', 'curve'],
@@ -262,12 +282,11 @@ export function positionGain(attrs, position) {
   const ovr = (f, st) => Math.floor((POS_WEIGHTS[f].reduce((sum, w, i) => sum + w * st[i], 0) + 50) / 100);
   const safe = (f) => Math.min(ovr(f, stats), ovr(f, fine));
   const own = ovr(fam, stats);
-  let best = null, top = own;
-  for (const [a, b] of CARD_PAIRS) {
-    const target = a === pos ? b : b === pos ? a : null;
-    if (!target || POS_FAMILY[target] === fam) continue;
+  let best = null, top = own, price = Infinity;
+  for (const [target, c] of cardCosts(pos)) {
+    if (POS_FAMILY[target] === fam) continue;
     const v = safe(POS_FAMILY[target]);
-    if (v > top) { top = v; best = target; }
+    if (v > top || (v === top && best && c < price)) { top = v; best = target; price = c; }
   }
   return best ? { gain: top - own, best } : { gain: 0, best: null };
 }

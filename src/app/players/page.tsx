@@ -7,7 +7,8 @@ import {
   indexEnabled,
 } from "@/data/gmc-index";
 import { compact, money } from "@/lib/format";
-import { POSITIONS } from "@/types";
+import { POSITIONS, type Position } from "@/types";
+import { cardRoute, routeCards, routeLabel } from "@/engine/positionCards";
 import Rating from "@/components/UI/Rating";
 import { isPremium } from "@/lib/session";
 
@@ -200,9 +201,11 @@ export default async function PlayersPage({
                       {premium && (
                         <td>
                           {posGain > 0 ? (
-                            <strong style={{ color: "var(--attr-good)" }}>
-                              {posBest} +{posGain}
-                            </strong>
+                            <PosGain
+                              from={player.position}
+                              to={posBest}
+                              gain={posGain}
+                            />
                           ) : (
                             "—"
                           )}
@@ -251,5 +254,30 @@ export default async function PlayersPage({
         </div>
       )}
     </div>
+  );
+}
+
+function PosGain({
+  from,
+  to,
+  gain,
+}: {
+  from: string;
+  to?: string | null;
+  gain: number;
+}) {
+  const route =
+    to && (POSITIONS as readonly string[]).includes(from)
+      ? cardRoute(from as Position, to as Position)
+      : undefined;
+  return (
+    <span
+      title={route ? `${routeLabel(route)} · ${routeCards(route)}` : undefined}
+    >
+      <strong style={{ color: "var(--attr-good)" }}>
+        {to} +{gain}
+      </strong>
+      {route && <small className="muted"> · {compact(route.cost)}</small>}
+    </span>
   );
 }

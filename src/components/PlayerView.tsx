@@ -6,7 +6,8 @@ import Link from "next/link";
 import type { Player, Subs } from "@/types";
 import { modelOvr } from "@/engine/ovr";
 import { summaryStats, gkStats, isLight } from "@/engine/stats";
-import { cardTargets, positionRatings } from "@/engine/positionFit";
+import { positionRatings } from "@/engine/positionFit";
+import { cardRoute, routeCards, routeLabel } from "@/engine/positionCards";
 import { FIELD_GROUPS, GK_GROUPS, MAX_COACHES } from "@/engine/tables";
 import { ovrLevers } from "@/engine/planner";
 import { coachSummary, useClubSettings } from "@/lib/trainingSettings";
@@ -15,7 +16,7 @@ import {
   matchesPerSeries,
   projectMatches,
 } from "@/engine/matchProgression";
-import { money } from "@/lib/format";
+import { compact, money } from "@/lib/format";
 import { TRAITS, TRAIT_TIER_LABEL } from "@/lib/traits";
 import { statLabels, subLabels } from "@/lib/i18n";
 import Rating, { ratingColors } from "./UI/Rating";
@@ -494,7 +495,7 @@ export default function PlayerView({
             <p className="muted mini-note">
               {fit
                 ? "S’il joue à ce poste sans le changer : note au poste × adéquation (100 % son poste, 95 % proche, 90 % voisin, 85 % mauvaise ligne). Estimation."
-                : "OVR qu’il aurait après une carte de poste (formule du jeu). Une carte ne fait passer qu’à un poste voisin (« hors carte » = inaccessible). ⚠ = calcul à la limite de l’arrondi : le jeu peut afficher un point de moins."}
+                : "OVR qu’il aurait après changement de poste (formule du jeu), avec le chemin de cartes le moins cher : les cartes s’enchaînent (Defender 20 000, Midfield 40 000, Forward 75 000). GK et CF : aucune carte. ⚠ = calcul à la limite de l’arrondi : le jeu peut afficher un point de moins."}
             </p>
             <table className="mini-table">
               <thead>
@@ -507,22 +508,23 @@ export default function PlayerView({
               <tbody>
                 {ratings.map((row) => {
                   const value = fit ? row.adjusted : row.raw;
-                  const reachable =
-                    row.position === player.position ||
-                    cardTargets(player.position).includes(row.position);
+                  const route = cardRoute(player.position, row.position);
                   return (
                     <tr key={row.position}>
                       <td>
                         <strong>{row.position}</strong>
                       </td>
-                      <td className="muted">
+                      <td
+                        className="muted"
+                        title={!fit && route ? routeLabel(route) : undefined}
+                      >
                         {fit
                           ? `${Math.round(row.coefficient * 100)} % · ${tiers[row.tier]}`
                           : row.position === player.position
                             ? "son poste"
-                            : reachable
-                              ? "poste voisin"
-                              : "hors carte"}
+                            : route
+                              ? `${routeCards(route)} · ${compact(route.cost)}`
+                              : "aucune carte"}
                       </td>
                       <td
                         style={{

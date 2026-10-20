@@ -8,6 +8,7 @@ import {
 import { GOOD_PAIRS, OKAY_PAIRS } from "./tables";
 import { familyOf, gkOvr, ovrForFamily, safeOvrAt } from "./ovr";
 import { gkStats, summaryStats } from "./stats";
+import { cardRoutes, type CardRoute } from "./positionCards";
 
 export function getFit(
   natural: Position,
@@ -51,32 +52,42 @@ export function positionRatings(
   });
 }
 
-/**
- * Postes accessibles avec une carte de poste : les voisins du manuel (paires
- * « bon » et « acceptable »). Hypothèse documentée : le jeu indique qu'une
- * carte ne fait passer qu'à un poste voisin.
- */
+/** Postes atteignables avec une ou plusieurs cartes de poste (voir positionCards). */
 export function cardTargets(position: Position): Position[] {
-  return POSITIONS.filter((target) => {
-    if (target === position) return false;
-    const tier = getFit(position, target).tier;
-    return tier === "good" || tier === "okay";
-  });
+  return [...cardRoutes(position).keys()];
 }
-/** Meilleur gain d'OVR « sûr » avec une carte de poste (0 si aucun). */
+/**
+ * Meilleur gain d'OVR « sûr » en changeant de poste, cartes enchaînées comprises.
+ * À OVR égal, le chemin le moins cher l'emporte. 0 si aucun gain.
+ */
 export function cardGain(player: Player, subs: Subs = player.attributes.subs) {
   const table = positionRatings(player, subs);
   const own = table.find((r) => r.position === player.position)?.raw;
-  const targets = new Set(cardTargets(player.position));
-  let best: (typeof table)[number] | undefined;
-  for (const row of table)
+  const routes = cardRoutes(player.position);
+  let best: (typeof table)[number] | undefined, route: CardRoute | undefined;
+  for (const row of table) {
+    const r = routes.get(row.position);
+    if (!r || row.safe === undefined) continue;
     if (
-      targets.has(row.position) &&
-      row.safe !== undefined &&
-      (best?.safe === undefined || row.safe > best.safe)
-    )
+      best?.safe === undefined ||
+      row.safe > best.safe ||
+      (row.safe === best.safe && route && r.cost < route.cost)
+    ) {
       best = row;
-  if (own === undefined || best?.safe === undefined || best.safe <= own)
-    return { gain: 0, best: undefined, edge: false };
-  return { gain: best.safe - own, best: best.position, edge: best.edge };
+      route = r;
+    }
+  }
+  if (
+    own === undefined ||
+    best?.safe === undefined ||
+    best.safe <= own ||
+    !route
+  )
+    return { gain: 0, best: undefined, edge: false, route: undefined };
+  return {
+    gain: best.safe - own,
+    best: best.position,
+    edge: best.edge,
+    route,
+  };
 }
