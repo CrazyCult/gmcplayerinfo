@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { shiftedOvr } from "../../src/engine/positionShift";
 import { modelOvr, safeModelOvr, safeOvrAt } from "../../src/engine/ovr";
 import { cardGain, cardTargets } from "../../src/engine/positionFit";
 import { cardRoute, routeLabel } from "../../src/engine/positionCards";
 import { ovrLevers } from "../../src/engine/planner";
 import { MAX_COACHES } from "../../src/engine/tables";
-import type { Player, Subs } from "../../src/types";
+import type { FieldStat, Player, Position, Stats, Subs } from "../../src/types";
 
 const subs = (pac: [number, number], rest: Record<string, number>): Subs =>
   ({
@@ -158,5 +160,52 @@ describe("leviers +1 OVR", () => {
     );
     expect(levers.length).toBeGreaterThan(0);
     for (const l of levers) expect(l.sessions).toBeGreaterThan(0);
+  });
+});
+
+describe("décalage d'attributs des cartes : aperçus du jeu", () => {
+  const data = JSON.parse(
+    readFileSync(
+      new URL("../fixtures/card-previews.json", import.meta.url),
+      "utf8",
+    ),
+  ) as {
+    players: {
+      position: Position;
+      stats: number[];
+      preview: Record<string, number>;
+    }[];
+  };
+  it("retrouve l'OVR du jeu 9 fois sur 10, toujours à 1 point près", () => {
+    let exact = 0,
+      total = 0;
+    for (const p of data.players) {
+      const stats = Object.fromEntries(
+        ["pac", "sho", "pas", "dri", "def", "phy"].map((k, i) => [
+          k,
+          p.stats[i],
+        ]),
+      ) as Stats<FieldStat>;
+      for (const [to, ovr] of Object.entries(p.preview)) {
+        const r = shiftedOvr(stats, p.position, to as Position)!;
+        total++;
+        if (r.ovr === ovr) exact++;
+        expect(Math.abs(r.ovr - ovr)).toBeLessThanOrEqual(1);
+      }
+    }
+    expect(total).toBe(456);
+    expect(exact).toBeGreaterThanOrEqual(410);
+  });
+  it("LB → LM : tir et dribble montent, défense baisse (cas George Mason)", () => {
+    const stats = {
+      pac: 111,
+      sho: 102,
+      pas: 106,
+      dri: 113,
+      def: 110,
+      phy: 107,
+    };
+    expect(shiftedOvr(stats, "LB", "LM")?.ovr).toBe(110);
+    expect(shiftedOvr(stats, "LB", "LB")?.ovr).toBe(109);
   });
 });

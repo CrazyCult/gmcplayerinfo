@@ -232,14 +232,21 @@ function upsertFull(env, p, teamId, fetchedAt) {
 // Même formule que le jeu : OVR = floor((Σ poids% × stat + 50) / 100) avec les
 // poids de la famille du poste. Déplacements et prix relevés dans
 // /api/store/position-cards (identiques à src/engine/positionCards.ts) ; les
-// cartes s'enchaînent, on cherche donc tous les postes atteignables. Le gain
-// retenu est le plus prudent des deux arrondis (stats arrondies / moyennes non
-// arrondies) ; à gain égal, le chemin le moins cher l'emporte.
+// cartes s'enchaînent, on cherche donc tous les postes atteignables. Le jeu
+// décale aussi les attributs selon le poste (SHIFT_OFFSETS, identiques à
+// src/engine/positionShift.ts, ajustés sur 456 aperçus du jeu : 91 % exacts,
+// tous à ±1). À gain égal, le chemin le moins cher l'emporte.
 const POS_WEIGHTS = {
   CB: [11, 3, 13, 4, 37, 32], FB: [25, 5, 15, 15, 25, 15], CDM: [10, 5, 25, 10, 30, 20], CM: [13, 13, 27, 17, 17, 13],
   CAM: [13, 18, 27, 24, 9, 9], WM: [24, 13, 20, 24, 10, 9], W: [28, 19, 14, 28, 5, 6], ST: [25, 30, 10, 20, 3, 12],
 };
 const POS_FAMILY = { CB: 'CB', LB: 'FB', RB: 'FB', LWB: 'FB', RWB: 'FB', CDM: 'CDM', CM: 'CM', CAM: 'CAM', LM: 'WM', RM: 'WM', LW: 'W', RW: 'W', ST: 'ST' };
+const SHIFT_PROFILE = { LB: 'FB', RB: 'FB', LWB: 'WB', RWB: 'WB', CB: 'CB', CDM: 'CDM', CM: 'CM', CAM: 'CAM', LM: 'WM', RM: 'WM', LW: 'W', RW: 'W', ST: 'ST' };
+const SHIFT_OFFSETS = {
+  CB: [0, 0, 0, 0, 0, 0], FB: [-1.38, 3.47, -1.38, 4.16, 4.53, -3.2], WB: [2.89, 1.53, 1.97, 2.0, 1.08, -3.1],
+  CDM: [0.04, 8.58, 0.59, 4.16, 0.82, -3.27], CM: [-2.72, 13.07, -3.11, 6.01, 6.56, -8.18], CAM: [0.03, 14.24, 1.38, 1.15, -1.62, -7.06],
+  WM: [-1.86, 10.89, -2.22, 7.34, -2.1, -2.94], W: [0.71, 10.05, 0, 4.19, -8.73, -1.45], ST: [-1.2, 13.43, -1.62, 4.61, -4.75, -7.97],
+};
 const POSITION_CARDS = [
   [20000, { LB: ['LWB', 'LM', 'CB'], LWB: ['LB'], CB: ['LB', 'RB'], RB: ['RWB', 'RM', 'CB'], RWB: ['RB'], LM: ['LB'], RM: ['RB'] }],
   [40000, { CDM: ['CM'], CM: ['CDM', 'CAM', 'LM', 'RM'], CAM: ['CM'], LM: ['CM'], RM: ['CM'] }],
@@ -272,20 +279,20 @@ const STAT_SUBS = {
 export function positionGain(attrs, position) {
   const pos = String(position || ''), fam = POS_FAMILY[pos];
   if (!fam || !attrs || typeof attrs !== 'object') return { gain: 0, best: null };
-  const statsOf = (fine) => Object.entries(STAT_SUBS).map(([k, subs]) => {
+  const stats = Object.entries(STAT_SUBS).map(([k, subs]) => {
     const v = subs.map(s => attrs[s]).filter(x => isNum(x, 0, 250));
-    if (v.length === subs.length) { const m = v.reduce((a, b) => a + b, 0) / v.length; return fine ? m : Math.round(m); }
+    if (v.length === subs.length) return Math.round(v.reduce((a, b) => a + b, 0) / v.length);
     return isNum(attrs[k], 0, 250) ? attrs[k] : null;
   });
-  const stats = statsOf(false), fine = statsOf(true);
   if (stats.some(v => v == null)) return { gain: 0, best: null };
-  const ovr = (f, st) => Math.floor((POS_WEIGHTS[f].reduce((sum, w, i) => sum + w * st[i], 0) + 50) / 100);
-  const safe = (f) => Math.min(ovr(f, stats), ovr(f, fine));
-  const own = ovr(fam, stats);
+  const ovr = (target) => {
+    const f = POS_FAMILY[target], a = SHIFT_OFFSETS[SHIFT_PROFILE[pos]], b = SHIFT_OFFSETS[SHIFT_PROFILE[target]];
+    return Math.floor(POS_WEIGHTS[f].reduce((sum, w, i) => sum + w * (stats[i] + (target === pos ? 0 : b[i] - a[i])), 0) / 100 + 0.5);
+  };
+  const own = ovr(pos);
   let best = null, top = own, price = Infinity;
   for (const [target, c] of cardCosts(pos)) {
-    if (POS_FAMILY[target] === fam) continue;
-    const v = safe(POS_FAMILY[target]);
+    const v = ovr(target);
     if (v > top || (v === top && best && c < price)) { top = v; best = target; price = c; }
   }
   return best ? { gain: top - own, best } : { gain: 0, best: null };
