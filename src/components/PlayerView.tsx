@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import type { Player, Subs } from "@/types";
+import { POSITIONS, type Player, type Subs } from "@/types";
 import { modelOvr } from "@/engine/ovr";
 import { summaryStats, gkStats, isLight } from "@/engine/stats";
 import { positionRatings } from "@/engine/positionFit";
+import { requestCardPreview } from "@/lib/companion-preview";
 import { cardRoute, routeCards, routeLabel } from "@/engine/positionCards";
 import { FIELD_GROUPS, GK_GROUPS, MAX_COACHES } from "@/engine/tables";
 import { ovrLevers } from "@/engine/planner";
@@ -74,14 +75,47 @@ export default function PlayerView({
       : summaryStats(subs, player.attributes);
   const groups = player.position === "GK" ? GK_GROUPS : FIELD_GROUPS;
   const calculated = modelOvr(player, subs);
+  // Valeurs exactes du jeu (aperçu des cartes via GMC Companion), valables
+  // seulement pour les attributs réels (pas pendant une simulation).
+  const [gamePreview, setGamePreview] = useState<{
+    state: "idle" | "loading" | "done" | "error";
+    values: Record<string, number>;
+    message?: string;
+  }>({ state: "idle", values: {} });
+  const exactCard = subs === player.attributes.subs ? gamePreview.values : {};
+  const cardValue = (row: ReturnType<typeof positionRatings>[number]) =>
+    exactCard[row.position] ?? row.card?.ovr;
+  async function loadGamePreview() {
+    setGamePreview({ state: "loading", values: {} });
+    try {
+      const positions = POSITIONS.filter(
+        (p) => p !== "GK" && p !== player.position,
+      );
+      const values = await requestCardPreview(player.id, positions);
+      setGamePreview({
+        state: Object.keys(values).length ? "done" : "error",
+        values,
+        message: Object.keys(values).length
+          ? undefined
+          : "Le jeu n’a pas donné d’aperçu pour ce joueur (sans doute pas dans ton effectif).",
+      });
+    } catch (error) {
+      setGamePreview({
+        state: "error",
+        values: {},
+        message:
+          error instanceof Error ? error.message : "Aperçu indisponible.",
+      });
+    }
+  }
   const ratings = positionRatings(player, subs)
     .filter((row) =>
       player.position === "GK" ? row.position === "GK" : row.position !== "GK",
     )
     .sort(
       (a, b) =>
-        (fit ? (b.adjusted ?? -1) : (b.raw ?? -1)) -
-        (fit ? (a.adjusted ?? -1) : (a.raw ?? -1)),
+        (fit ? (b.adjusted ?? -1) : (cardValue(b) ?? -1)) -
+        (fit ? (a.adjusted ?? -1) : (cardValue(a) ?? -1)),
     );
   const localId = remote ? player.id : `local:${player.id}`;
   const [startDay] = useState(() =>
@@ -495,8 +529,26 @@ export default function PlayerView({
             <p className="muted mini-note">
               {fit
                 ? "S’il joue à ce poste sans le changer : note au poste × adéquation (100 % son poste, 95 % proche, 90 % voisin, 85 % mauvaise ligne). Estimation."
-                : "OVR qu’il aurait après changement de poste (formule du jeu), avec le chemin de cartes le moins cher : les cartes s’enchaînent (Defender 20 000, Midfield 40 000, Forward 75 000). Gardien : aucune carte. ⚠ = calcul à la limite de l’arrondi : le jeu peut afficher un point de moins."}
+                : "OVR qu’il aurait après changement de poste, avec le chemin de cartes le moins cher (Defender 20 000, Midfield 40 000, Forward 75 000, enchaînables ; gardien : aucune carte). Le jeu décale aussi les attributs selon le poste (ex. défenseur → milieu : tir +, défense −) : ≈ = estimation, juste 9 fois sur 10 et toujours à 1 point près ; ⚠ = trop proche de l’arrondi. ✓ = valeur donnée par le jeu."}
             </p>
+            {!fit && remote && player.position !== "GK" && (
+              <div className="player-links" style={{ marginBottom: 10 }}>
+                <button
+                  type="button"
+                  className="button subtle"
+                  disabled={gamePreview.state === "loading"}
+                  onClick={loadGamePreview}
+                  title="Demande au jeu l’OVR exact à chaque poste, via GMC Companion et ton onglet GameChase (lecture seule : aucune carte utilisée)"
+                >
+                  {gamePreview.state === "loading"
+                    ? "Aperçu du jeu en cours…"
+                    : "Valeurs exactes du jeu"}
+                </button>
+                {gamePreview.message && (
+                  <small className="muted">{gamePreview.message}</small>
+                )}
+              </div>
+            )}
             <table className="mini-table">
               <thead>
                 <tr>
@@ -507,7 +559,9 @@ export default function PlayerView({
               </thead>
               <tbody>
                 {ratings.map((row) => {
-                  const value = fit ? row.adjusted : row.raw;
+                  const fromGame =
+                    !fit && exactCard[row.position] !== undefined;
+                  const value = fit ? row.adjusted : cardValue(row);
                   const route = cardRoute(player.position, row.position);
                   return (
                     <tr key={row.position}>
@@ -534,11 +588,28 @@ export default function PlayerView({
                               : RARITY_COLOR[playerRarity({ overall: value })],
                         }}
                       >
+                        {!fit &&
+                          !fromGame &&
+                          row.position !== player.position &&
+                          value !== undefined && (
+                            <span className="muted" title="Estimation">
+                              ≈
+                            </span>
+                          )}
                         <strong>{value ?? "—"}</strong>
-                        {!fit && row.edge && row.exact !== undefined && (
+                        {fromGame && (
                           <span
                             className="muted"
-                            title={`Calcul ${row.exact.toFixed(2).replace(".", ",")} : trop proche de l’arrondi, le jeu peut afficher ${row.safe ?? (value ?? 0) - 1}.`}
+                            title="Valeur donnée par le jeu (aperçu de la carte)"
+                          >
+                            {" "}
+                            ✓
+                          </span>
+                        )}
+                        {!fit && !fromGame && row.card?.edge && (
+                          <span
+                            className="muted"
+                            title={`Calcul ${row.card.raw.toFixed(2).replace(".", ",")} : trop proche de l’arrondi, le jeu peut afficher 1 point de plus ou de moins.`}
                           >
                             {" "}
                             ⚠

@@ -202,6 +202,8 @@ GMC_SITE_TOKEN=
 
 ### 5.1 Pourquoi pas l'API du jeu
 L'API de gamechase.io fonctionne avec les cookies de session du joueur et refuse les autres origines. Le site **n'appelle jamais gamechase.io**.
+
+**Cartes de poste (22/10/2026).** Le jeu décale les attributs selon le poste visé (ex. LB → LM : tir +8, défense −8). Le site l'estime avec `src/engine/positionShift.ts` (décalages moyens par profil, ajustés sur 456 aperçus du jeu : 91 % exacts, tous à ±1 ; fixture anonymisée `tests/fixtures/card-previews.json`). Pour la valeur exacte, la fiche joueur demande l'aperçu à GMC Companion par `window.postMessage` (canal `gmc-card-preview-v1`, chemin `/player/{id}` seulement) ; l'extension interroge `POST /api/store/position-cards/preview` depuis l'onglet GameChase connecté (lecture seule, module « Aperçu exact des cartes de poste »). Le site n'appelle toujours pas gamechase.io.
 Les données viennent de deux sources :
 
 1. **Serveur d'index GMC** (Cloudflare Worker + D1) : il reçoit déjà les effectifs lus par les utilisateurs de l'extension GMC Companion.

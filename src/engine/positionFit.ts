@@ -9,6 +9,7 @@ import { GOOD_PAIRS, OKAY_PAIRS } from "./tables";
 import { familyOf, gkOvr, ovrForFamily, safeOvrAt } from "./ovr";
 import { gkStats, summaryStats } from "./stats";
 import { cardRoutes, type CardRoute } from "./positionCards";
+import { shiftedOvr } from "./positionShift";
 
 export function getFit(
   natural: Position,
@@ -38,12 +39,20 @@ export function positionRatings(
     // Valeur exacte avant arrondi + drapeau « limite » (voir safeOvrAt).
     const check =
       raw === undefined ? undefined : safeOvrAt(family, player, subs);
+    // Carte de poste : OVR estimé après le décalage d'attributs du jeu.
+    const card =
+      position === player.position
+        ? raw === undefined
+          ? undefined
+          : { ovr: raw, raw: check?.raw ?? raw, edge: check?.edge ?? false }
+        : shiftedOvr(field, player.position, position);
     return {
       position,
       raw,
       exact: check?.raw,
       safe: check?.safe,
       edge: check?.edge ?? false,
+      card,
       ...fit,
       adjusted:
         raw === undefined ? undefined : Math.floor(raw * fit.coefficient),
@@ -57,8 +66,9 @@ export function cardTargets(position: Position): Position[] {
   return [...cardRoutes(position).keys()];
 }
 /**
- * Meilleur gain d'OVR « sûr » en changeant de poste, cartes enchaînées comprises.
- * À OVR égal, le chemin le moins cher l'emporte. 0 si aucun gain.
+ * Meilleur gain d'OVR en changeant de poste (estimation avec le décalage
+ * d'attributs du jeu), cartes enchaînées comprises. À OVR égal, le chemin le
+ * moins cher l'emporte. 0 si aucun gain.
  */
 export function cardGain(player: Player, subs: Subs = player.attributes.subs) {
   const table = positionRatings(player, subs);
@@ -67,27 +77,22 @@ export function cardGain(player: Player, subs: Subs = player.attributes.subs) {
   let best: (typeof table)[number] | undefined, route: CardRoute | undefined;
   for (const row of table) {
     const r = routes.get(row.position);
-    if (!r || row.safe === undefined) continue;
+    if (!r || !row.card) continue;
     if (
-      best?.safe === undefined ||
-      row.safe > best.safe ||
-      (row.safe === best.safe && route && r.cost < route.cost)
+      !best?.card ||
+      row.card.ovr > best.card.ovr ||
+      (row.card.ovr === best.card.ovr && route && r.cost < route.cost)
     ) {
       best = row;
       route = r;
     }
   }
-  if (
-    own === undefined ||
-    best?.safe === undefined ||
-    best.safe <= own ||
-    !route
-  )
+  if (own === undefined || !best?.card || best.card.ovr <= own || !route)
     return { gain: 0, best: undefined, edge: false, route: undefined };
   return {
-    gain: best.safe - own,
+    gain: best.card.ovr - own,
     best: best.position,
-    edge: best.edge,
+    edge: best.card.edge,
     route,
   };
 }

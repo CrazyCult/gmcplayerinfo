@@ -208,6 +208,7 @@ export default function Comparison({
                   "GK",
                   "CB",
                   "RB",
+                  "RWB",
                   "CDM",
                   "CM",
                   "CAM",
@@ -222,18 +223,20 @@ export default function Comparison({
                 const rating = positionRatings(player!).find(
                   (rating) => rating.position === position,
                 )!;
-                return fit ? rating.adjusted : rating.raw;
+                return fit ? rating.adjusted : rating.card?.ovr;
               });
               return row(
                 fit
                   ? position
                   : position === "RB"
-                    ? "LB / RB / LWB / RWB"
-                    : position === "RM"
-                      ? "LM / RM"
-                      : position === "RW"
-                        ? "LW / RW"
-                        : position,
+                    ? "LB / RB"
+                    : position === "RWB"
+                      ? "LWB / RWB"
+                      : position === "RM"
+                        ? "LM / RM"
+                        : position === "RW"
+                          ? "LW / RW"
+                          : position,
                 values[0],
                 values[1],
               );
