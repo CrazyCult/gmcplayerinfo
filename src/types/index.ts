@@ -12,7 +12,6 @@ export const POSITIONS = [
   "CAM",
   "RW",
   "LW",
-  "CF",
   "ST",
 ] as const;
 export type Position = (typeof POSITIONS)[number];

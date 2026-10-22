@@ -233,9 +233,7 @@ export default function Comparison({
                       ? "LM / RM"
                       : position === "RW"
                         ? "LW / RW"
-                        : position === "ST"
-                          ? "ST / CF"
-                          : position,
+                        : position,
                 values[0],
                 values[1],
               );

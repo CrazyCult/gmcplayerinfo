@@ -40,7 +40,7 @@ const DB_PAGE_SIZE = 24, DB_AVAIL = ['all', 'transfer', 'loan', 'free'];
 // ne fait que quelques pages, donc pas de pages profondes (lentes pour le jeu)
 // ni de joueurs qui glissent d'une page à l'autre pendant la lecture. Une
 // tranche trop grosse (> DB_SLICE_SPLIT joueurs) est coupée en deux.
-const DB_POSITIONS = ['GK', 'CB', 'LB', 'RB', 'LWB', 'RWB', 'CDM', 'CM', 'CAM', 'LM', 'RM', 'LW', 'RW', 'CF', 'ST'];
+const DB_POSITIONS = ['GK', 'CB', 'LB', 'RB', 'LWB', 'RWB', 'CDM', 'CM', 'CAM', 'LM', 'RM', 'LW', 'RW', 'ST'];
 const DB_BANDS = [[1, 49], [50, 54], [55, 59], [60, 64], [65, 69], [70, 74], [75, 79], [80, 84], [85, 89], [90, 94], [95, 99], [100, 150]];
 const DB_SLICE_SPLIT = 240;
 const SLICE_RE = /^s:([A-Z]{2,3}):(\d{1,3}):(\d{1,3})$/;
@@ -239,7 +239,7 @@ const POS_WEIGHTS = {
   CB: [11, 3, 13, 4, 37, 32], FB: [25, 5, 15, 15, 25, 15], CDM: [10, 5, 25, 10, 30, 20], CM: [13, 13, 27, 17, 17, 13],
   CAM: [13, 18, 27, 24, 9, 9], WM: [24, 13, 20, 24, 10, 9], W: [28, 19, 14, 28, 5, 6], ST: [25, 30, 10, 20, 3, 12],
 };
-const POS_FAMILY = { CB: 'CB', LB: 'FB', RB: 'FB', LWB: 'FB', RWB: 'FB', CDM: 'CDM', CM: 'CM', CAM: 'CAM', LM: 'WM', RM: 'WM', LW: 'W', RW: 'W', CF: 'ST', ST: 'ST' };
+const POS_FAMILY = { CB: 'CB', LB: 'FB', RB: 'FB', LWB: 'FB', RWB: 'FB', CDM: 'CDM', CM: 'CM', CAM: 'CAM', LM: 'WM', RM: 'WM', LW: 'W', RW: 'W', ST: 'ST' };
 const POSITION_CARDS = [
   [20000, { LB: ['LWB', 'LM', 'CB'], LWB: ['LB'], CB: ['LB', 'RB'], RB: ['RWB', 'RM', 'CB'], RWB: ['RB'], LM: ['LB'], RM: ['RB'] }],
   [40000, { CDM: ['CM'], CM: ['CDM', 'CAM', 'LM', 'RM'], CAM: ['CM'], LM: ['CM'], RM: ['CM'] }],

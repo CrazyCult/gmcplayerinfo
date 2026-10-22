@@ -495,7 +495,7 @@ export default function PlayerView({
             <p className="muted mini-note">
               {fit
                 ? "S’il joue à ce poste sans le changer : note au poste × adéquation (100 % son poste, 95 % proche, 90 % voisin, 85 % mauvaise ligne). Estimation."
-                : "OVR qu’il aurait après changement de poste (formule du jeu), avec le chemin de cartes le moins cher : les cartes s’enchaînent (Defender 20 000, Midfield 40 000, Forward 75 000). GK et CF : aucune carte. ⚠ = calcul à la limite de l’arrondi : le jeu peut afficher un point de moins."}
+                : "OVR qu’il aurait après changement de poste (formule du jeu), avec le chemin de cartes le moins cher : les cartes s’enchaînent (Defender 20 000, Midfield 40 000, Forward 75 000). Gardien : aucune carte. ⚠ = calcul à la limite de l’arrondi : le jeu peut afficher un point de moins."}
             </p>
             <table className="mini-table">
               <thead>

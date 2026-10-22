@@ -68,7 +68,6 @@ export const FAMILIES: Record<Position, Family> = {
   LM: "WM",
   RW: "W",
   LW: "W",
-  CF: "ST",
   ST: "ST",
 };
 export const GOOD_PAIRS: readonly (readonly Position[])[] = [
@@ -79,7 +78,6 @@ export const GOOD_PAIRS: readonly (readonly Position[])[] = [
   ["LM", "LW"],
   ["RM", "RW"],
   ["CAM", "ST"],
-  ["CF", "ST"],
 ];
 // Manuel du jeu : « a one-step neighbour (a CB at CDM, an LM at CM) at 90 ».
 export const OKAY_PAIRS: readonly (readonly Position[])[] = [
