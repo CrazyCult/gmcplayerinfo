@@ -114,7 +114,6 @@ describe("cartes de poste : déplacements du jeu, enchaînés", () => {
     // CM → ST : CAM puis ST (40 000 + 75 000), moins cher que par l'aile.
     expect(routeLabel(cardRoute("CM", "ST")!)).toBe("CM → CAM → ST");
     expect(cardTargets("GK")).toEqual([]);
-    expect(cardTargets("CF")).toEqual([]);
     expect(new Set(cardTargets("ST"))).not.toContain("GK");
   });
   it("prend le meilleur poste atteignable avec l'arrondi prudent", () => {

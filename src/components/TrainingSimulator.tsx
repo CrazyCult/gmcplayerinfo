@@ -308,11 +308,6 @@ export default function TrainingSimulator({
             />
           </label>
         </div>
-        {player.position === "CF" && (
-          <div className="notice">
-            Un CF n’a accès qu’aux exercices du physio, comme dans le jeu.
-          </div>
-        )}
         <div className="tabs">
           <button
             className="button"
@@ -373,12 +368,12 @@ export default function TrainingSimulator({
                   <div className="milestone" key={milestone.ovr}>
                     <strong>{milestone.ovr}</strong>
                     <small>{milestone.sessions} séances</small>
-                    <small title="Coût de ce point d’OVR">
-                      ce point : +
+                    <small title="Coût pour gagner ce point d’OVR">
+                      {previous?.ovr ?? plan.from} → {milestone.ovr} : +
                       {money(milestone.cost - (previous?.cost ?? 0))}
                     </small>
                     <small title="Total investi depuis le début du plan">
-                      total : <b>{money(milestone.cost)}</b>
+                      total investi : <b>{money(milestone.cost)}</b>
                     </small>
                   </div>
                 );

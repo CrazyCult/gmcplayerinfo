@@ -104,11 +104,7 @@ describe("séances et restrictions", () => {
       trainSession(pasero, "gkHandling", { coaches: MAX_COACHES, fitness: 35 }),
     ).not.toBeNull();
   });
-  it("CF : physio uniquement ; GK : pas de vitesse de champ", () => {
-    expect(exerciseAccess("CF", "finishing", MAX_COACHES)).toEqual([]);
-    expect(
-      exerciseAccess("CF", "strength", MAX_COACHES).map((a) => a.coach),
-    ).toEqual(["physio"]);
+  it("GK : pas de vitesse de champ", () => {
     for (const key of ["acceleration", "sprintSpeed", "agility"] as const)
       expect(exerciseAccess("GK", key, MAX_COACHES)).toEqual([]);
   });

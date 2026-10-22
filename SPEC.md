@@ -216,7 +216,7 @@ Les données viennent de deux sources :
 | Image joueur | `player.portrait_url` (ou `card_url` s'il existe) ; repli `public/assets/placeholder.png` |
 | Lien fiche officielle | `https://gamechase.io/gamev2/players/{id}` — **à vérifier** sur le jeu ; sinon pas de lien |
 | Monnaie | **GMC2** (afficher `1 234 567 GMC2`, abréviation `1,23 M` en compact) |
-| Postes (15) | `GK, RB, LB, CB, RWB, LWB, CDM, RM, LM, CM, CAM, RW, LW, CF, ST` (ordre d'affichage repris de MFL) |
+| Postes (14) | `GK, RB, LB, CB, RWB, LWB, CDM, RM, LM, CM, CAM, RW, LW, ST` (ordre d'affichage repris de MFL ; pas de CF dans GameChase) |
 | Rareté | `common, uncommon, rare, epic, legendary, galactico` |
 | Phase de carrière | `youth, talent, prime, decline, retired` |
 | Divisions / ligues | Nom de ligue si présent dans les données, sinon section masquée |
@@ -319,7 +319,7 @@ Un site public élargit cette diffusion : **mettre à jour `/privacy`** (donnée
 (`salary`/`wage`, `contract_end`/`contract.end`, etc.).
 
 ```ts
-export type Position = 'GK'|'RB'|'LB'|'CB'|'RWB'|'LWB'|'CDM'|'RM'|'LM'|'CM'|'CAM'|'RW'|'LW'|'CF'|'ST';
+export type Position = 'GK'|'RB'|'LB'|'CB'|'RWB'|'LWB'|'CDM'|'RM'|'LM'|'CM'|'CAM'|'RW'|'LW'|'ST';
 export type Rarity = 'common'|'uncommon'|'rare'|'epic'|'legendary'|'galactico';
 export type CareerPhase = 'youth'|'talent'|'prime'|'decline'|'retired';
 
@@ -484,7 +484,7 @@ Les sous-attributs de champ d'un gardien sont repliés dans « Attributs de cham
 - Titre « Notes par poste » + bouton engrenage → Popover : switch **Entraînement**, switch **Adéquation au poste** (défaut **on**), sélecteur **Âge simulé**.
 - **Adéquation ON** : une ligne par poste (15, GK masqué pour un joueur de champ), triée par note ajustée décroissante :
   `[poste + <PositionFitBadge>] … [écart vs OVR] [note ajustée]` et la note brute en petit gris.
-- **Adéquation OFF** : 8 familles (`GK`, `CB`, `LB/RB/LWB/RWB`, `CDM`, `CM`, `CAM`, `LM/RM`, `LW/RW`, `ST/CF`) avec la note brute exacte.
+- **Adéquation OFF** : 8 familles (`GK`, `CB`, `LB/RB/LWB/RWB`, `CDM`, `CM`, `CAM`, `LM/RM`, `LW/RW`, `ST`) avec la note brute exacte.
 - Option « terrain » : schéma 4-4-2 neutre avec la note à chaque poste (couleur §21.2).
 - IDs uniques pour chaque switch (bug MFL #10).
 
@@ -559,7 +559,7 @@ Chaque stat = `round(moyenne de ses sous-attributs)` :
 | CAM | CAM | 13 | 18 | 27 | 24 | 9 | 9 |
 | WM | LM, RM | 24 | 13 | 20 | 24 | 10 | 9 |
 | W | LW, RW | 28 | 19 | 14 | 28 | 5 | 6 |
-| ST | ST, CF | 25 | 30 | 10 | 20 | 3 | 12 |
+| ST | ST | 25 | 30 | 10 | 20 | 3 | 12 |
 
 Chaque ligne somme à 100.
 
@@ -593,7 +593,7 @@ Un seul module, utilisé partout (fiche, carte PNG, OG, comparaison, simulateur)
 
 | Bon (×0,95) | Acceptable (×0,90) |
 |---|---|
-| LB↔LWB, RB↔RWB, CDM↔CM, CM↔CAM, LM↔LW, RM↔RW, CAM↔ST, CF↔ST | CB↔CDM, LW↔RW, LM↔RM |
+| LB↔LWB, RB↔RWB, CDM↔CM, CM↔CAM, LM↔LW, RM↔RW, CAM↔ST | CB↔CDM, LW↔RW, LM↔RM |
 
   Tout le reste = mauvais (×0,85) ; GK ↔ champ = mauvais. Le tableau est une **donnée** (`tables.ts`), modifiable sans toucher au code.
 - Pas de bonus capitaine ni de pénalité « poste secondaire » (GameChase n'a qu'un poste par joueur).
@@ -658,7 +658,7 @@ Un exercice est disponible si un coach **couvre le poste** du joueur **et** a un
 | Gardiens `gk` | GK | gkDiving 1, gkHandling 1, gkPositioningSub 2, gkKicking 2, gkReflexes 3, reactions 3, jumping 4, strength 4, gkAcceleration 5, gkSprintSpeed 5, balance 5 |
 | Physio `physio` | tous | stamina 1, acceleration 2, sprintSpeed 2, agility 3, balance 3, jumping 4, strength 4, reactions 5, aggression 5 |
 
-> CF n'apparaît chez aucun coach de poste : un CF n'a accès qu'au physio. Garder ce comportement (c'est celui du jeu) et l'indiquer dans l'UI.
+> Le poste CF n'existe pas dans GameChase : il a été retiré du site (22/10/2026).
 
 ### 15.5 Planificateur « jusqu'à l'OVR max » (`planner.ts`)
 Simulation séance par séance, en entiers :
@@ -865,7 +865,7 @@ Fixtures à placer dans `tests/fixtures/` (fournies par l'utilisateur) :
 - **Multiplicateurs** : même joueur à 17, 21, 27, 32 ans → gains 6 / 4 / 2 / mental seul.
 - **Prix** : seuils 81/86/91/96 → ×2/×4/×10/×25 ; prix recalculé après chaque séance.
 - **Plafond** : aucun sous-attribut ne dépasse le potentiel ; séances finales sans gain d'OVR retirées.
-- **Disponibilité** : CF → physio seul ; GK → pas d'acceleration/sprintSpeed/agility de champ.
+- **Disponibilité** : GK → pas d'acceleration/sprintSpeed/agility de champ.
 - **Notes par poste** : note brute au poste naturel = OVR calculé (100 %) ; coefficients 1/0,95/0,90/0,85 appliqués.
 - **Valeur** (repris de MFL) : EMA, moyenne tronquée, IQR, fourchette centrée, `inverse()` singulière → `null`.
 - **Contrats** : `aggregateContracts` (trim, groupes).
@@ -888,7 +888,7 @@ Fixtures à placer dans `tests/fixtures/` (fournies par l'utilisateur) :
 10. **Images** : OG/Twitter, OG comparaison, `/api/player-card`, `ShareCardButton`.
 11. **SEO/PWA**.
 12. **Déploiement** (Vercel ou Cloudflare) + variables d'environnement.
-13. **Vérifications** : joueur inexistant, gardien, CF, joueur ≥ 31 ans, joueur au potentiel, OVR ≠ formule, sous-attribut manquant, mode import seul (sans token), mobile 375 px, thème clair.
+13. **Vérifications** : joueur inexistant, gardien, joueur ≥ 31 ans, joueur au potentiel, OVR ≠ formule, sous-attribut manquant, mode import seul (sans token), mobile 375 px, thème clair.
 
 Après chaque étape : `pnpm lint && pnpm test && pnpm build`.
 

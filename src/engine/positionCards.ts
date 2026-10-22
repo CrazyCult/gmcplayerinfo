@@ -3,7 +3,7 @@ import type { Position } from "../types";
 /**
  * Cartes de poste du jeu (relevé de /api/store/position-cards, 21/10/2026).
  * Chaque carte change le poste d'une case ; les cartes s'enchaînent
- * (« glisser » : CB → LB → LM → LW…). GK et CF ne sont couverts par aucune carte.
+ * (« glisser » : CB → LB → LM → LW…). Le gardien (GK) n’est couvert par aucune carte.
  */
 export const POSITION_CARDS = {
   defender_shift: {
