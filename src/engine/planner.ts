@@ -206,3 +206,40 @@ export function ovrLevers(player: Player, options: PlanOptions = {}) {
     (a, b) => Number(b.progresses) - Number(a.progresses) || a.cost - b.cost,
   );
 }
+
+/** Étape du plan : même exercice répété d'affilée. */
+export interface PlanStep {
+  key: SubKey;
+  name: string;
+  count: number;
+  ovrBefore: number;
+  ovrAfter: number;
+  cost: number;
+  /** Coût cumulé depuis le début du plan, cette étape comprise. */
+  total: number;
+}
+/** Regroupe la séquence du plan en étapes, dans l'ordre où les faire. */
+export function planSteps(sequence: readonly Session[]): PlanStep[] {
+  const steps: PlanStep[] = [];
+  let total = 0;
+  for (const s of sequence) {
+    total += s.cost;
+    const last = steps.at(-1);
+    if (last && last.key === s.key) {
+      last.count++;
+      last.ovrAfter = s.ovrAfter;
+      last.cost += s.cost;
+      last.total = total;
+    } else
+      steps.push({
+        key: s.key,
+        name: s.name,
+        count: 1,
+        ovrBefore: s.ovrBefore,
+        ovrAfter: s.ovrAfter,
+        cost: s.cost,
+        total,
+      });
+  }
+  return steps;
+}

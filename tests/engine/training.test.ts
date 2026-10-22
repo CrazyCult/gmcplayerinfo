@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { planTraining, planVariants } from "../../src/engine/planner";
+import {
+  planSteps,
+  planTraining,
+  planVariants,
+} from "../../src/engine/planner";
 import {
   exerciseAccess,
   priceMultiplier,
@@ -30,6 +34,17 @@ describe("Pasero : référence de la spécification", () => {
       97, 98, 99, 100, 101, 102, 103,
     ]);
     expect(plan.recharges).toBe(2);
+  });
+  it("donne l'ordre des séances, regroupé, avec le total cumulé", () => {
+    const plan = planTraining(pasero, { coaches: MAX_COACHES, center: 5 });
+    const steps = planSteps(plan.sequence);
+    expect(steps.reduce((n, s) => n + s.count, 0)).toBe(plan.sessions);
+    expect(steps.at(-1)?.total).toBe(plan.cost);
+    expect(steps.at(-1)?.ovrAfter).toBe(103);
+    for (const [i, s] of steps.entries()) {
+      if (i) expect(s.key).not.toBe(steps[i - 1].key);
+      expect(s.total).toBe((steps[i - 1]?.total ?? 0) + s.cost);
+    }
   });
   it("ne gagne pas un point sur une seule séance de vitesse", () => {
     expect(
