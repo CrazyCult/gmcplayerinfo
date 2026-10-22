@@ -368,8 +368,10 @@ export default function TrainingSimulator({
                   <div className="milestone" key={milestone.ovr}>
                     <strong>{milestone.ovr}</strong>
                     <small>{milestone.sessions} séances</small>
-                    <small title="Coût pour gagner ce point d’OVR">
-                      {previous?.ovr ?? plan.from} → {milestone.ovr} : +
+                    <small
+                      title={`Coût pour passer de ${previous?.ovr ?? plan.from} à ${milestone.ovr}`}
+                    >
+                      coût lvl : +
                       {money(milestone.cost - (previous?.cost ?? 0))}
                     </small>
                     <small title="Total investi depuis le début du plan">
