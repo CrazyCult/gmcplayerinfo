@@ -825,7 +825,7 @@ button.pill.accent {
   padding-bottom: 8px;
 }
 .milestone {
-  min-width: 96px;
+  min-width: 132px;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -1762,4 +1762,27 @@ details.fold[open] > summary .fold-chevron {
   font-size: 13px;
   overflow-wrap: anywhere;
   user-select: all;
+}
+.plan-order {
+  margin: 12px 0;
+}
+.plan-order summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 8px 0;
+}
+.plan-order ol {
+  margin: 0;
+  padding-left: 24px;
+}
+.plan-order li {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0;
+  font-size: 13px;
+}
+.plan-step {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
 }

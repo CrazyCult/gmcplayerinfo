@@ -5,8 +5,8 @@ import { saveClubSettings, useClubSettings } from "@/lib/trainingSettings";
 import { toast } from "sonner";
 import type { Player, Subs } from "@/types";
 import { EXERCISES, type Coach, type CoachLevels } from "@/engine/tables";
-import { modelOvr } from "@/engine/ovr";
-import { planTraining, planVariants } from "@/engine/planner";
+import { familyOf, modelOvr, rawOvrValue } from "@/engine/ovr";
+import { planSteps, planTraining, planVariants } from "@/engine/planner";
 import ResalePlanner from "./ResalePlanner";
 import Fold from "./UI/Fold";
 import { exerciseAccess, trainSession, type Session } from "@/engine/training";
@@ -20,6 +20,14 @@ const coachLabels: Record<Coach, string> = {
   gk: "Gardiens",
   physio: "Physio",
 };
+/** OVR avant arrondi (même formule que modelOvr), pour voir les fractions gagnées. */
+const exactOvr = (player: Player, subs: Subs) =>
+  rawOvrValue(familyOf(player.position), player, subs);
+const decimal = (value: number) =>
+  value.toLocaleString("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 interface Settings {
   coaches: CoachLevels;
   center: number;
@@ -64,6 +72,7 @@ export default function TrainingSimulator({
     () => planTraining(simulated, { ...settings, fitness: state.fitness }),
     [simulated, settings, state.fitness],
   );
+  const steps = useMemo(() => planSteps(plan.sequence), [plan.sequence]);
   const variants = useMemo(
     () => (activated ? planVariants(simulated, settings) : null),
     [activated, simulated, settings],
@@ -75,6 +84,49 @@ export default function TrainingSimulator({
     }),
     { cost: 0, expected: 0 },
   );
+  // Séance par séance : effet de la prochaine séance de chaque exercice sur
+  // l'OVR, avec les décimales (une séance fait rarement gagner un point entier).
+  const currentExact = exactOvr(player, state.subs);
+  // Gain exact (décimales) de chaque séance déjà faite.
+  const doneGains: (number | undefined)[] = [];
+  {
+    let subs = player.attributes.subs,
+      prev = exactOvr(player, subs);
+    for (const session of state.sequence) {
+      subs = { ...subs, [session.key]: session.after };
+      const next = exactOvr(player, subs);
+      doneGains.push(
+        next === undefined || prev === undefined ? undefined : next - prev,
+      );
+      prev = next;
+    }
+  }
+  const startExact = exactOvr(player, player.attributes.subs);
+  const manualRows = EXERCISES.flatMap((exercise) => {
+    const access = exerciseAccess(
+      player.position,
+      exercise.key,
+      settings.coaches,
+    );
+    if (!access.length) return [];
+    const result = trainSession(player, exercise.key, {
+      ...settings,
+      subs: state.subs,
+      fitness: state.fitness,
+    });
+    const after = result ? exactOvr(player, result.subs) : undefined;
+    const gain =
+      after === undefined || currentExact === undefined
+        ? undefined
+        : after - currentExact;
+    return [{ exercise, access, result, gain }];
+  });
+  const bestManual = manualRows
+    .filter((r) => r.result && r.gain !== undefined && r.gain > 0)
+    .sort(
+      (a, b) =>
+        b.gain! / b.result!.session.cost - a.gain! / a.result!.session.cost,
+    )[0]?.exercise.key;
   function updateSettings(next: Settings) {
     setAge(next.age);
     if (next.coaches !== club.coaches || next.center !== club.center)
@@ -315,20 +367,60 @@ export default function TrainingSimulator({
               )
             )}
             <div className="milestones">
-              {plan.milestones.map((milestone) => (
-                <div className="milestone" key={milestone.ovr}>
-                  <strong>{milestone.ovr}</strong>
-                  <small>{milestone.sessions} séances</small>
-                  <small>{money(milestone.cost)}</small>
-                </div>
-              ))}
+              {plan.milestones.map((milestone, index) => {
+                const previous = plan.milestones[index - 1];
+                return (
+                  <div className="milestone" key={milestone.ovr}>
+                    <strong>{milestone.ovr}</strong>
+                    <small>{milestone.sessions} séances</small>
+                    <small title="Coût de ce point d’OVR">
+                      ce point : +
+                      {money(milestone.cost - (previous?.cost ?? 0))}
+                    </small>
+                    <small title="Total investi depuis le début du plan">
+                      total : <b>{money(milestone.cost)}</b>
+                    </small>
+                  </div>
+                );
+              })}
             </div>
-            {Object.entries(plan.drills).map(([name, count]) => (
-              <div className="drill-row" key={name}>
-                <strong>{name}</strong>
-                <span className="pill">×{count}</span>
-              </div>
-            ))}
+            {plan.sessions > 0 && (
+              <details className="plan-order" open={steps.length <= 30}>
+                <summary>
+                  Ordre des séances · {steps.length} étape
+                  {steps.length > 1 ? "s" : ""}
+                </summary>
+                <p className="muted" style={{ fontSize: 12 }}>
+                  À faire dans cet ordre : le prix d’une séance dépend de l’OVR
+                  au moment où tu la fais. Total par exercice :{" "}
+                  {Object.entries(plan.drills)
+                    .map(([name, count]) => `${name} ×${count}`)
+                    .join(" · ")}
+                  .
+                </p>
+                <ol>
+                  {steps.map((step, index) => (
+                    <li key={index}>
+                      <div className="plan-step">
+                        <span>
+                          <strong>{step.name}</strong>{" "}
+                          <span className="pill">×{step.count}</span>
+                        </span>
+                        <span className="muted">
+                          OVR {step.ovrBefore}
+                          {step.ovrAfter > step.ovrBefore ? (
+                            <b className="link-accent"> → {step.ovrAfter}</b>
+                          ) : (
+                            " (pas encore de point)"
+                          )}{" "}
+                          · {money(step.cost)} · total {money(step.total)}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            )}
             {variants?.unlocked && (
               <div className="notice">
                 Coachs niveau 5 : OVR {variants.unlocked.to} ·{" "}
@@ -360,7 +452,11 @@ export default function TrainingSimulator({
             <div className="notice">
               {state.sequence.length} séances · {money(totals.cost)} · Coût
               attendu {money(totals.expected)} · OVR {modelOvr(player) ?? "—"} →{" "}
-              {modelOvr(simulated) ?? "—"} · Forme restante {state.fitness}
+              {modelOvr(simulated) ?? "—"}
+              {startExact !== undefined && currentExact !== undefined
+                ? ` (${decimal(startExact)} → ${decimal(currentExact)}, +${decimal(currentExact - startExact)})`
+                : ""}{" "}
+              · Forme restante {state.fitness}
             </div>
             <div className="player-links">
               <button
@@ -391,26 +487,64 @@ export default function TrainingSimulator({
                 </button>
               )}
             </div>
-            {EXERCISES.map((exercise) => {
-              const access = exerciseAccess(
-                player.position,
-                exercise.key,
-                settings.coaches,
-              );
-              if (!access.length) return null;
-              const result = trainSession(player, exercise.key, {
-                ...settings,
-                subs: state.subs,
-                fitness: state.fitness,
-              });
+            {state.sequence.length > 0 && (
+              <details className="plan-order">
+                <summary>Séances faites · {state.sequence.length}</summary>
+                <ol>
+                  {state.sequence.map((session, index) => (
+                    <li key={index}>
+                      <div className="plan-step">
+                        <strong>{session.name}</strong>
+                        <span className="muted">
+                          {session.before} → {session.after} ·{" "}
+                          {doneGains[index] !== undefined &&
+                            `OVR +${decimal(doneGains[index])} · `}
+                          OVR {session.ovrBefore}
+                          {session.ovrAfter > session.ovrBefore && (
+                            <b className="link-accent"> → {session.ovrAfter}</b>
+                          )}{" "}
+                          · {money(session.cost)}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            )}
+            {manualRows.map(({ exercise, access, result, gain }) => {
+              const best = result && exercise.key === bestManual;
               return (
                 <div className="drill-row" key={exercise.key}>
                   <div>
-                    <strong>{subLabels[exercise.key]}</strong>
+                    <strong>
+                      {subLabels[exercise.key]}
+                      {best && (
+                        <span
+                          className="link-accent"
+                          title="Plus grand gain d’OVR par GMC2 dépensé"
+                        >
+                          {" "}
+                          ★ meilleur rapport
+                        </span>
+                      )}
+                    </strong>
                     <small>
                       {exercise.name} · {state.subs[exercise.key] ?? "—"} /{" "}
                       {player.potential}
                     </small>
+                    {result && gain !== undefined && (
+                      <small>
+                        OVR +{decimal(gain)} par séance
+                        {result.session.ovrAfter > result.session.ovrBefore ? (
+                          <b className="link-accent">
+                            {" "}
+                            → passe à {result.session.ovrAfter}
+                          </b>
+                        ) : (
+                          ` (${decimal(currentExact ?? 0)} → ${decimal((currentExact ?? 0) + gain)})`
+                        )}
+                      </small>
+                    )}
                     <small>
                       {access
                         .map(
