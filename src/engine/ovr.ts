@@ -35,14 +35,13 @@ export function ovrForFamily(
   );
   if (values.some((value) => value === undefined || !Number.isFinite(value)))
     return undefined;
-  return Math.floor(
-    ((values as number[]).reduce(
-      (sum, value, index) => sum + value * WEIGHTS[family][index],
-      0,
-    ) +
-      50) /
-      100,
+  // Poids du manuel ramenés à 100 (décimaux) : on arrondit la somme au
+  // millionième pour qu'un demi-point exact ne bascule pas à cause du flottant.
+  const total = (values as number[]).reduce(
+    (sum, value, index) => sum + value * WEIGHTS[family][index],
+    0,
   );
+  return Math.floor((Math.round(total * 1e6) / 1e6 + 50) / 100);
 }
 export function modelOvr(
   player: Pick<Player, "position" | "attributes">,

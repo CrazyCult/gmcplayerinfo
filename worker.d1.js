@@ -234,18 +234,27 @@ function upsertFull(env, p, teamId, fetchedAt) {
 // /api/store/position-cards (identiques à src/engine/positionCards.ts) ; les
 // cartes s'enchaînent, on cherche donc tous les postes atteignables. Le jeu
 // décale aussi les attributs selon le poste (SHIFT_OFFSETS, identiques à
-// src/engine/positionShift.ts, ajustés sur 456 aperçus du jeu : 91 % exacts,
+// src/engine/positionShift.ts, ajustés sur 456 aperçus du jeu : 94 % exacts,
 // tous à ±1). À gain égal, le chemin le moins cher l'emporte.
+// Poids du manuel du jeu (30/10/2026), ramenés à 100 (identiques à src/engine/tables.ts).
+const per100 = (w) => { const t = w.reduce((a, b) => a + b, 0); return w.map(x => x * 100 / t); };
 const POS_WEIGHTS = {
-  CB: [11, 3, 13, 4, 37, 32], FB: [25, 5, 15, 15, 25, 15], CDM: [10, 5, 25, 10, 30, 20], CM: [13, 13, 27, 17, 17, 13],
-  CAM: [13, 18, 27, 24, 9, 9], WM: [24, 13, 20, 24, 10, 9], W: [28, 19, 14, 28, 5, 6], ST: [25, 30, 10, 20, 3, 12],
+  CB: per100([1, 0.3, 1.2, 0.5, 3.5, 3]), FB: per100([2.5, 0.5, 1.5, 1.5, 2.5, 1.5]), WB: per100([3, 0.5, 2, 2, 2, 1.5]),
+  CDM: per100([1, 0.5, 2.5, 1, 3, 2]), CM: per100([1.5, 1.5, 3, 2, 2, 1.5]), CAM: per100([1.5, 2, 3, 2.5, 1, 1]),
+  WM: per100([2.5, 1.5, 2, 2.5, 1, 1]), W: per100([3, 2, 1.5, 3, 0.5, 0.7]), ST: per100([2.5, 3, 1, 2, 0.3, 1.2]),
 };
-const POS_FAMILY = { CB: 'CB', LB: 'FB', RB: 'FB', LWB: 'FB', RWB: 'FB', CDM: 'CDM', CM: 'CM', CAM: 'CAM', LM: 'WM', RM: 'WM', LW: 'W', RW: 'W', ST: 'ST' };
+const POS_FAMILY = { CB: 'CB', LB: 'FB', RB: 'FB', LWB: 'WB', RWB: 'WB', CDM: 'CDM', CM: 'CM', CAM: 'CAM', LM: 'WM', RM: 'WM', LW: 'W', RW: 'W', ST: 'ST' };
 const SHIFT_PROFILE = { LB: 'FB', RB: 'FB', LWB: 'WB', RWB: 'WB', CB: 'CB', CDM: 'CDM', CM: 'CM', CAM: 'CAM', LM: 'WM', RM: 'WM', LW: 'W', RW: 'W', ST: 'ST' };
 const SHIFT_OFFSETS = {
-  CB: [0, 0, 0, 0, 0, 0], FB: [-1.38, 3.47, -1.38, 4.16, 4.53, -3.2], WB: [2.89, 1.53, 1.97, 2.0, 1.08, -3.1],
-  CDM: [0.04, 8.58, 0.59, 4.16, 0.82, -3.27], CM: [-2.72, 13.07, -3.11, 6.01, 6.56, -8.18], CAM: [0.03, 14.24, 1.38, 1.15, -1.62, -7.06],
-  WM: [-1.86, 10.89, -2.22, 7.34, -2.1, -2.94], W: [0.71, 10.05, 0, 4.19, -8.73, -1.45], ST: [-1.2, 13.43, -1.62, 4.61, -4.75, -7.97],
+  CB: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  FB: [-0.19, 2.19, -0.06, 3.08, 2.24, -1.32],
+  WB: [-0.64, 4.55, -1.33, 5.65, 6.66, -8.05],
+  CDM: [1.7, 7.14, 2.34, 2.44, -2.11, -0.86],
+  CM: [0.92, 10.34, -0.05, 2.54, 1.79, -4.59],
+  CAM: [5.99, 8.75, 7.77, -5.48, -13.44, 3.66],
+  WM: [0.13, 10.43, -0.78, 5.13, -3.03, -3.06],
+  W: [2.38, 7.98, 2.45, 2.26, -13.24, 2.65],
+  ST: [1.13, 10.95, 1.0, 2.43, -9.5, -3.94],
 };
 const POSITION_CARDS = [
   [20000, { LB: ['LWB', 'LM', 'CB'], LWB: ['LB'], CB: ['LB', 'RB'], RB: ['RWB', 'RM', 'CB'], RWB: ['RB'], LM: ['LB'], RM: ['RB'] }],
@@ -287,7 +296,8 @@ export function positionGain(attrs, position) {
   if (stats.some(v => v == null)) return { gain: 0, best: null };
   const ovr = (target) => {
     const f = POS_FAMILY[target], a = SHIFT_OFFSETS[SHIFT_PROFILE[pos]], b = SHIFT_OFFSETS[SHIFT_PROFILE[target]];
-    return Math.floor(POS_WEIGHTS[f].reduce((sum, w, i) => sum + w * (stats[i] + (target === pos ? 0 : b[i] - a[i])), 0) / 100 + 0.5);
+    const total = POS_WEIGHTS[f].reduce((sum, w, i) => sum + w * (stats[i] + (target === pos ? 0 : b[i] - a[i])), 0);
+    return Math.floor((Math.round(total * 1e6) / 1e6 + 50) / 100);
   };
   const own = ovr(pos);
   let best = null, top = own, price = Infinity;
