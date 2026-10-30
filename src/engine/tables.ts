@@ -43,15 +43,26 @@ export const GK_GROUPS: Record<GkStat, readonly SubKey[]> = {
   pos: ["gkPositioningSub"],
   spe: ["gkSprintSpeed", "gkAcceleration"],
 };
+// Poids de chaque stat dans l'OVR, par poste (manuel du jeu, « How OVR is
+// worked out », 30/10/2026), ramenés à 100 : OVR = Σ poids × stat / 100.
+// Manuel : ST 2,5/3/1/2/0,3/1,2 · LW-RW 3/2/1,5/3/0,5/0,7 · CAM 1,5/2/3/2,5/1/1
+// · CM 1,5/1,5/3/2/2/1,5 · CDM 1/0,5/2,5/1/3/2 · LB-RB 2,5/0,5/1,5/1,5/2,5/1,5
+// · CB 1/0,3/1,2/0,5/3,5/3 · LM-RM 2,5/1,5/2/2,5/1/1 · LWB-RWB 3/0,5/2/2/2/1,5.
+// Vérifié : OVR exact pour 38 joueurs sur 38 (aperçus du 22/10/2026).
+const per100 = (w: readonly number[]) => {
+  const sum = w.reduce((a, b) => a + b, 0);
+  return w.map((x) => (x * 100) / sum);
+};
 export const WEIGHTS = {
-  CB: [11, 3, 13, 4, 37, 32],
-  FB: [25, 5, 15, 15, 25, 15],
-  CDM: [10, 5, 25, 10, 30, 20],
-  CM: [13, 13, 27, 17, 17, 13],
-  CAM: [13, 18, 27, 24, 9, 9],
-  WM: [24, 13, 20, 24, 10, 9],
-  W: [28, 19, 14, 28, 5, 6],
-  ST: [25, 30, 10, 20, 3, 12],
+  CB: per100([1, 0.3, 1.2, 0.5, 3.5, 3]),
+  FB: per100([2.5, 0.5, 1.5, 1.5, 2.5, 1.5]),
+  WB: per100([3, 0.5, 2, 2, 2, 1.5]),
+  CDM: per100([1, 0.5, 2.5, 1, 3, 2]),
+  CM: per100([1.5, 1.5, 3, 2, 2, 1.5]),
+  CAM: per100([1.5, 2, 3, 2.5, 1, 1]),
+  WM: per100([2.5, 1.5, 2, 2.5, 1, 1]),
+  W: per100([3, 2, 1.5, 3, 0.5, 0.7]),
+  ST: per100([2.5, 3, 1, 2, 0.3, 1.2]),
 } as const;
 export type Family = keyof typeof WEIGHTS | "GK";
 export const FAMILIES: Record<Position, Family> = {
@@ -59,8 +70,8 @@ export const FAMILIES: Record<Position, Family> = {
   CB: "CB",
   RB: "FB",
   LB: "FB",
-  RWB: "FB",
-  LWB: "FB",
+  RWB: "WB",
+  LWB: "WB",
   CDM: "CDM",
   CM: "CM",
   CAM: "CAM",

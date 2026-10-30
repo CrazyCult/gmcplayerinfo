@@ -83,15 +83,15 @@ const player = (
 
 describe("arrondis : calcul sûr et cas limites", () => {
   it("signale un OVR que l'autre arrondi ferait baisser", () => {
-    // PAC = 84/83 (83,5) : stats arrondies → 79,51 en ailier (80), moyennes exactes → 79,37 (79).
+    // PAC = 82/81 (81,5) : stats arrondies → 79,53 en ailier (80), moyennes exactes → 79,39 (79).
     const p = player(
       "LM",
-      subs([84, 83], { sho: 79, pas: 79, dri: 79, def: 72, phy: 70 }),
+      subs([82, 81], { sho: 80, pas: 80, dri: 80, def: 72, phy: 70 }),
       79,
     );
     const w = safeOvrAt("W", p);
     expect(w).toMatchObject({ ovr: 80, safe: 79, edge: true });
-    expect(w!.raw).toBeCloseTo(79.51, 2);
+    expect(w!.raw).toBeCloseTo(79.53, 2);
   });
   it("ne signale rien quand les deux arrondis sont d'accord et loin du demi-point", () => {
     const p = player(
@@ -136,7 +136,7 @@ describe("cartes de poste : déplacements du jeu, enchaînés", () => {
     const cb = cardGain(player("CB", winger, 64));
     expect(cb.best).toMatch(/^(LW|RW)$/);
     expect(cb.route).toMatchObject({ cost: 115000, cards: 3 });
-    // Cas limite : 80 « optimiste » mais 79 sûr → aucun gain depuis LM (79).
+    // LM 79 sans profil marqué : aucun poste atteignable ne lui fait gagner un point.
     const edge = player(
       "LM",
       subs([84, 83], { sho: 79, pas: 79, dri: 79, def: 72, phy: 70 }),
@@ -194,7 +194,7 @@ describe("décalage d'attributs des cartes : aperçus du jeu", () => {
       }
     }
     expect(total).toBe(456);
-    expect(exact).toBeGreaterThanOrEqual(410);
+    expect(exact).toBeGreaterThanOrEqual(425);
   });
   it("LB → LM : tir et dribble montent, défense baisse (cas George Mason)", () => {
     const stats = {

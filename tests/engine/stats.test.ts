@@ -35,9 +35,12 @@ describe("stats et OVR en entiers", () => {
     expect(summaryStats({ sprintSpeed: 90 }).pac).toBeUndefined();
     expect(gkStats({ gkDiving: 103 }).spe).toBeUndefined();
   });
-  it("les huit familles totalisent 100 et respectent le demi-point", () => {
+  it("les familles totalisent 100 et respectent le demi-point", () => {
     for (const [family, weights] of Object.entries(WEIGHTS)) {
-      expect(weights.reduce((sum, value) => sum + value, 0)).toBe(100);
+      expect(weights.reduce((sum, value) => sum + value, 0)).toBeCloseTo(
+        100,
+        9,
+      );
       expect(
         ovrForFamily(
           family as keyof typeof WEIGHTS,
