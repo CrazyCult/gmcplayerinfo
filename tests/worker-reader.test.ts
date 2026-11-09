@@ -59,7 +59,7 @@ it("reads assigned database pages with the reader account and stores them like a
   const value = cookie.split("; ").map(c => c.slice(c.indexOf("=") + 1)).join("");
   expect(JSON.parse(atob(value.slice(7).replace(/-/g, "+").replace(/_/g, "/"))).access_token).toBe("AT-1");
   // Joueurs stockés, état visible dans les statistiques, sans la session
-  const n = (await mock.DB.prepare("SELECT COUNT(*) AS n FROM db_players").first()).n;
+  const n = (await mock.DB.prepare("SELECT COUNT(*) AS n FROM db_players").first())!.n;
   expect(n).toBeGreaterThan(0);
   const stats = await (await worker.fetch(new Request("https://index.test/v1/db/stats"), env)).json();
   expect(stats.reader.ok).toBe(true);
@@ -141,6 +141,7 @@ it("serves site requests (player sheets) before database pages", async () => {
     throw new Error("unexpected " + url);
   }));
   const at = Date.parse("2026-11-09T15:01:00Z");
+  vi.setSystemTime(at);
   await tick(env, at); // la base fait connaître le joueur ST-60 (fiche légère)
   const site = (path: string, method = "GET") => worker.fetch(new Request(`https://index.test${path}`, { method, headers: { Authorization: "Bearer tok" } }), env).then(r => r.json());
   const known = (await (mock as any).DB.prepare("SELECT id FROM site_players LIMIT 1").all()).results[0].id as string;
@@ -148,10 +149,25 @@ it("serves site requests (player sheets) before database pages", async () => {
   const ask = await site(`/v1/site/request/${known}`, "POST");
   expect(ask.status).toBe("demande");
   order.length = 0;
+  vi.setSystemTime(at + 60e3);
   await tick(env, at + 60e3);
   expect(order[0]).toBe("fiche"); // la demande passe avant les pages de la base
   const st = await site(`/v1/site/status/${known}`);
   expect(st.light).toBe(false);
   const stats = await (await worker.fetch(new Request("https://index.test/v1/db/stats"), env)).json();
   expect(stats.reader.requestsToday).toBe(1);
+  // Fiche complète : relecture sur demande, au plus toutes les 10 min.
+  vi.setSystemTime(at + 5 * 60e3);
+  expect((await site(`/v1/site/request/${known}`, "POST")).status).toBe("recent");
+  vi.setSystemTime(at + 12 * 60e3);
+  const again = await site(`/v1/site/request/${known}`, "POST");
+  expect(again).toMatchObject({ light: false, status: "demande" });
+  expect((await site(`/v1/site/status/${known}`)).requestedAt).toBe(again.requestedAt);
+  order.length = 0;
+  await tick(env, at + 12 * 60e3 + 1000);
+  expect(order[0]).toBe("fiche");
+  const done = await site(`/v1/site/status/${known}`);
+  expect(done.requestedAt).toBe(null);
+  expect(done.fetchedAt).toBeGreaterThanOrEqual(again.requestedAt);
+  vi.useRealTimers();
 });

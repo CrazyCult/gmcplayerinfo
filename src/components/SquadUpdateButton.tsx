@@ -92,8 +92,8 @@ export default function SquadUpdateButton({
       >
         {message ||
           (since
-            ? "Demande envoyée aux GMC Companion actifs. L’effectif s’affichera ici après sa lecture ; le délai dépend des extensions disponibles."
-            : "Sans extension sur cet appareil : demande une lecture de tout le club aux GMC Companion actifs.")}
+            ? "Demande envoyée : l’effectif est relu en priorité (en général dans la minute) et s’affichera ici tout seul."
+            : "Relit tout l’effectif du club en priorité, même sans extension.")}
       </small>
     </div>
   );

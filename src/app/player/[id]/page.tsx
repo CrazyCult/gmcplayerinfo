@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import LocalPlayer from "@/components/LocalPlayer";
 import Search from "@/components/Search";
 import PlayerView from "@/components/PlayerView";
+import RefreshPlayerButton from "@/components/RefreshPlayerButton";
 import MarketPanel from "@/components/MarketPanel";
 import OvrHistory from "@/components/OvrHistory";
 import Fold from "@/components/UI/Fold";
@@ -71,7 +72,13 @@ export default async function PlayerPage({
           {new Date(snapshot.fetchedAt).toLocaleString("fr-CH", {
             timeZone: "Europe/Zurich",
           })}{" "}
-          par GMC Companion.
+          par GMC Companion.{" "}
+          {!snapshot.light && (
+            <RefreshPlayerButton
+              playerId={snapshot.player.id}
+              fetchedAt={snapshot.fetchedAt}
+            />
+          )}
         </p>
         <PlayerView
           player={snapshot.player}
