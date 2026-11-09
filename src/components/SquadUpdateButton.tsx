@@ -12,6 +12,17 @@ export default function SquadUpdateButton({
 }) {
   const router = useRouter();
   const [since, setSince] = useState(requestedAt);
+  // Demande qui traîne (plus de 2 min) : on peut la relancer, ce qui réveille
+  // tout de suite le compte lecteur du serveur.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!since) return;
+    const t = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(t);
+  }, [since]);
+  const [relaunched, setRelaunched] = useState(0);
+  const stale =
+    Boolean(since) && now - Math.max(since ?? 0, relaunched) > 120_000;
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState("");
   useEffect(() => {
@@ -60,13 +71,15 @@ export default function SquadUpdateButton({
     };
   }, [since, teamId, router]);
   async function ask() {
-    if (sending || since) return;
+    if (sending || (since && !stale)) return;
     setSending(true);
     setMessage("");
     try {
       const result = await requestClubUpdate(teamId);
       if (result.ok) {
         setSince(result.requestedAt);
+        setRelaunched(Date.now());
+        setNow(Date.now());
         router.refresh();
       } else setMessage(result.error);
     } catch {
@@ -79,13 +92,15 @@ export default function SquadUpdateButton({
     <div>
       <button
         className="button"
-        disabled={sending || Boolean(since)}
+        disabled={sending || (Boolean(since) && !stale)}
         onClick={() => void ask()}
       >
         {sending
           ? "Demande en cours…"
           : since
-            ? "Mise à jour demandée"
+            ? stale
+              ? "Relancer la mise à jour"
+              : "Mise à jour demandée"
             : "Demander la mise à jour de l’effectif"}
       </button>
       <small
@@ -94,9 +109,11 @@ export default function SquadUpdateButton({
         role="status"
       >
         {message ||
-          (since
-            ? "Demande envoyée : l’effectif est relu en priorité (en général dans la minute) et s’affichera ici tout seul."
-            : "Relit tout l’effectif du club en priorité, même sans extension.")}
+          (since && stale
+            ? "Toujours en attente : tu peux relancer la demande."
+            : since
+              ? "Demande envoyée : l’effectif est relu en priorité (en général dans la minute) et s’affichera ici tout seul."
+              : "Relit tout l’effectif du club en priorité, même sans extension.")}
       </small>
     </div>
   );
