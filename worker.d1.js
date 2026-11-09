@@ -35,7 +35,9 @@ const PRIVACY_HTML = `<!doctype html><html lang="fr"><head><meta charset="utf-8"
 // - Un budget d'écritures par jour suspend la lecture de la base complète et
 //   le rattrapage quand il est atteint (le marché continue).
 // ---------------------------------------------------------------------------
-const MAX_CLUBS_PER_POST = 10, MAX_PLAYERS = 60, MAX_CLUB_BYTES = 250000, PAGE = 50;
+const MAX_CLUBS_PER_POST = 10, MAX_PLAYERS = 60, MAX_CLUB_BYTES = 450000, PAGE = 50;
+// Effectif d'un club : jusqu'à 100 joueurs (certains clubs en ont plus de 60).
+const MAX_CLUB_PLAYERS = 100;
 const DB_PAGE_SIZE = 24, DB_AVAIL = ['all', 'transfer', 'loan', 'free'];
 // Base complète lue par tranches (poste × fourchette d'OVR) : chaque tranche
 // ne fait que quelques pages, donc pas de pages profondes (lentes pour le jeu)
@@ -669,7 +671,7 @@ async function siteClubRequest(req, env, url, json) {
   const teamId = tail('/v1/site/club/');
   if (!isStr(teamId, 64)) return json({ error: 'Identifiant invalide' }, 400);
   // The snapshot, club name and any newer individual cards share one database
-  // round trip. json_each is bounded by the club snapshot (at most 60 players).
+  // round trip. json_each is bounded by the club snapshot (at most 100 players).
   const row = await env.DB.prepare(`SELECT c.fetched_at, c.players, n.name, n.crest, r.requested_at AS request_at, r.player_id AS request_player_id,
       (SELECT json_group_array(json_object('id', f.id, 'data', f.data)) FROM full_players f
        WHERE f.fetched_at > c.fetched_at AND f.id IN (
@@ -696,7 +698,7 @@ async function siteClubRequest(req, env, url, json) {
   }
   if (!players.length) {
     const rows = (await env.DB.prepare(`SELECT d.* FROM site_players s JOIN db_players d ON d.id = s.id
-      WHERE s.id IN (SELECT id FROM site_players WHERE team_id = ?1 LIMIT 80)`).bind(teamId).all()).results;
+      WHERE s.id IN (SELECT id FROM site_players WHERE team_id = ?1 LIMIT 120)`).bind(teamId).all()).results;
     players = rows.map(d => ({ player: dbPublicPlayer(d), light: true }));
   }
   if (!c && !n && !players.length) return json({ error: 'Club inconnu' }, 404);
@@ -867,7 +869,7 @@ async function extensionRequest(req, env, url, json, internal = false) {
       const players = Array.isArray(c.players) ? c.players : null;
       const text = players ? JSON.stringify(players) : '';
       if (!isStr(c.teamId, 64) || !isInt(c.fetchedAt, 1.6e12, now + 5 * 60e3) || !players || !players.length ||
-          players.length > MAX_PLAYERS || !players.every(validPlayer) || text.length > MAX_CLUB_BYTES) { rejected++; continue; }
+          players.length > MAX_CLUB_PLAYERS || !players.every(validPlayer) || text.length > MAX_CLUB_BYTES) { rejected++; continue; }
       valid.push({ c, text });
     }
     const known = new Map();

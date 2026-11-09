@@ -314,13 +314,13 @@ it("falls back to the players API, player by player, when the club page has no d
   vi.useRealTimers();
 });
 
-it("trims heavy fields so a 60-player squad page fits the server limit", async () => {
+it("keeps a 71-player squad and trims heavy fields to fit the server limit", async () => {
   const { env } = setup();
   const at = Date.parse("2026-11-09T15:01:00Z");
   vi.setSystemTime(at);
-  const squad = Array.from({ length: 60 }, (_, i) => ({ ...player(`S-${i}`, "ST", 70), card_url: "https://x.test/" + "c".repeat(4000),
+  const squad = Array.from({ length: 71 }, (_, i) => ({ ...player(`S-${i}`, "ST", 70), card_url: "https://x.test/" + "c".repeat(7000),
     match_history: [{ id: "m", rating: 7 }], attributes: { pac: 70, sho: 70, pas: 70, dri: 70, def: 40, phy: 60, finishing: 72 } }));
-  expect(JSON.stringify(squad).length).toBeGreaterThan(250000);
+  expect(JSON.stringify(squad).length).toBeGreaterThan(450000);
   vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
     const url = String(input instanceof Request ? input.url : input);
     if (url.startsWith(SUPA)) return Response.json({ access_token: "AT", refresh_token: "RT", expires_in: 3600, user: { id: "u" } });
@@ -339,7 +339,7 @@ it("trims heavy fields so a 60-player squad page fits the server limit", async (
   await tick(env, at + 60e3);
   const club = await site("/v1/site/club/c1");
   expect(club.fetchedAt).toBeGreaterThanOrEqual(ask.requestedAt);
-  expect(club.players).toHaveLength(60);
+  expect(club.players).toHaveLength(71);
   expect(club.players[0].player.attributes.finishing).toBe(72);
   vi.useRealTimers();
 });

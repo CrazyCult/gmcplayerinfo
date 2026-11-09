@@ -239,7 +239,7 @@ const pause = (env) => new Promise(res => setTimeout(res, env.READER_GAP_MS != n
 async function clubViaApi(env, call, s, teamId) {
   const key = 'bot:club:' + teamId;
   const st = (await meta(env, key)) || { ids: null, got: {}, since: Date.now() };
-  if (!st.ids) st.ids = ((await env.DB.prepare('SELECT id FROM site_players WHERE team_id = ?1 LIMIT 80').bind(teamId).all()).results || []).map(x => x.id);
+  if (!st.ids) st.ids = ((await env.DB.prepare('SELECT id FROM site_players WHERE team_id = ?1 LIMIT 120').bind(teamId).all()).results || []).map(x => x.id);
   if (!st.ids.length) { await env.DB.prepare('DELETE FROM db_meta WHERE k = ?1').bind(key).run(); return { error: 'aucun joueur connu pour ce club' }; }
   const todo = st.ids.filter(id => !st.got[id]);
   let read = 0, last = null;
@@ -261,17 +261,17 @@ async function clubViaApi(env, call, s, teamId) {
   return refused ? { error: refused } : { done: players.length };
 }
 
-// Effectif envoyé au serveur : au-delà de 240 Ko, on retire les champs lourds
+// Effectif envoyé au serveur : au-delà de 430 Ko, on retire les champs lourds
 // sans intérêt pour le site (longs textes, listes d'objets) ; puis on vérifie
 // que le serveur l'a bien accepté.
-const CLUB_MAX = 240000;
+const CLUB_MAX = 430000;
 function slim(players) {
   if (JSON.stringify(players).length <= CLUB_MAX) return players;
   return players.map(p => Object.fromEntries(Object.entries(p).filter(([k, v]) => k === 'attributes' || k === 'traits' ||
     !((typeof v === 'string' && v.length > 200) || (Array.isArray(v) && v.some(x => x && typeof x === 'object')) || (v && typeof v === 'object' && !Array.isArray(v) && JSON.stringify(v).length > 400)))));
 }
 async function sendClub(call, teamId, players, crest) {
-  const list = slim(players).slice(0, 60);
+  const list = slim(players).slice(0, 100);
   const size = JSON.stringify(list).length;
   const ack = await call('/v1/clubs', { clubs: [{ teamId, fetchedAt: Date.now(), players: list, ...(crest ? { crest } : {}) }] });
   if (ack && ack.accepted === 1) return null;
