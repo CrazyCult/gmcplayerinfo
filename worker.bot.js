@@ -221,28 +221,81 @@ function whyFailed(r, text, what) {
   return `${what} introuvable dans la page ${new URL(r.url || GAME).pathname} (${(r.headers.get('content-type') || '?').split(';')[0]}, ${text.length} octets, ` +
     `"players":[ ×${n('"players":[')}, "overall" ×${n('"overall"')}, "pac" ×${n('"pac"')}, "initialPlayer" ×${n('"initialPlayer"')})` + around;
 }
+// Fiche complète par l'API du jeu (/api/players/{id}) : même réponse en v2 et
+// en v3, 51 sous-attributs, ~3 Ko. Repli si les pages ne donnent rien.
+const API_PER_RUN = 12;               // fiches lues par passage (limite d'appels Cloudflare)
+async function apiPlayer(env, id, s) {
+  const r = await gameGet(env, '/api/players/' + encodeURIComponent(id), s);
+  if (!r.ok || !/json/.test(r.headers.get('content-type') || '')) return { r, p: null };
+  let j = null; try { j = await r.json(); } catch (_) {}
+  const p = j && typeof j === 'object' ? (j.player && typeof j.player === 'object' ? j.player : j) : null;
+  return { r, p: p && p.id === id && typeof p.overall === 'number' && p.attributes && typeof p.attributes === 'object' ? p : null };
+}
+const stop = (r) => [401, 403, 429].includes(r.status) || (r.status >= 300 && r.status < 400);
+const pause = (env) => new Promise(res => setTimeout(res, env.READER_GAP_MS != null ? Math.min(+env.READER_GAP_MS, 250) : 250));
+
+// Effectif par l'API, joueur par joueur (en plusieurs passages si besoin) : la
+// liste des joueurs du club vient de la base ; l'instantané part à la fin.
+async function clubViaApi(env, call, s, teamId) {
+  const key = 'bot:club:' + teamId;
+  const st = (await meta(env, key)) || { ids: null, got: {}, since: Date.now() };
+  if (!st.ids) st.ids = ((await env.DB.prepare('SELECT id FROM site_players WHERE team_id = ?1 LIMIT 80').bind(teamId).all()).results || []).map(x => x.id);
+  if (!st.ids.length) { await env.DB.prepare('DELETE FROM db_meta WHERE k = ?1').bind(key).run(); return { error: 'aucun joueur connu pour ce club' }; }
+  const todo = st.ids.filter(id => !st.got[id]);
+  let read = 0, last = null;
+  for (const id of todo.slice(0, API_PER_RUN)) {
+    if (read) await pause(env);
+    const { r, p } = await apiPlayer(env, id, s);
+    last = r; read++;
+    if (p) st.got[id] = p;
+    else if (stop(r)) break;
+    else st.got[id] = false;    // joueur parti, fiche refusée : on n'insiste pas
+  }
+  const left = st.ids.filter(id => st.got[id] === undefined).length;
+  if (left && !(last && stop(last))) { await setMeta(env, key, st); return { partial: st.ids.length - left, total: st.ids.length }; }
+  if (left) { await setMeta(env, key, st); return { error: `API ${last.status}`, stopped: last }; }
+  const players = Object.values(st.got).filter(Boolean);
+  await env.DB.prepare('DELETE FROM db_meta WHERE k = ?1').bind(key).run();
+  if (!players.length) return { error: 'aucune fiche lue par l\'API' };
+  await call('/v1/clubs', { clubs: [{ teamId, fetchedAt: Date.now(), players }] });
+  return { done: players.length };
+}
+
 async function serveRequests(env, call, s) {
   const asked = await call('/v1/assign', { limit: 2, players: true, requestsOnly: true });
   let served = 0;
-  const failed = [];
-  const stop = (r) => [401, 403, 429].includes(r.status) || (r.status >= 300 && r.status < 400);
+  const failed = [], progress = [];
   for (const id of (asked && asked.players) || []) {
-    const r = await gameGet(env, '/gamev2/players/' + encodeURIComponent(id), s, true);
-    const text = r.ok ? await r.text() : '';
-    const p = text ? initialPlayer(text) : null;
-    if (p && p.id === id && p.attributes) { await call('/v1/players', { players: [{ fetchedAt: Date.now(), player: p }] }); served++; continue; }
-    failed.push(`joueur ${id} : ${whyFailed(r, text, 'fiche')}`);
-    if (stop(r)) return { served, failed };
+    // 1. L'API (légère, indépendante de la version du jeu), 2. la page.
+    const a = await apiPlayer(env, id, s);
+    let p = a.p, why = '';
+    if (!p && !stop(a.r)) {
+      const r = await gameGet(env, '/gamev2/players/' + encodeURIComponent(id), s, true);
+      const text = r.ok ? await r.text() : '';
+      p = text ? initialPlayer(text) : null;
+      if (!(p && p.id === id && p.attributes)) { p = null; why = `API ${a.r.status}, page : ${whyFailed(r, text, 'fiche')}`; if (stop(r)) { failed.push(`joueur ${id} : ${why}`); return { served, failed, progress }; } }
+    } else if (!p) why = `API ${a.r.status}`;
+    if (p) { await call('/v1/players', { players: [{ fetchedAt: Date.now(), player: p }] }); served++; continue; }
+    failed.push(`joueur ${id} : ${why}`);
+    if (stop(a.r)) return { served, failed, progress };
   }
   for (const teamId of (asked && asked.assigned) || []) {
-    const r = await gameGet(env, '/gamev2/club/' + encodeURIComponent(teamId), s, true);
-    const text = r.ok ? await r.text() : '';
-    const players = text ? clubPlayers(text, teamId) : null;
-    if (players) { await call('/v1/clubs', { clubs: [{ teamId, fetchedAt: Date.now(), players, crest: crestOf(text, teamId) }] }); served++; continue; }
-    failed.push(`club ${teamId} : ${whyFailed(r, text, 'effectif')}`);
-    if (stop(r)) return { served, failed };
+    // Lecture par l'API déjà commencée : on la continue.
+    let viaApi = !!(await meta(env, 'bot:club:' + teamId));
+    if (!viaApi) {
+      const r = await gameGet(env, '/gamev2/club/' + encodeURIComponent(teamId), s, true);
+      const text = r.ok ? await r.text() : '';
+      const players = text ? clubPlayers(text, teamId) : null;
+      if (players) { await call('/v1/clubs', { clubs: [{ teamId, fetchedAt: Date.now(), players, crest: crestOf(text, teamId) }] }); served++; continue; }
+      if ([401, 429].includes(r.status)) { failed.push(`club ${teamId} : ${whyFailed(r, text, 'effectif')}`); return { served, failed, progress }; }
+      viaApi = true;   // page v3 (cartes sans données) ou page absente : l'API joueur par joueur
+    }
+    const res = await clubViaApi(env, call, s, teamId);
+    if (res.done) served++;
+    else if (res.partial) progress.push(`club ${teamId} : ${res.partial}/${res.total} fiches lues par l'API`);
+    else { failed.push(`club ${teamId} : ${res.error}`); if (res.stopped) return { served, failed, progress }; }
   }
-  return { served, failed };
+  return { served, failed, progress };
 }
 const today = () => new Date().toISOString().slice(0, 10);
 /**
@@ -252,14 +305,14 @@ const today = () => new Date().toISOString().slice(0, 10);
 export async function botRequests(env, call) {
   const b = await begin(env);
   if (b.result) return b.result;
-  const { served, failed } = await serveRequests(env, call, b.s);
+  const { served, failed, progress } = await serveRequests(env, call, b.s);
   if (served || failed.length) {
     const st = (await meta(env, 'bot:status')) || b.st, day = today();
     await setMeta(env, 'bot:status', { ...st, day, pagesToday: st.day === day ? st.pagesToday || 0 : 0,
       requestsToday: (st.day === day ? st.requestsToday || 0 : 0) + served,
       requestError: failed.length ? failed.join(' ; ').slice(0, 1500) : '', t: Date.now() });
   }
-  return failed.length ? { requests: served, failed } : { requests: served };
+  return { requests: served, ...(progress.length ? { progress } : {}), ...(failed.length ? { failed } : {}) };
 }
 export async function botStep(env, call) {
   const b = await begin(env);
@@ -270,7 +323,7 @@ export async function botStep(env, call) {
   let retried = false;
   // 1. D'abord les demandes du site : fiches de joueurs et effectifs (« Mon
   //    effectif », clubs des utilisateurs), avant toute page de la base.
-  const { served, failed } = await serveRequests(env, call, s);
+  const { served, failed, progress } = await serveRequests(env, call, s);
   limit = Math.max(0, limit - served);
   // 2. Puis la base complète (marché et prêts d'abord, côté serveur).
   const assign = limit ? await call('/v1/db/assign', { limit, full: true }) : null;
@@ -296,7 +349,7 @@ export async function botStep(env, call) {
   const requestsToday = (st.day === day ? st.requestsToday || 0 : 0) + served;
   await save({ ok: true, error: '', pausedUntil: 0, day, pagesToday, requestsToday, lastPages: done, budget: assign && assign.budget || null,
     ...(served || failed.length ? { requestError: failed.join(' ; ').slice(0, 1500) } : {}) });
-  return failed.length ? { done, tasks: tasks.length, requests: served, failed } : { done, tasks: tasks.length, requests: served };
+  return { done, tasks: tasks.length, requests: served, ...(progress.length ? { progress } : {}), ...(failed.length ? { failed } : {}) };
 }
 
 /** État pour les statistiques (jamais la session). */

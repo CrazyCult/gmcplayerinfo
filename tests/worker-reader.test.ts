@@ -138,6 +138,7 @@ it("serves site requests (player sheets) before database pages", async () => {
       const players = q.get("availability") === "all" ? [player(`${pos}-${min}`, pos, min)] : [];
       return Response.json({ page: 1, total: players.length, pageSize: 24, players });
     }
+    if (/\/api\/players\/[^/?]+$/.test(url) && !url.includes("database")) return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
     throw new Error("unexpected " + url);
   }));
   const at = Date.parse("2026-11-09T15:01:00Z");
@@ -268,5 +269,47 @@ it("follows the game's redirect from /gamev2/club to /gamev3/club", async () => 
   const club = await (await worker.fetch(new Request("https://index.test/v1/site/club/c1", { headers: { Authorization: "Bearer tok" } }), env)).json();
   expect(club.fetchedAt).toBeGreaterThan(at);
   expect(club.players.map((p: { player: { id: string; overall: number } }) => [p.player.id, p.player.overall])).toEqual([["A-70", 70]]);
+  vi.useRealTimers();
+});
+
+it("falls back to the players API, player by player, when the club page has no data (v3 cards)", async () => {
+  const { env, mock } = setup();
+  const at = Date.parse("2026-11-09T15:01:00Z");
+  vi.setSystemTime(at);
+  let api = 0;
+  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url.startsWith(SUPA)) return Response.json({ access_token: "AT", refresh_token: "RT", expires_in: 3600, user: { id: "u" } });
+    if (url.includes("/gamev2/club/")) return new Response(null, { status: 307, headers: { location: "/gamev3/club/c1" } });
+    if (url.includes("/gamev3/club/")) return new Response('5:["$","b","pac",{"className":"v3-card-stat","children":97}]\n', { headers: { "content-type": "text/x-component" } });
+    if (url.startsWith("https://gamechase.io/api/players/database")) return Response.json({ page: 1, total: 0, pageSize: 24, players: [] });
+    const m = /\/api\/players\/([^/?]+)$/.exec(url);
+    if (m) { api++; return Response.json({ ...player(m[1], "ST", 80), attributes: { pac: 80, sho: 80, pas: 80, dri: 80, def: 40, phy: 70, finishing: 81 } }); }
+    throw new Error("unexpected " + url);
+  }));
+  await worker.fetch(new Request("https://index.test/v1/db/stats"), env); // crée les tables
+  const db = (mock as any).DB;
+  for (let i = 0; i < 15; i++) {
+    const p = player(`K-${i}`, "ST", 60 + i);
+    await db.prepare(`INSERT INTO site_players (id, team_id, light, name, name_norm, last_norm, position, age, overall, potential) VALUES (?1, 'c1', 1, ?2, ?3, ?3, 'ST', 17, ?4, 101)`).bind(p.id, p.name, p.name.toLowerCase(), p.overall).run();
+    await db.prepare(`INSERT INTO db_players (id, name, name_norm, position, age, overall, potential, value, club_id, club_name, attrs, seen_at) VALUES (?1, ?2, ?3, 'ST', 17, ?4, 101, 1000, 'c1', 'Club 1', ?5, ?6)`).bind(p.id, p.name, p.name.toLowerCase(), p.overall, JSON.stringify(p.attributes), at).run();
+  }
+  const site = (path: string, method = "GET") => worker.fetch(new Request(`https://index.test${path}`, { method, headers: { Authorization: "Bearer tok" } }), env).then(r => r.json());
+  const first = await site("/v1/site/club/c1");
+  const known = first.players.length;
+  expect(known).toBeGreaterThan(12);
+  const ask = await site("/v1/site/club/c1", "POST");
+  expect(["demande", "deja-demande"]).toContain(ask.status); // la simple visite demande déjà un club sans instantané
+  api = 0;
+  vi.setSystemTime(at + 10 * 60e3);
+  await tick(env, at + 10 * 60e3);
+  expect(api).toBe(12); // 12 fiches par passage
+  expect((await site("/v1/site/club/c1")).fetchedAt).toBe(null);
+  vi.setSystemTime(at + 12 * 60e3); // reprise de la demande (plus de 90 s)
+  await tick(env, at + 12 * 60e3);
+  const club = await site("/v1/site/club/c1");
+  expect(club.fetchedAt).toBeGreaterThanOrEqual(ask.requestedAt);
+  expect(club.players).toHaveLength(known);
+  expect(club.players.every((p: { light: boolean; player: { overall: number } }) => !p.light && p.player.overall === 80)).toBe(true);
   vi.useRealTimers();
 });
