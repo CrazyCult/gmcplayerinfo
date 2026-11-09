@@ -4,6 +4,7 @@
 // Accès réservé aux installations ayant une licence valide (même signature
 // ECDSA que l'extension).
 
+import { botConfigured, botPublicStatus, botStep } from './worker.bot.js';
 const PRIVACY_HTML = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>GMC Companion : politique de confidentialité</title>
 <style>body{font:16px/1.6 system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#1b2430}h1{color:#e0661b}h2{margin-top:28px}</style></head><body>
@@ -787,9 +788,24 @@ export async function backfillStep(env) {
 }
 
 const statsCacheByDb = new WeakMap();
+// Appel interne (compte lecteur) : même code que pour une extension, sans licence.
+const plainJson = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
+export function internalCall(env) {
+  return async (path, body) => {
+    const u = new URL('https://internal' + path);
+    const req = new Request(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const res = await extensionRequest(req, env, u, plainJson, true);
+    try { return await res.json(); } catch (_) { return null; }
+  };
+}
 export default {
-  async scheduled(_event, env, ctx) {
-    ctx.waitUntil(backfillStep(env).catch(() => {}));
+  // Déclencheur conseillé : chaque minute (« * * * * * »). Le rattrapage ne
+  // tourne qu'une minute sur cinq ; le compte lecteur, s'il est configuré, à
+  // chaque passage.
+  async scheduled(event, env, ctx) {
+    const minute = Math.floor((event && event.scheduledTime || Date.now()) / 60e3);
+    if (minute % 5 === 0) ctx.waitUntil(backfillStep(env).catch(() => {}));
+    if (botConfigured(env)) ctx.waitUntil(ensureDb(env).then(() => botStep(env, internalCall(env))).catch(e => console.error('compte lecteur : ' + (e && e.message || e))));
   },
   async fetch(req, env) {
     const cors = {
@@ -818,9 +834,9 @@ export default {
   },
 };
 
-async function extensionRequest(req, env, url, json) {
-  const installId = req.headers.get('X-GMC-Install');
-  if (!(await licenceOk(env, installId, req.headers.get('X-GMC-Licence')))) return json({ error: 'licence invalide ou expirée' }, 401);
+async function extensionRequest(req, env, url, json, internal = false) {
+  const installId = internal ? 'srv-reader' : req.headers.get('X-GMC-Install');
+  if (!internal && !(await licenceOk(env, installId, req.headers.get('X-GMC-Licence')))) return json({ error: 'licence invalide ou expirée' }, 401);
   await ensureDb(env);
   const now = Date.now();
 
@@ -1162,9 +1178,10 @@ async function extensionRequest(req, env, url, json) {
   // Statistiques : calculées au plus toutes les 10 minutes (requêtes indexées).
   if (req.method === 'GET' && url.pathname === '/v1/db/stats') {
     const cached = statsCacheByDb.get(env.DB);
-    if (cached && cached.data.protocol === 2 && now - cached.at < STATS_TTL) return json(cached.data);
+    // L'état du compte lecteur reste à jour même quand les statistiques viennent du cache.
+    if (cached && cached.data.protocol === 2 && now - cached.at < STATS_TTL) return json({ ...cached.data, reader: await botPublicStatus(env) });
     const saved = await env.DB.prepare('SELECT v FROM db_meta WHERE k = ?1').bind('stats').first();
-    if (saved) { const s = JSON.parse(saved.v); if (s.data.protocol === 2 && now - s.at < STATS_TTL) { statsCacheByDb.set(env.DB, s); return json(s.data); } }
+    if (saved) { const s = JSON.parse(saved.v); if (s.data.protocol === 2 && now - s.at < STATS_TTL) { statsCacheByDb.set(env.DB, s); return json({ ...s.data, reader: await botPublicStatus(env) }); } }
     const players = (await env.DB.prepare('SELECT MAX(rowid) AS n FROM site_players').first())?.n || 0;
     const transfer = (await env.DB.prepare('SELECT COUNT(*) AS n FROM site_players WHERE transfer_price > 0').first()).n;
     const loan = (await env.DB.prepare('SELECT COUNT(*) AS n FROM site_players WHERE loan_fee > 0').first()).n;
@@ -1198,7 +1215,8 @@ async function extensionRequest(req, env, url, json) {
     }
     const coverage = { globallyVerified: false, slices: [...coverageGroups.values()].map(({ ids, ...group }) => ({ ...group, uniqueIds: ids.size })), failures: [] };
     const data = { protocol: 2, players, transfer, loan, free: totals.free ?? null, pages: pg.results, totals, coverage,
-      writesToday: await writesToday(env), writeBudget: Number.isFinite(writeBudget(env)) ? writeBudget(env) : null };
+      writesToday: await writesToday(env), writeBudget: Number.isFinite(writeBudget(env)) ? writeBudget(env) : null,
+      reader: await botPublicStatus(env) };
     const entry = { at: now, data };
     statsCacheByDb.set(env.DB, entry);
     await env.DB.prepare('INSERT INTO db_meta (k, v) VALUES (?1, ?2) ON CONFLICT(k) DO UPDATE SET v = excluded.v').bind('stats', JSON.stringify(entry)).run();

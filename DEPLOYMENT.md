@@ -21,6 +21,18 @@ Le Worker garde les données dans Turso (SQLite hébergé). Offre gratuite : 5 G
 
 Les données se remplissent d'elles-mêmes : chaque extension renvoie au serveur les effectifs qu'il n'a pas (contrôle au démarrage puis toutes les heures), et la base du jeu est relue par les extensions 2.30+.
 
+## Compte lecteur (base du jeu lue par le serveur, sans extension)
+
+Depuis le 09/11/2026, `/api/players/database?availability=all` renvoie tous les joueurs du jeu (63 000+), mais uniquement avec une session GameChase. Un compte de jeu dédié, en lecture seule, permet au Worker de lire la base lui-même, 24h/24 (`worker.bot.js`). Il réserve les pages comme une extension (`/v1/db/assign`), les lit dans le jeu, puis les enregistre avec les mêmes contrôles (`/v1/db/players`).
+
+1. Créer le compte de jeu dédié (adresse e-mail à part), finir l'inscription jusqu'au club. Ne jamais l'utiliser pour des échanges avec un autre compte.
+2. Secrets (jamais dans le dépôt) : `npx wrangler secret put GC_BOT_EMAIL`, puis `npx wrangler secret put GC_BOT_PASSWORD`.
+3. Variables (`vars` de `wrangler.jsonc`, ou Réglages → Variables du Worker) : `GC_SUPABASE_URL` = `https://teffakezggfkrlcdlaox.supabase.co` et `GC_SUPABASE_ANON` = la clé publique « anon » du jeu (visible dans son code, relevée le 09/11/2026). Facultatif : `READER_PAGES` (pages par minute, 4 par défaut).
+4. Déclencheur Cron du Worker : **chaque minute** (`* * * * *`). Le rattrapage existant ne tourne qu'une minute sur cinq.
+5. `npx wrangler deploy`. L'état apparaît dans `/v1/db/stats` → `reader` (`ok`, `error`, `pagesToday`, `pausedUntil`) ; la session n'y figure jamais.
+
+Le compte lecteur ne fait que des lectures (GET). Il se met en pause tout seul : 6 h si la session est refusée, 1 h si le jeu demande de ralentir (429), 24 h sur 403 (compte bloqué ?), 1 h si la connexion échoue. Sans les secrets, il reste désactivé et seules les extensions alimentent la base.
+
 ## Projet Vercel
 
 Importer le dépôt public `CrazyCult/gmcplayerinfo` comme projet Next.js ou utiliser `pnpm dlx vercel login` puis `pnpm dlx vercel link`. Le gestionnaire et le lockfile sont pnpm.
