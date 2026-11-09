@@ -177,7 +177,7 @@ export default function SquadTable({
     ["position", "Poste"],
     ["name", "Joueur"],
     ["age", "Âge"],
-    ["birthday", "Prochain +1"],
+    ["birthday", "Âge +1"],
     ["overall", "OVR"],
     ["potential", "POT"],
     ["gap", "Écart"],
