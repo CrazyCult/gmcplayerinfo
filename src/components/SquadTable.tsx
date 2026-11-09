@@ -29,10 +29,8 @@ type SortKey =
   | "birthday"
   | "overall"
   | "potential"
-  | "gap"
   | "sessions"
   | "cost"
-  | "fitness"
   | "posGain"
   | "plusOneCost"
   | "plusOneNet";
@@ -71,7 +69,7 @@ export default function SquadTable({
   const [filter, setFilter] = useState(""),
     [position, setPosition] = useState(""),
     [age, setAge] = useState("");
-  const [sort, setSort] = useState<SortKey>("gap"),
+  const [sort, setSort] = useState<SortKey>("potential"),
     [direction, setDirection] = useState(-1);
   const rows = useMemo(
     () =>
@@ -132,10 +130,8 @@ export default function SquadTable({
           plusOneCost,
           plusOneSessions,
           plusOneNet,
-          gap: player.potential - player.overall,
           sessions: ok ? plan.sessions : undefined,
           cost: ok ? plan.cost : undefined,
-          fitness: ok ? plan.fitness : undefined,
           to: plan?.to,
         };
       }),
@@ -180,10 +176,8 @@ export default function SquadTable({
     ["birthday", "Âge +1"],
     ["overall", "OVR"],
     ["potential", "POT"],
-    ["gap", "Écart"],
     ["sessions", "Séances → max"],
     ["cost", "Coût → max"],
-    ["fitness", "Forme"],
     ...(premium
       ? ([
           ["posGain", "★ Poste +"],
@@ -354,7 +348,6 @@ export default function SquadTable({
                   <td>
                     <Rating value={player.potential} />
                   </td>
-                  <td className="link-accent">+{player.gap}</td>
                   <td>
                     {player.sessions ?? "—"} <small>→ {player.to ?? "—"}</small>
                   </td>
@@ -365,7 +358,6 @@ export default function SquadTable({
                   >
                     {player.cost === undefined ? "—" : compact(player.cost)}
                   </td>
-                  <td>{player.fitness ?? "—"}</td>
                   {premium && (
                     <>
                       <td className="wrap">
