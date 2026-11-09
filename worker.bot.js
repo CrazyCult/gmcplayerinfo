@@ -146,7 +146,7 @@ export async function botStep(env, call) {
   const now = Date.now();
   // Réglages changés (clé, adresse) : la pause d'échec de connexion est levée.
   const cfg = [env.GC_SUPABASE_URL, env.GC_SUPABASE_ANON, env.GC_BOT_EMAIL].map(x => String(x).length + ':' + String(x).slice(-6)).join('|');
-  if (st.pausedUntil && now < st.pausedUntil && !(st.cfg && st.cfg !== cfg)) return { paused: st.error };
+  if (st.pausedUntil && now < st.pausedUntil && st.cfg === cfg) return { paused: st.error };
   const save = (patch) => setMeta(env, 'bot:status', { ...st, ...patch, cfg, t: Date.now() });
   lastAuthError = null;
   let s = await session(env);
