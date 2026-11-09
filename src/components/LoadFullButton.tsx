@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const POLL_MS = 30_000,
+const POLL_MS = 5_000,
   POLL_MAX_MS = 45 * 60_000;
 type State = "checking" | "idle" | "sending" | "waiting" | "error";
 
@@ -60,6 +60,8 @@ export default function LoadFullButton({
   useEffect(() => {
     if (state !== "waiting") return;
     const started = Date.now();
+    let reading = false,
+      skip = 0;
     const timer = setInterval(async () => {
       if (Date.now() - started > POLL_MAX_MS) {
         clearInterval(timer);
@@ -67,6 +69,10 @@ export default function LoadFullButton({
         setMessage("Toujours pas lue. Réessaie plus tard.");
         return;
       }
+      if (reading || document.hidden) return;
+      // Toutes les 5 s les 2 premières minutes, puis toutes les 20 s.
+      if (Date.now() - started > 120_000 && ++skip % 4) return;
+      reading = true;
       try {
         const response = await fetch(
           `/api/player/${encodeURIComponent(playerId)}/status`,
@@ -79,6 +85,8 @@ export default function LoadFullButton({
         }
       } catch {
         /* nouvel essai au prochain intervalle */
+      } finally {
+        reading = false;
       }
     }, POLL_MS);
     return () => clearInterval(timer);

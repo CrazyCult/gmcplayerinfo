@@ -18,7 +18,8 @@ export default function SquadUpdateButton({
     if (!since) return;
     const controller = new AbortController();
     const started = Date.now();
-    let reading = false;
+    let reading = false,
+      skip = 0;
     const timer = setInterval(async () => {
       if (Date.now() - started > 45 * 60_000) {
         clearInterval(timer);
@@ -27,6 +28,8 @@ export default function SquadUpdateButton({
         return;
       }
       if (reading || document.hidden) return;
+      // Toutes les 5 s les 2 premières minutes, puis toutes les 20 s.
+      if (Date.now() - started > 120_000 && ++skip % 4) return;
       reading = true;
       try {
         const response = await fetch(
@@ -50,7 +53,7 @@ export default function SquadUpdateButton({
       } finally {
         reading = false;
       }
-    }, 30_000);
+    }, 5_000);
     return () => {
       clearInterval(timer);
       controller.abort();

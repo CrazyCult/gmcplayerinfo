@@ -4,7 +4,7 @@
 // Accès réservé aux installations ayant une licence valide (même signature
 // ECDSA que l'extension).
 
-import { botConfigured, botPublicStatus, botStep } from './worker.bot.js';
+import { botConfigured, botPublicStatus, botRequests, botStep } from './worker.bot.js';
 const PRIVACY_HTML = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>GMC Companion : politique de confidentialité</title>
 <style>body{font:16px/1.6 system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#1b2430}h1{color:#e0661b}h2{margin-top:28px}</style></head><body>
@@ -59,7 +59,7 @@ const CREST_RE = /^https:\/\/[a-z0-9]+\.public\.blob\.vercel-storage\.com\/[^\s"
 const HISTORY_MAX = 150000; // historique d'OVR brut (caractères JSON)
 const REQUEST_TTL = 24 * 3600e3, REQUEST_MAX_PENDING = 300;
 // Fiche complète relue sur demande au plus toutes les 10 min.
-const REFRESH_MIN_MS = 10 * 60e3;
+const REFRESH_MIN_MS = 10 * 60e3, TAKEOVER_MS = 90e3;
 const STATS_TTL = 10 * 60e3;
 const CATALOG_MAX_PAGES = 20, COUNT_CAP = 1000;
 
@@ -814,7 +814,7 @@ export default {
     if (minute % 5 === 0) ctx.waitUntil(backfillStep(env).catch(() => {}));
     if (botConfigured(env)) ctx.waitUntil(ensureDb(env).then(() => botStep(env, internalCall(env))).then(r => console.log('compte lecteur : ' + JSON.stringify(r))).catch(e => console.error('compte lecteur : ' + (e && e.message || e))));
   },
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const cors = {
       'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN || '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -830,7 +830,16 @@ export default {
       return new Response(PRIVACY_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
     }
     try {
-      if (url.pathname.startsWith('/v1/site/')) return await siteRequest(req, env, url, json);
+      if (url.pathname.startsWith('/v1/site/')) {
+        const res = await siteRequest(req, env, url, json);
+        // Demande de fiche ou d'effectif : le compte lecteur la sert tout de suite.
+        if (req.method === 'POST' && res.status === 200 && ctx && botConfigured(env) &&
+            (url.pathname.startsWith('/v1/site/request/') || url.pathname.startsWith('/v1/site/club/')))
+          ctx.waitUntil(botRequests(env, internalCall(env))
+            .then(r => console.log('compte lecteur (demande) : ' + JSON.stringify(r)))
+            .catch(e => console.error('compte lecteur (demande) : ' + (e && e.message || e))));
+        return res;
+      }
       return await extensionRequest(req, env, url, json);
     } catch (e) {
       const msg = String(e && e.message || e);
@@ -902,13 +911,16 @@ async function extensionRequest(req, env, url, json, internal = false) {
   if (req.method === 'POST' && url.pathname === '/v1/assign') {
     let body; try { body = await req.json(); } catch (_) { return json({ error: 'JSON invalide' }, 400); }
     let limit = Math.max(0, Math.min(20, parseInt(body.limit, 10) || 0));
+    // Compte lecteur : une demande du site réservée par une extension depuis
+    // plus de 90 s est reprise (l'extension a pu être fermée en route).
+    const takeover = internal && body.requestsOnly === true;
     const freshH = Math.max(1, Math.min(72, parseInt(body.minFreshHours, 10) || 12));
     // Extensions 2.31+ : fiches demandées joueur par joueur (une seule page lue).
     let players = [];
     if (body.players === true && limit) {
       players = (await env.DB.prepare(`SELECT r.player_id FROM player_requests r
           LEFT JOIN full_players f ON f.id = r.player_id LEFT JOIN leases l ON l.team_id = 'p:' || r.player_id
-          WHERE r.requested_at > ?1 AND (f.fetched_at IS NULL OR f.fetched_at < r.requested_at) AND (l.leased_until IS NULL OR l.leased_until < ?2)
+          WHERE r.requested_at > ?1 AND (f.fetched_at IS NULL OR f.fetched_at < r.requested_at) AND (l.leased_until IS NULL OR l.leased_until < ?2${takeover ? ` OR l.leased_until < ${now + 10 * 60e3 - TAKEOVER_MS}` : ''})
           ORDER BY r.requested_at ASC LIMIT ?3`).bind(now - REQUEST_TTL, now, limit).all()).results.map(x => x.player_id);
       if (players.length) await runBatch(env, players.map(id => env.DB.prepare(
         'INSERT INTO leases (team_id, leased_until, leased_by) VALUES (?1, ?2, ?3) ON CONFLICT(team_id) DO UPDATE SET leased_until = excluded.leased_until, leased_by = excluded.leased_by'
@@ -919,7 +931,7 @@ async function extensionRequest(req, env, url, json, internal = false) {
     // les demandes de club entier (« Mon effectif », player_id nul) restent.
     const asked = limit ? (await env.DB.prepare(`SELECT r.team_id FROM site_requests r
         LEFT JOIN clubs c ON c.team_id = r.team_id LEFT JOIN leases l ON l.team_id = r.team_id
-        WHERE r.requested_at > ?1 AND ${body.players === true ? 'r.player_id IS NULL AND' : ''} (c.fetched_at IS NULL OR c.fetched_at < r.requested_at) AND (l.leased_until IS NULL OR l.leased_until < ?2)
+        WHERE r.requested_at > ?1 AND ${body.players === true ? 'r.player_id IS NULL AND' : ''} (c.fetched_at IS NULL OR c.fetched_at < r.requested_at) AND (l.leased_until IS NULL OR l.leased_until < ?2${takeover ? ` OR l.leased_until < ${now + 30 * 60e3 - TAKEOVER_MS}` : ''})
         ORDER BY r.requested_at ASC LIMIT ?3`).bind(now - REQUEST_TTL, now, limit).all()).results.map(x => x.team_id) : [];
     const cands = [...new Set(asked.concat((Array.isArray(body.candidates) ? body.candidates : []).filter(x => isStr(x, 64)).slice(0, 300)))];
     if (!limit || !cands.length) return json({ assigned: [], players });
