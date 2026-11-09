@@ -140,36 +140,64 @@ function pageParams(a, p) {
  * extension. `call(path, body)` appelle le serveur de l'intérieur (même code
  * que pour les extensions, sans licence).
  */
-export async function botStep(env, call) {
-  if (!botConfigured(env)) return { off: true };
+async function begin(env) {
+  if (!botConfigured(env)) return { result: { off: true } };
   const st = (await meta(env, 'bot:status')) || {};
   const now = Date.now();
   // Réglages changés (clé, adresse) : la pause d'échec de connexion est levée.
   const cfg = [env.GC_SUPABASE_URL, env.GC_SUPABASE_ANON, env.GC_BOT_EMAIL].map(x => String(x).length + ':' + String(x).slice(-6)).join('|');
-  if (st.pausedUntil && now < st.pausedUntil && st.cfg === cfg) return { paused: st.error };
+  if (st.pausedUntil && now < st.pausedUntil && st.cfg === cfg) return { result: { paused: st.error } };
   const save = (patch) => setMeta(env, 'bot:status', { ...st, ...patch, cfg, t: Date.now() });
   lastAuthError = null;
   let s = await session(env);
-  if (!s) { const error = loginError(lastAuthError); await save({ ok: false, error, pausedUntil: now + PAUSE.login }); return { error: 'login', detail: error }; }
-  let limit = Math.max(1, Math.min(20, parseInt(env.READER_PAGES || '', 10) || PAGES_PER_RUN));
-  let retried = false;
-  // 1. D'abord les demandes du site : fiches de joueurs et effectifs (« Mon
-  //    effectif », clubs des utilisateurs), avant toute page de la base.
+  if (!s) { const error = loginError(lastAuthError); await save({ ok: false, error, pausedUntil: now + PAUSE.login }); return { result: { error: 'login', detail: error } }; }
+  return { st, save, s };
+}
+// Demandes du site (fiches de joueurs, effectifs entiers) : servies avant tout.
+async function serveRequests(env, call, s) {
   const asked = await call('/v1/assign', { limit: 2, players: true, requestsOnly: true });
   let served = 0;
   for (const id of (asked && asked.players) || []) {
     const r = await gameGet(env, '/gamev2/players/' + encodeURIComponent(id), s, true);
     const p = r.ok ? initialPlayer(await r.text()) : null;
     if (p && p.id === id && p.attributes) { await call('/v1/players', { players: [{ fetchedAt: Date.now(), player: p }] }); served++; }
-    else if ([401, 403, 429].includes(r.status) || (r.status >= 300 && r.status < 400)) break;
+    else if ([401, 403, 429].includes(r.status) || (r.status >= 300 && r.status < 400)) return served;
   }
   for (const teamId of (asked && asked.assigned) || []) {
     const r = await gameGet(env, '/gamev2/club/' + encodeURIComponent(teamId), s, true);
     const text = r.ok ? await r.text() : '';
     const players = text ? clubPlayers(text) : null;
     if (players) { await call('/v1/clubs', { clubs: [{ teamId, fetchedAt: Date.now(), players, crest: crestOf(text, teamId) }] }); served++; }
-    else if ([401, 403, 429].includes(r.status) || (r.status >= 300 && r.status < 400)) break;
+    else if ([401, 403, 429].includes(r.status) || (r.status >= 300 && r.status < 400)) return served;
   }
+  return served;
+}
+const today = () => new Date().toISOString().slice(0, 10);
+/**
+ * Demande faite sur le site : servie tout de suite (appelé juste après la
+ * demande), sans attendre le passage de la minute.
+ */
+export async function botRequests(env, call) {
+  const b = await begin(env);
+  if (b.result) return b.result;
+  const served = await serveRequests(env, call, b.s);
+  if (served) {
+    const st = (await meta(env, 'bot:status')) || b.st, day = today();
+    await setMeta(env, 'bot:status', { ...st, day, pagesToday: st.day === day ? st.pagesToday || 0 : 0,
+      requestsToday: (st.day === day ? st.requestsToday || 0 : 0) + served, t: Date.now() });
+  }
+  return { requests: served };
+}
+export async function botStep(env, call) {
+  const b = await begin(env);
+  if (b.result) return b.result;
+  const { st, save } = b;
+  let s = b.s;
+  let limit = Math.max(1, Math.min(20, parseInt(env.READER_PAGES || '', 10) || PAGES_PER_RUN));
+  let retried = false;
+  // 1. D'abord les demandes du site : fiches de joueurs et effectifs (« Mon
+  //    effectif », clubs des utilisateurs), avant toute page de la base.
+  const served = await serveRequests(env, call, s);
   limit = Math.max(0, limit - served);
   // 2. Puis la base complète (marché et prêts d'abord, côté serveur).
   const assign = limit ? await call('/v1/db/assign', { limit, full: true }) : null;
@@ -190,7 +218,7 @@ export async function botStep(env, call) {
       a: t.a, p: t.p, taskId: t.taskId, total: Number.isInteger(j.total) ? j.total : undefined });
     if (ack && (ack.status === 'completed' || ack.status === 'split')) done++;
   }
-  const day = new Date().toISOString().slice(0, 10);
+  const day = today();
   const pagesToday = (st.day === day ? st.pagesToday || 0 : 0) + done;
   const requestsToday = (st.day === day ? st.requestsToday || 0 : 0) + served;
   await save({ ok: true, error: '', pausedUntil: 0, day, pagesToday, requestsToday, lastPages: done, budget: assign && assign.budget || null });

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const POLL_MS = 20_000,
+const POLL_MS = 5_000,
   POLL_MAX_MS = 30 * 60_000;
 const time = (t: number) =>
   new Date(t).toLocaleTimeString("fr-CH", {
@@ -46,7 +46,8 @@ export default function RefreshPlayerButton({
   useEffect(() => {
     if (!since) return;
     const started = Date.now();
-    let reading = false;
+    let reading = false,
+      skip = 0;
     const timer = setInterval(async () => {
       if (Date.now() - started > POLL_MAX_MS) {
         clearInterval(timer);
@@ -55,6 +56,8 @@ export default function RefreshPlayerButton({
         return;
       }
       if (reading || document.hidden) return;
+      // Toutes les 5 s les 2 premières minutes, puis toutes les 20 s.
+      if (Date.now() - started > 120_000 && ++skip % 4) return;
       reading = true;
       try {
         const response = await fetch(

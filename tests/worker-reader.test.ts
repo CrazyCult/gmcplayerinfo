@@ -207,5 +207,31 @@ it("rereads a whole squad on request (« Mon effectif ») before database pages"
   expect(club.fetchedAt).toBeGreaterThanOrEqual(ask.requestedAt);
   expect(club.requestedAt).toBe(null);
   expect(club.players.map((p: { player: { id: string } }) => p.player.id).sort()).toEqual(["A-70", "B-71"]);
+  // Demande suivante (11 min plus tard) : servie tout de suite, sans attendre la minute.
+  vi.setSystemTime(at + 12 * 60e3);
+  order.length = 0;
+  const jobs: Promise<unknown>[] = [];
+  const res = await worker.fetch(new Request("https://index.test/v1/site/club/c1", { method: "POST", headers: { Authorization: "Bearer tok" } }), env,
+    { waitUntil: (p: Promise<unknown>) => jobs.push(p) });
+  const again = await res.json();
+  expect(again.status).toBe("demande");
+  await Promise.all(jobs);
+  expect(order).toEqual(["club"]); // lu aussitôt, sans page de la base
+  expect((await site("/v1/site/club/c1")).fetchedAt).toBeGreaterThanOrEqual(again.requestedAt);
+  vi.useRealTimers();
+});
+
+it("takes over a site request left by an extension for more than 90 s", async () => {
+  const { env, mock } = setup();
+  const at = Date.parse("2026-11-09T15:01:00Z");
+  vi.setSystemTime(at);
+  const db = (mock as any).DB;
+  await worker.fetch(new Request("https://index.test/v1/db/stats"), env); // crée les tables
+  await db.prepare("INSERT INTO site_requests (team_id, player_id, requested_at) VALUES ('c9', NULL, ?1)").bind(at).run();
+  await db.prepare("INSERT INTO leases (team_id, leased_until, leased_by) VALUES ('c9', ?1, 'ext-1')").bind(at + 30 * 60e3).run();
+  const call = (await import("../worker.d1.js")).internalCall(env);
+  expect((await call("/v1/assign", { limit: 2, players: true, requestsOnly: true })).assigned).toEqual([]);
+  vi.setSystemTime(at + 91e3);
+  expect((await call("/v1/assign", { limit: 2, players: true, requestsOnly: true })).assigned).toEqual(["c9"]);
   vi.useRealTimers();
 });
