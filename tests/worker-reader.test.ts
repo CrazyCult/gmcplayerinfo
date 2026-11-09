@@ -247,7 +247,10 @@ it("follows the game's redirect from /gamev2/club to /gamev3/club", async () => 
     if (url.includes("/gamev2/club/")) { seen.push("v2"); return new Response(null, { status: 307, headers: { location: "/gamev3/club/c1" } }); }
     if (url.includes("/gamev3/club/")) {
       seen.push("v3");
-      return new Response(`1:{"players":${JSON.stringify([player("A-70", "ST", 70)])}}`, { headers: { "content-type": "text/x-component" } });
+      // Forme v3 : pas de liste "players", noms de champs différents.
+      const row = { id: "A-70", name: "P A-70", ovr: 70, pot: 101, age: 17, pos: "ST", club_id: "c1", stats: { pac: 70, sho: 70, pas: 70, dri: 70, def: 40, phy: 60 } };
+      const other = { id: "Z-90", name: "Rival", ovr: 90, pot: 95, age: 25, club_id: "c2", stats: { pac: 90 } };
+      return new Response(`0:["$"]\n5:{"squad":{"rows":[${JSON.stringify(row)}]},"fixtures":[{"star":${JSON.stringify(other)}}]}\n`, { headers: { "content-type": "text/x-component" } });
     }
     if (url.startsWith("https://gamechase.io/api/players/database")) {
       const q = new URL(url).searchParams, pos = q.get("position") || "ST", min = +(q.get("minOvr") || 60);
@@ -264,5 +267,6 @@ it("follows the game's redirect from /gamev2/club to /gamev3/club", async () => 
   expect(seen).toEqual(["v2", "v3"]);
   const club = await (await worker.fetch(new Request("https://index.test/v1/site/club/c1", { headers: { Authorization: "Bearer tok" } }), env)).json();
   expect(club.fetchedAt).toBeGreaterThan(at);
+  expect(club.players.map((p: { player: { id: string; overall: number } }) => [p.player.id, p.player.overall])).toEqual([["A-70", 70]]);
   vi.useRealTimers();
 });

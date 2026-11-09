@@ -114,15 +114,56 @@ function scanJson(text, key, open, close) {
     try { const v = JSON.parse(text.slice(start, end + 1)); return [v, end]; } catch (_) { from = end + 1; }
   }
 }
-export function clubPlayers(text) {
+export function clubPlayers(text, teamId) {
   let from = 0;
   while (from < text.length) {
     const [arr, end] = scanJson(text.slice(from), '"players":[', '[', ']');
-    if (end == null) return null;
+    if (end == null) break;
     if (Array.isArray(arr) && arr.length && arr[0] && 'overall' in arr[0] && 'id' in arr[0]) return arr;
     from += end + 1;
   }
-  return null;
+  // Seulement les joueurs du club (la page peut citer d'autres joueurs).
+  const v3 = rscPlayers(text).players.filter(p => !teamId || p.club_id == null || p.club_id === teamId);
+  return v3.length ? v3 : null;
+}
+
+// Pages /gamev3 : les joueurs ne sont plus dans une liste "players" ; on lit
+// chaque ligne JSON de la réponse RSC et on garde les objets qui ressemblent à
+// un joueur (identifiant, nom, stats pac…), quel que soit leur emplacement.
+const pick = (o, keys) => { for (const k of keys) if (o && o[k] != null && o[k] !== '$undefined') return o[k]; return undefined; };
+const int = (v) => (typeof v === 'number' ? Math.round(v) : typeof v === 'string' && /^\d+(\.\d+)?$/.test(v) ? Math.round(+v) : undefined);
+function v3Player(o, attrs) {
+  const overall = int(pick(o, ['overall', 'ovr', 'rating', 'overall_rating', 'overallRating', 'current_overall', 'currentOverall']));
+  const potential = int(pick(o, ['potential', 'pot', 'potential_rating', 'potentialRating', 'max_potential']));
+  const age = int(pick(o, ['age']));
+  const name = pick(o, ['name', 'full_name', 'fullName', 'display_name', 'displayName']);
+  if (typeof o.id !== 'string' || typeof name !== 'string' || overall == null || potential == null || age == null) return null;
+  return { ...o, name, overall, potential, age, attributes: o.attributes && typeof o.attributes === 'object' ? o.attributes : attrs,
+    position: pick(o, ['position', 'pos', 'main_position', 'mainPosition']), club_id: pick(o, ['club_id', 'clubId', 'team_id', 'teamId']) };
+}
+export function rscPlayers(text) {
+  const found = new Map();
+  let shape = null;
+  const visit = (node, parent, depth) => {
+    if (!node || typeof node !== 'object' || depth > 40) return;
+    if (!Array.isArray(node) && typeof node.pac === 'number') {
+      // Stats seules (attributs) : le joueur est l'objet parent ; sinon l'objet lui-même.
+      const owner = typeof node.id === 'string' ? node : parent;
+      if (owner && typeof owner.id === 'string' && !found.has(owner.id)) {
+        const p = v3Player(owner, owner === node ? undefined : node);
+        if (p) found.set(owner.id, p);
+        else if (!shape) shape = { joueur: Object.keys(owner).slice(0, 40), stats: owner === node ? null : Object.keys(node).slice(0, 20) };
+      }
+    }
+    for (const v of Array.isArray(node) ? node : Object.values(node)) if (v && typeof v === 'object') visit(v, Array.isArray(node) ? parent : node, depth + 1);
+  };
+  for (const line of text.split('\n')) {
+    const m = /^[0-9a-f]+:(.*)$/s.exec(line);
+    const body = m ? m[1] : line;
+    if (!/^[[{]/.test(body) || !body.includes('"pac"')) continue;
+    try { visit(JSON.parse(body), null, 0); } catch (_) {}
+  }
+  return { players: [...found.values()], shape };
 }
 export const initialPlayer = (text) => scanJson(text, '"initialPlayer":{', '{', '}')[0] || null;
 const crestOf = (text, teamId) => {
@@ -172,6 +213,8 @@ function whyFailed(r, text, what) {
   }
   if (!r.ok) return `HTTP ${r.status}`;
   const n = (k) => text.split(k).length - 1;
+  const sh = rscPlayers(text).shape;
+  if (sh) return `${what} : forme inconnue dans ${new URL(r.url || GAME).pathname} — joueur {${sh.joueur.join(',')}}` + (sh.stats ? ` stats {${sh.stats.join(',')}}` : '');
   return `${what} introuvable dans la page ${new URL(r.url || GAME).pathname} (${(r.headers.get('content-type') || '?').split(';')[0]}, ${text.length} octets, ` +
     `"players":[ ×${n('"players":[')}, "overall" ×${n('"overall"')}, "pac" ×${n('"pac"')}, "initialPlayer" ×${n('"initialPlayer"')})`;
 }
@@ -191,7 +234,7 @@ async function serveRequests(env, call, s) {
   for (const teamId of (asked && asked.assigned) || []) {
     const r = await gameGet(env, '/gamev2/club/' + encodeURIComponent(teamId), s, true);
     const text = r.ok ? await r.text() : '';
-    const players = text ? clubPlayers(text) : null;
+    const players = text ? clubPlayers(text, teamId) : null;
     if (players) { await call('/v1/clubs', { clubs: [{ teamId, fetchedAt: Date.now(), players, crest: crestOf(text, teamId) }] }); served++; continue; }
     failed.push(`club ${teamId} : ${whyFailed(r, text, 'effectif')}`);
     if (stop(r)) return { served, failed };
