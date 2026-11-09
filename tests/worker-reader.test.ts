@@ -313,3 +313,33 @@ it("falls back to the players API, player by player, when the club page has no d
   expect(club.players.every((p: { light: boolean; player: { overall: number } }) => !p.light && p.player.overall === 80)).toBe(true);
   vi.useRealTimers();
 });
+
+it("trims heavy fields so a 60-player squad page fits the server limit", async () => {
+  const { env } = setup();
+  const at = Date.parse("2026-11-09T15:01:00Z");
+  vi.setSystemTime(at);
+  const squad = Array.from({ length: 60 }, (_, i) => ({ ...player(`S-${i}`, "ST", 70), card_url: "https://x.test/" + "c".repeat(4000),
+    match_history: [{ id: "m", rating: 7 }], attributes: { pac: 70, sho: 70, pas: 70, dri: 70, def: 40, phy: 60, finishing: 72 } }));
+  expect(JSON.stringify(squad).length).toBeGreaterThan(250000);
+  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url.startsWith(SUPA)) return Response.json({ access_token: "AT", refresh_token: "RT", expires_in: 3600, user: { id: "u" } });
+    if (url.includes("/gamev2/club/")) return new Response(`1:{"players":${JSON.stringify(squad)}}`, { headers: { "content-type": "text/x-component" } });
+    if (url.startsWith("https://gamechase.io/api/players/database")) {
+      const q = new URL(url).searchParams;
+      const players = q.get("availability") === "all" ? [player("S-0", q.get("position") || "ST", +(q.get("minOvr") || 60))] : [];
+      return Response.json({ page: 1, total: players.length, pageSize: 24, players });
+    }
+    throw new Error("unexpected " + url);
+  }));
+  await tick(env, at);
+  const site = (path: string, method = "GET") => worker.fetch(new Request(`https://index.test${path}`, { method, headers: { Authorization: "Bearer tok" } }), env).then(r => r.json());
+  const ask = await site("/v1/site/club/c1", "POST");
+  vi.setSystemTime(at + 60e3);
+  await tick(env, at + 60e3);
+  const club = await site("/v1/site/club/c1");
+  expect(club.fetchedAt).toBeGreaterThanOrEqual(ask.requestedAt);
+  expect(club.players).toHaveLength(60);
+  expect(club.players[0].player.attributes.finishing).toBe(72);
+  vi.useRealTimers();
+});

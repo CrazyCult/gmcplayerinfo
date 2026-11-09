@@ -257,8 +257,25 @@ async function clubViaApi(env, call, s, teamId) {
   const players = Object.values(st.got).filter(Boolean);
   await env.DB.prepare('DELETE FROM db_meta WHERE k = ?1').bind(key).run();
   if (!players.length) return { error: 'aucune fiche lue par l\'API' };
-  await call('/v1/clubs', { clubs: [{ teamId, fetchedAt: Date.now(), players }] });
-  return { done: players.length };
+  const refused = await sendClub(call, teamId, players);
+  return refused ? { error: refused } : { done: players.length };
+}
+
+// Effectif envoyé au serveur : au-delà de 240 Ko, on retire les champs lourds
+// sans intérêt pour le site (longs textes, listes d'objets) ; puis on vérifie
+// que le serveur l'a bien accepté.
+const CLUB_MAX = 240000;
+function slim(players) {
+  if (JSON.stringify(players).length <= CLUB_MAX) return players;
+  return players.map(p => Object.fromEntries(Object.entries(p).filter(([k, v]) => k === 'attributes' || k === 'traits' ||
+    !((typeof v === 'string' && v.length > 200) || (Array.isArray(v) && v.some(x => x && typeof x === 'object')) || (v && typeof v === 'object' && !Array.isArray(v) && JSON.stringify(v).length > 400)))));
+}
+async function sendClub(call, teamId, players, crest) {
+  const list = slim(players).slice(0, 60);
+  const size = JSON.stringify(list).length;
+  const ack = await call('/v1/clubs', { clubs: [{ teamId, fetchedAt: Date.now(), players: list, ...(crest ? { crest } : {}) }] });
+  if (ack && ack.accepted === 1) return null;
+  return `effectif refusé par le serveur (${list.length} joueurs, ${size} octets${ack && ack.error ? ', ' + ack.error : ''})`;
 }
 
 async function serveRequests(env, call, s) {
@@ -286,7 +303,11 @@ async function serveRequests(env, call, s) {
       const r = await gameGet(env, '/gamev2/club/' + encodeURIComponent(teamId), s, true);
       const text = r.ok ? await r.text() : '';
       const players = text ? clubPlayers(text, teamId) : null;
-      if (players) { await call('/v1/clubs', { clubs: [{ teamId, fetchedAt: Date.now(), players, crest: crestOf(text, teamId) }] }); served++; continue; }
+      if (players) {
+        const refused = await sendClub(call, teamId, players, crestOf(text, teamId));
+        if (refused) failed.push(`club ${teamId} : ${refused}`); else served++;
+        continue;
+      }
       if ([401, 429].includes(r.status)) { failed.push(`club ${teamId} : ${whyFailed(r, text, 'effectif')}`); return { served, failed, progress }; }
       viaApi = true;   // page v3 (cartes sans données) ou page absente : l'API joueur par joueur
     }
