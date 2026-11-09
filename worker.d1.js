@@ -805,7 +805,7 @@ export default {
   async scheduled(event, env, ctx) {
     const minute = Math.floor((event && event.scheduledTime || Date.now()) / 60e3);
     if (minute % 5 === 0) ctx.waitUntil(backfillStep(env).catch(() => {}));
-    if (botConfigured(env)) ctx.waitUntil(ensureDb(env).then(() => botStep(env, internalCall(env))).catch(e => console.error('compte lecteur : ' + (e && e.message || e))));
+    if (botConfigured(env)) ctx.waitUntil(ensureDb(env).then(() => botStep(env, internalCall(env))).then(r => console.log('compte lecteur : ' + JSON.stringify(r))).catch(e => console.error('compte lecteur : ' + (e && e.message || e))));
   },
   async fetch(req, env) {
     const cors = {
