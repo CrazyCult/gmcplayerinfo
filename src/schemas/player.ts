@@ -137,6 +137,8 @@ const rawPlayerSchema = calculationPlayerSchema.extend({
     .enum(["youth", "talent", "prime", "decline", "retired"])
     .nullish(),
   traits: z.array(z.string()).nullish(),
+  lastAgeUp: optionalText,
+  last_age_up_date: optionalText,
   playingStyle: optionalText,
   playing_style: optionalText,
   preferredFoot: optionalText,
@@ -195,6 +197,7 @@ export const playerSchema = rawPlayerSchema.transform((raw): Player => {
     flagCode: raw.flagCode ?? raw.flag_code,
     rarity: raw.rarity ?? undefined,
     careerPhase: raw.careerPhase ?? raw.career_phase ?? undefined,
+    lastAgeUp: raw.lastAgeUp ?? raw.last_age_up_date,
     playingStyle: raw.playingStyle ?? raw.playing_style,
     preferredFoot:
       foot === "left" || foot === "right" || foot === "both" ? foot : undefined,

@@ -88,6 +88,8 @@ export interface Player {
   flagCode?: string;
   rarity?: Rarity;
   careerPhase?: CareerPhase | null;
+  /** Date du dernier anniversaire (+1 an) dans le jeu. */
+  lastAgeUp?: string;
   playingStyle?: string;
   preferredFoot?: "left" | "right" | "both";
   value?: number;

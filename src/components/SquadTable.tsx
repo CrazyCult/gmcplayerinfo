@@ -13,11 +13,20 @@ import ClubSettingsForm from "./ClubSettingsForm";
 import Fold from "./UI/Fold";
 import { POSITIONS, type Player } from "@/types";
 import Rating from "./UI/Rating";
+import { nextBirthday } from "@/lib/birthday";
+
+const birthdayDate = (t: number) =>
+  new Date(t).toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Europe/Paris",
+  });
 
 type SortKey =
   | "name"
   | "position"
   | "age"
+  | "birthday"
   | "overall"
   | "potential"
   | "gap"
@@ -110,8 +119,12 @@ export default function SquadTable({
             }
           }
         }
+        const next = nextBirthday(player.lastAgeUp, player.age);
         return {
           ...player,
+          birthday: next?.days,
+          birthdayAt: next?.at,
+          birthdayDrop: next?.drop,
           posGain,
           posBest,
           posCost,
@@ -151,7 +164,12 @@ export default function SquadTable({
     else {
       setSort(key);
       setDirection(
-        key === "name" || key === "position" || key === "plusOneCost" ? 1 : -1,
+        key === "name" ||
+          key === "position" ||
+          key === "plusOneCost" ||
+          key === "birthday"
+          ? 1
+          : -1,
       );
     }
   }
@@ -159,6 +177,7 @@ export default function SquadTable({
     ["position", "Poste"],
     ["name", "Joueur"],
     ["age", "Âge"],
+    ["birthday", "Prochain +1"],
     ["overall", "OVR"],
     ["potential", "POT"],
     ["gap", "Écart"],
@@ -300,6 +319,35 @@ export default function SquadTable({
                     )}
                   </td>
                   <td>{player.age}</td>
+                  <td
+                    title={
+                      player.birthdayAt === undefined
+                        ? "Date du dernier anniversaire inconnue (fiche légère ou ancienne lecture)"
+                        : `${player.age + 1} ans vers le ${new Date(player.birthdayAt).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })} (un +1 tous les 40 jours)`
+                    }
+                  >
+                    {player.birthdayAt === undefined ? (
+                      "—"
+                    ) : (
+                      <>
+                        {birthdayDate(player.birthdayAt)}{" "}
+                        <small className="muted">· {player.birthday} j</small>
+                        {player.birthdayDrop && (
+                          <small
+                            style={{
+                              color: "var(--attr-bad)",
+                              fontWeight: 700,
+                              display: "block",
+                            }}
+                            title="Le bonus d’entraînement baisse à cet anniversaire : entraîner avant."
+                          >
+                            ⚠ ×{player.birthdayDrop[0]} → ×
+                            {player.birthdayDrop[1]}
+                          </small>
+                        )}
+                      </>
+                    )}
+                  </td>
                   <td>
                     <Rating value={player.overall} />
                   </td>
