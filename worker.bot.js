@@ -154,23 +154,38 @@ async function begin(env) {
   return { st, save, s };
 }
 // Demandes du site (fiches de joueurs, effectifs entiers) : servies avant tout.
+// Pourquoi une page n'a rien donné (pour les journaux et /v1/db/stats).
+function whyFailed(r, text, what) {
+  if (r.status >= 300 && r.status < 400) {
+    let to = r.headers.get('location') || '';
+    try { to = new URL(to, GAME).pathname; } catch (_) {}
+    return `redirigé vers ${to || '?'} (HTTP ${r.status})`;
+  }
+  if (!r.ok) return `HTTP ${r.status}`;
+  return `${what} introuvable dans la page (${(r.headers.get('content-type') || '?').split(';')[0]}, ${text.length} octets)`;
+}
 async function serveRequests(env, call, s) {
   const asked = await call('/v1/assign', { limit: 2, players: true, requestsOnly: true });
   let served = 0;
+  const failed = [];
+  const stop = (r) => [401, 403, 429].includes(r.status) || (r.status >= 300 && r.status < 400);
   for (const id of (asked && asked.players) || []) {
     const r = await gameGet(env, '/gamev2/players/' + encodeURIComponent(id), s, true);
-    const p = r.ok ? initialPlayer(await r.text()) : null;
-    if (p && p.id === id && p.attributes) { await call('/v1/players', { players: [{ fetchedAt: Date.now(), player: p }] }); served++; }
-    else if ([401, 403, 429].includes(r.status) || (r.status >= 300 && r.status < 400)) return served;
+    const text = r.ok ? await r.text() : '';
+    const p = text ? initialPlayer(text) : null;
+    if (p && p.id === id && p.attributes) { await call('/v1/players', { players: [{ fetchedAt: Date.now(), player: p }] }); served++; continue; }
+    failed.push(`joueur ${id} : ${whyFailed(r, text, 'fiche')}`);
+    if (stop(r)) return { served, failed };
   }
   for (const teamId of (asked && asked.assigned) || []) {
     const r = await gameGet(env, '/gamev2/club/' + encodeURIComponent(teamId), s, true);
     const text = r.ok ? await r.text() : '';
     const players = text ? clubPlayers(text) : null;
-    if (players) { await call('/v1/clubs', { clubs: [{ teamId, fetchedAt: Date.now(), players, crest: crestOf(text, teamId) }] }); served++; }
-    else if ([401, 403, 429].includes(r.status) || (r.status >= 300 && r.status < 400)) return served;
+    if (players) { await call('/v1/clubs', { clubs: [{ teamId, fetchedAt: Date.now(), players, crest: crestOf(text, teamId) }] }); served++; continue; }
+    failed.push(`club ${teamId} : ${whyFailed(r, text, 'effectif')}`);
+    if (stop(r)) return { served, failed };
   }
-  return served;
+  return { served, failed };
 }
 const today = () => new Date().toISOString().slice(0, 10);
 /**
@@ -180,13 +195,14 @@ const today = () => new Date().toISOString().slice(0, 10);
 export async function botRequests(env, call) {
   const b = await begin(env);
   if (b.result) return b.result;
-  const served = await serveRequests(env, call, b.s);
-  if (served) {
+  const { served, failed } = await serveRequests(env, call, b.s);
+  if (served || failed.length) {
     const st = (await meta(env, 'bot:status')) || b.st, day = today();
     await setMeta(env, 'bot:status', { ...st, day, pagesToday: st.day === day ? st.pagesToday || 0 : 0,
-      requestsToday: (st.day === day ? st.requestsToday || 0 : 0) + served, t: Date.now() });
+      requestsToday: (st.day === day ? st.requestsToday || 0 : 0) + served,
+      requestError: failed.length ? failed.join(' ; ').slice(0, 300) : '', t: Date.now() });
   }
-  return { requests: served };
+  return failed.length ? { requests: served, failed } : { requests: served };
 }
 export async function botStep(env, call) {
   const b = await begin(env);
@@ -197,7 +213,7 @@ export async function botStep(env, call) {
   let retried = false;
   // 1. D'abord les demandes du site : fiches de joueurs et effectifs (« Mon
   //    effectif », clubs des utilisateurs), avant toute page de la base.
-  const served = await serveRequests(env, call, s);
+  const { served, failed } = await serveRequests(env, call, s);
   limit = Math.max(0, limit - served);
   // 2. Puis la base complète (marché et prêts d'abord, côté serveur).
   const assign = limit ? await call('/v1/db/assign', { limit, full: true }) : null;
@@ -221,13 +237,14 @@ export async function botStep(env, call) {
   const day = today();
   const pagesToday = (st.day === day ? st.pagesToday || 0 : 0) + done;
   const requestsToday = (st.day === day ? st.requestsToday || 0 : 0) + served;
-  await save({ ok: true, error: '', pausedUntil: 0, day, pagesToday, requestsToday, lastPages: done, budget: assign && assign.budget || null });
-  return { done, tasks: tasks.length, requests: served };
+  await save({ ok: true, error: '', pausedUntil: 0, day, pagesToday, requestsToday, lastPages: done, budget: assign && assign.budget || null,
+    ...(served || failed.length ? { requestError: failed.join(' ; ').slice(0, 300) } : {}) });
+  return failed.length ? { done, tasks: tasks.length, requests: served, failed } : { done, tasks: tasks.length, requests: served };
 }
 
 /** État pour les statistiques (jamais la session). */
 export async function botPublicStatus(env) {
   if (!botConfigured(env)) return null;
   const st = (await meta(env, 'bot:status')) || {};
-  return { t: st.t || null, ok: !!st.ok, error: st.error || '', pausedUntil: st.pausedUntil || 0, pagesToday: st.pagesToday || 0, requestsToday: st.requestsToday || 0 };
+  return { t: st.t || null, ok: !!st.ok, error: st.error || '', pausedUntil: st.pausedUntil || 0, pagesToday: st.pagesToday || 0, requestsToday: st.requestsToday || 0, requestError: st.requestError || '' };
 }
