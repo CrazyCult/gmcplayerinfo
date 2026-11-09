@@ -91,10 +91,16 @@ it("pauses when the reader account cannot log in, and stays off without configur
   vi.stubGlobal("fetch", fetchMock);
   await tick(env, Date.parse("2026-11-09T15:01:00Z"));
   const stats = await (await worker.fetch(new Request("https://index.test/v1/db/stats"), env)).json();
-  expect(stats.reader.error).toMatch(/connexion du compte lecteur refusée/);
+  expect(stats.reader.error).toMatch(/e-mail ou mot de passe/);
   const n = fetchMock.mock.calls.length;
   await tick(env, Date.parse("2026-11-09T15:02:00Z"));
   expect(fetchMock.mock.calls.length).toBe(n); // en pause
+  // Mauvaise clé anon : Supabase répond 401 « Invalid API key ».
+  env.GC_SUPABASE_ANON = "bad-key";
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ message: "Invalid API key", hint: "Double check your Supabase `anon` or `service_role` API key." }, { status: 401 })));
+  await tick(env, Date.parse("2026-11-09T15:03:00Z")); // clé changée : la pause est levée
+  const s1 = await (await worker.fetch(new Request("https://index.test/v1/db/stats"), env)).json();
+  expect(s1.reader.error).toMatch(/GC_SUPABASE_ANON/);
   const { env: off } = setup();
   delete (off as Record<string, unknown>).GC_BOT_EMAIL;
   vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("no fetch expected"); }));

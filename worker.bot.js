@@ -20,7 +20,7 @@ const GAME = 'https://gamechase.io';
 const PAGES_PER_RUN = 4;
 const GAP_MS = 1500;                // entre deux pages du jeu
 const COOKIE_CHUNK = 3180;          // taille des morceaux de cookie de @supabase/ssr
-const PAUSE = { auth: 6 * 3600e3, rate: 3600e3, forbidden: 24 * 3600e3, login: 3600e3 };
+const PAUSE = { auth: 6 * 3600e3, rate: 3600e3, forbidden: 24 * 3600e3, login: 10 * 60e3 };
 const DB_KEEP = ['id', 'name', 'position', 'age', 'overall', 'potential', 'value', 'club_id', 'club_name', 'nationality', 'flag_code',
   'free_agent', 'transfer_price', 'loan_fee', 'traits', 'attributes', 'portrait_url'];
 
@@ -38,11 +38,28 @@ const setMeta = (env, k, v) => env.DB.prepare('INSERT INTO db_meta (k, v) VALUES
   .bind(k, JSON.stringify(v)).run();
 
 // --- Session Supabase du compte lecteur ---------------------------------------------
+let lastAuthError = null;
+// Message lisible pour un refus de connexion.
+function loginError(e) {
+  const why = (e && e.why || '').toLowerCase();
+  if (e && e.status === 401 && /api ?key|apikey|no api key/.test(why)) return 'clé GC_SUPABASE_ANON refusée par Supabase (clé incomplète ou erronée)';
+  if (e && e.status === 401) return 'Supabase refuse la requête (401 : vérifier GC_SUPABASE_ANON) ' + (e.why || '');
+  if (/email_not_confirmed|not confirmed/.test(why)) return 'e-mail du compte lecteur pas encore confirmé';
+  if (/invalid_credentials|invalid_grant|invalid login/.test(why)) return 'e-mail ou mot de passe du compte lecteur refusé';
+  if (e && e.status === 429) return 'trop de tentatives de connexion, nouvel essai plus tard';
+  return 'connexion du compte lecteur refusée' + (e ? ` (${e.status}${e.why ? ' ' + e.why : ''})` : '');
+}
 async function auth(env, grant, body) {
   const res = await fetch(`${env.GC_SUPABASE_URL.replace(/\/+$/, '')}/auth/v1/token?grant_type=${grant}`, {
     method: 'POST', headers: { apikey: env.GC_SUPABASE_ANON, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    // Ne garde que le code d'erreur de Supabase (jamais la requête ni la session).
+    let why = '';
+    try { const e = await res.json(); why = String(e.error_code || e.error || e.msg || e.message || '').slice(0, 80); } catch (_) {}
+    lastAuthError = { status: res.status, why };
+    return null;
+  }
   const s = await res.json();
   if (!s || !s.access_token || !s.refresh_token) return null;
   return { ...s, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (+s.expires_in || 3600) };
@@ -127,10 +144,13 @@ export async function botStep(env, call) {
   if (!botConfigured(env)) return { off: true };
   const st = (await meta(env, 'bot:status')) || {};
   const now = Date.now();
-  if (st.pausedUntil && now < st.pausedUntil) return { paused: st.error };
-  const save = (patch) => setMeta(env, 'bot:status', { ...st, ...patch, t: Date.now() });
+  // Réglages changés (clé, adresse) : la pause d'échec de connexion est levée.
+  const cfg = [env.GC_SUPABASE_URL, env.GC_SUPABASE_ANON, env.GC_BOT_EMAIL].map(x => String(x).length + ':' + String(x).slice(-6)).join('|');
+  if (st.pausedUntil && now < st.pausedUntil && !(st.cfg && st.cfg !== cfg)) return { paused: st.error };
+  const save = (patch) => setMeta(env, 'bot:status', { ...st, ...patch, cfg, t: Date.now() });
+  lastAuthError = null;
   let s = await session(env);
-  if (!s) { await save({ ok: false, error: 'connexion du compte lecteur refusée (e-mail, mot de passe ?)', pausedUntil: now + PAUSE.login }); return { error: 'login' }; }
+  if (!s) { const error = loginError(lastAuthError); await save({ ok: false, error, pausedUntil: now + PAUSE.login }); return { error: 'login', detail: error }; }
   let limit = Math.max(1, Math.min(20, parseInt(env.READER_PAGES || '', 10) || PAGES_PER_RUN));
   let retried = false;
   // 1. D'abord les demandes du site : fiches de joueurs et effectifs (« Mon
