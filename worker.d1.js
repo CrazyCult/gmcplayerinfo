@@ -4,6 +4,7 @@
 // Accès réservé aux installations ayant une licence valide (même signature
 // ECDSA que l'extension).
 
+import { botConfigured, botPublicStatus, botStep } from './worker.bot.js';
 const PRIVACY_HTML = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>GMC Companion : politique de confidentialité</title>
 <style>body{font:16px/1.6 system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#1b2430}h1{color:#e0661b}h2{margin-top:28px}</style></head><body>
@@ -57,6 +58,8 @@ const DB_LEASE_MS = 10 * 60e3;
 const CREST_RE = /^https:\/\/[a-z0-9]+\.public\.blob\.vercel-storage\.com\/[^\s"'<>]{1,250}$/;
 const HISTORY_MAX = 150000; // historique d'OVR brut (caractères JSON)
 const REQUEST_TTL = 24 * 3600e3, REQUEST_MAX_PENDING = 300;
+// Fiche complète relue sur demande au plus toutes les 10 min.
+const REFRESH_MIN_MS = 10 * 60e3;
 const STATS_TTL = 10 * 60e3;
 const CATALOG_MAX_PAGES = 20, COUNT_CAP = 1000;
 
@@ -511,7 +514,7 @@ async function siteRequest(req, env, url, json) {
   await ensureDb(env);
   const idFrom = (prefix) => { try { const id = decodeURIComponent(url.pathname.slice(prefix.length)); return isStr(id, 128) ? id : null; } catch { return null; } };
 
-  // Demande de fiche complète : le joueur (et son club, pour les anciennes
+  // Demande de fiche (légère → complète, ou fiche complète à relire) : le joueur (et son club, pour les anciennes
   // extensions) passe en tête de ce qui est confié aux extensions (/v1/assign).
   // Seule écriture possible du site.
   if (isRequest || url.pathname.startsWith(statusPrefix)) {
@@ -521,24 +524,29 @@ async function siteRequest(req, env, url, json) {
     if (!s) return json({ error: 'Joueur introuvable' }, 404);
     const full = !s.light;
     const now = Date.now();
-    const r = await env.DB.prepare('SELECT requested_at FROM player_requests WHERE player_id = ?1').bind(id).first();
-    const pending = r && now - r.requested_at < REQUEST_TTL && !full;
-    if (!isRequest) {
-      const f = full ? await env.DB.prepare('SELECT fetched_at FROM full_players WHERE id = ?1').bind(id).first() : null;
-      const c = full && !f && s.team_id ? await env.DB.prepare('SELECT fetched_at FROM clubs WHERE team_id = ?1').bind(s.team_id).first() : null;
-      return json({ light: !full, fetchedAt: (f || c || {}).fetched_at ?? null, requestedAt: pending ? r.requested_at : null });
-    }
-    if (full) return json({ light: false, status: 'complet' });
-    if (pending) return json({ light: true, status: 'deja-demande', requestedAt: r.requested_at });
+    const [r, f, c] = await readBatch(env, [
+      env.DB.prepare('SELECT requested_at FROM player_requests WHERE player_id = ?1').bind(id),
+      env.DB.prepare('SELECT fetched_at FROM full_players WHERE id = ?1').bind(id),
+      env.DB.prepare('SELECT fetched_at FROM clubs WHERE team_id = ?1').bind(s.team_id || ''),
+    ]).then(rs => rs.map(x => x[0] || null));
+    // Fiche complète : lue seule, sinon dans l'instantané de son club.
+    const fetchedAt = full ? Math.max(f?.fetched_at ?? 0, c?.fetched_at ?? 0) || null : null;
+    // Demande en cours : pas encore servie (fiche plus ancienne que la demande).
+    const pending = !!r && now - r.requested_at < REQUEST_TTL && (!full || !fetchedAt || fetchedAt < r.requested_at);
+    if (!isRequest) return json({ light: !full, fetchedAt, requestedAt: pending ? r.requested_at : null });
+    if (pending) return json({ light: !full, status: 'deja-demande', requestedAt: r.requested_at, fetchedAt });
+    // Fiche complète toute fraîche : inutile de la relire.
+    if (full && fetchedAt && now - fetchedAt < REFRESH_MIN_MS) return json({ light: false, status: 'recent', fetchedAt });
     const n = (await env.DB.prepare(`SELECT COUNT(*) AS n FROM (SELECT 1 FROM player_requests WHERE requested_at > ?1 LIMIT ${REQUEST_MAX_PENDING})`)
       .bind(now - REQUEST_TTL).first()).n;
     if (n >= REQUEST_MAX_PENDING) return json({ error: 'Trop de demandes en attente, réessaie plus tard.' }, 429);
     const stmts = [env.DB.prepare(`INSERT INTO player_requests (player_id, requested_at) VALUES (?1, ?2)
       ON CONFLICT(player_id) DO UPDATE SET requested_at = excluded.requested_at`).bind(id, now)];
-    if (s.team_id && !s.free_agent) stmts.push(env.DB.prepare(`INSERT INTO site_requests (team_id, player_id, requested_at) VALUES (?1, ?2, ?3)
+    // Anciennes extensions (sans lecture joueur par joueur) : le club entier, seulement pour une fiche légère.
+    if (!full && s.team_id && !s.free_agent) stmts.push(env.DB.prepare(`INSERT INTO site_requests (team_id, player_id, requested_at) VALUES (?1, ?2, ?3)
       ON CONFLICT(team_id) DO UPDATE SET player_id = excluded.player_id, requested_at = excluded.requested_at`).bind(s.team_id, id, now));
     await runBatch(env, stmts);
-    return json({ light: true, status: 'demande', requestedAt: now });
+    return json({ light: !full, status: 'demande', requestedAt: now, fetchedAt });
   }
 
   if (url.pathname.startsWith(playerPrefix)) {
@@ -787,9 +795,24 @@ export async function backfillStep(env) {
 }
 
 const statsCacheByDb = new WeakMap();
+// Appel interne (compte lecteur) : même code que pour une extension, sans licence.
+const plainJson = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
+export function internalCall(env) {
+  return async (path, body) => {
+    const u = new URL('https://internal' + path);
+    const req = new Request(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const res = await extensionRequest(req, env, u, plainJson, true);
+    try { return await res.json(); } catch (_) { return null; }
+  };
+}
 export default {
-  async scheduled(_event, env, ctx) {
-    ctx.waitUntil(backfillStep(env).catch(() => {}));
+  // Déclencheur conseillé : chaque minute (« * * * * * »). Le rattrapage ne
+  // tourne qu'une minute sur cinq ; le compte lecteur, s'il est configuré, à
+  // chaque passage.
+  async scheduled(event, env, ctx) {
+    const minute = Math.floor((event && event.scheduledTime || Date.now()) / 60e3);
+    if (minute % 5 === 0) ctx.waitUntil(backfillStep(env).catch(() => {}));
+    if (botConfigured(env)) ctx.waitUntil(ensureDb(env).then(() => botStep(env, internalCall(env))).then(r => console.log('compte lecteur : ' + JSON.stringify(r))).catch(e => console.error('compte lecteur : ' + (e && e.message || e))));
   },
   async fetch(req, env) {
     const cors = {
@@ -818,9 +841,9 @@ export default {
   },
 };
 
-async function extensionRequest(req, env, url, json) {
-  const installId = req.headers.get('X-GMC-Install');
-  if (!(await licenceOk(env, installId, req.headers.get('X-GMC-Licence')))) return json({ error: 'licence invalide ou expirée' }, 401);
+async function extensionRequest(req, env, url, json, internal = false) {
+  const installId = internal ? 'srv-reader' : req.headers.get('X-GMC-Install');
+  if (!internal && !(await licenceOk(env, installId, req.headers.get('X-GMC-Licence')))) return json({ error: 'licence invalide ou expirée' }, 401);
   await ensureDb(env);
   const now = Date.now();
 
@@ -884,8 +907,8 @@ async function extensionRequest(req, env, url, json) {
     let players = [];
     if (body.players === true && limit) {
       players = (await env.DB.prepare(`SELECT r.player_id FROM player_requests r
-          LEFT JOIN site_players s ON s.id = r.player_id LEFT JOIN leases l ON l.team_id = 'p:' || r.player_id
-          WHERE r.requested_at > ?1 AND (s.light IS NULL OR s.light = 1) AND (l.leased_until IS NULL OR l.leased_until < ?2)
+          LEFT JOIN full_players f ON f.id = r.player_id LEFT JOIN leases l ON l.team_id = 'p:' || r.player_id
+          WHERE r.requested_at > ?1 AND (f.fetched_at IS NULL OR f.fetched_at < r.requested_at) AND (l.leased_until IS NULL OR l.leased_until < ?2)
           ORDER BY r.requested_at ASC LIMIT ?3`).bind(now - REQUEST_TTL, now, limit).all()).results.map(x => x.player_id);
       if (players.length) await runBatch(env, players.map(id => env.DB.prepare(
         'INSERT INTO leases (team_id, leased_until, leased_by) VALUES (?1, ?2, ?3) ON CONFLICT(team_id) DO UPDATE SET leased_until = excluded.leased_until, leased_by = excluded.leased_by'
@@ -1162,9 +1185,10 @@ async function extensionRequest(req, env, url, json) {
   // Statistiques : calculées au plus toutes les 10 minutes (requêtes indexées).
   if (req.method === 'GET' && url.pathname === '/v1/db/stats') {
     const cached = statsCacheByDb.get(env.DB);
-    if (cached && cached.data.protocol === 2 && now - cached.at < STATS_TTL) return json(cached.data);
+    // L'état du compte lecteur reste à jour même quand les statistiques viennent du cache.
+    if (cached && cached.data.protocol === 2 && now - cached.at < STATS_TTL) return json({ ...cached.data, reader: await botPublicStatus(env) });
     const saved = await env.DB.prepare('SELECT v FROM db_meta WHERE k = ?1').bind('stats').first();
-    if (saved) { const s = JSON.parse(saved.v); if (s.data.protocol === 2 && now - s.at < STATS_TTL) { statsCacheByDb.set(env.DB, s); return json(s.data); } }
+    if (saved) { const s = JSON.parse(saved.v); if (s.data.protocol === 2 && now - s.at < STATS_TTL) { statsCacheByDb.set(env.DB, s); return json({ ...s.data, reader: await botPublicStatus(env) }); } }
     const players = (await env.DB.prepare('SELECT MAX(rowid) AS n FROM site_players').first())?.n || 0;
     const transfer = (await env.DB.prepare('SELECT COUNT(*) AS n FROM site_players WHERE transfer_price > 0').first()).n;
     const loan = (await env.DB.prepare('SELECT COUNT(*) AS n FROM site_players WHERE loan_fee > 0').first()).n;
@@ -1198,7 +1222,8 @@ async function extensionRequest(req, env, url, json) {
     }
     const coverage = { globallyVerified: false, slices: [...coverageGroups.values()].map(({ ids, ...group }) => ({ ...group, uniqueIds: ids.size })), failures: [] };
     const data = { protocol: 2, players, transfer, loan, free: totals.free ?? null, pages: pg.results, totals, coverage,
-      writesToday: await writesToday(env), writeBudget: Number.isFinite(writeBudget(env)) ? writeBudget(env) : null };
+      writesToday: await writesToday(env), writeBudget: Number.isFinite(writeBudget(env)) ? writeBudget(env) : null,
+      reader: await botPublicStatus(env) };
     const entry = { at: now, data };
     statsCacheByDb.set(env.DB, entry);
     await env.DB.prepare('INSERT INTO db_meta (k, v) VALUES (?1, ?2) ON CONFLICT(k) DO UPDATE SET v = excluded.v').bind('stats', JSON.stringify(entry)).run();

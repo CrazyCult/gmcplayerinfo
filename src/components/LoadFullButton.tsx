@@ -64,9 +64,7 @@ export default function LoadFullButton({
       if (Date.now() - started > POLL_MAX_MS) {
         clearInterval(timer);
         setState("idle");
-        setMessage(
-          "Toujours pas lu : aucune extension active pour l’instant. Réessaie plus tard.",
-        );
+        setMessage("Toujours pas lue. Réessaie plus tard.");
         return;
       }
       try {
@@ -142,9 +140,9 @@ export default function LoadFullButton({
       </a>
       <small className="muted" style={{ flexBasis: "100%" }}>
         {state === "waiting"
-          ? `Demandé à ${new Date(since).toLocaleTimeString("fr-CH", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Zurich" })} : la première extension GMC Companion active lit la fiche de ce joueur (en général en quelques minutes). Si tu as l’extension, ouvrir sa fiche dans le jeu suffit : quelques secondes. Cette page se met à jour toute seule.`
+          ? `Demandé à ${new Date(since).toLocaleTimeString("fr-CH", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Zurich" })} : le serveur lit la fiche de ce joueur en priorité (en général dans la minute). Si tu as l’extension, ouvrir sa fiche dans le jeu suffit aussi. Cette page se met à jour toute seule.`
           : message ||
-            "Le site ne lit pas le jeu lui-même : il demande aux extensions GMC Companion de lire la fiche de ce joueur en priorité."}
+            "Demande la lecture de la fiche complète de ce joueur : elle passe avant tout le reste, en général dans la minute."}
       </small>
     </div>
   );
