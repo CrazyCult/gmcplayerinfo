@@ -31,6 +31,8 @@ Depuis le 09/11/2026, `/api/players/database?availability=all` renvoie tous les 
 4. Déclencheur Cron du Worker : **chaque minute** (`* * * * *`). Le rattrapage existant ne tourne qu'une minute sur cinq.
 5. `npx wrangler deploy`. L'état apparaît dans `/v1/db/stats` → `reader` (`ok`, `error`, `pagesToday`, `pausedUntil`) ; la session n'y figure jamais.
 
+Priorité : à chaque passage, il sert d'abord les demandes du site (fiche joueur demandée, « Mon effectif » d'un utilisateur, jusqu'à 2 par minute), puis consacre le reste de ses pages à la base. `reader.requestsToday` compte les demandes servies dans la journée. Les journaux du Worker (Observabilité) affichent une ligne `compte lecteur : {…}` à chaque passage.
+
 Le compte lecteur ne fait que des lectures (GET). Il se met en pause tout seul : 6 h si la session est refusée, 1 h si le jeu demande de ralentir (429), 24 h sur 403 (compte bloqué ?), 1 h si la connexion échoue. Sans les secrets, il reste désactivé et seules les extensions alimentent la base.
 
 ## Projet Vercel

@@ -5,6 +5,8 @@
 // - Identifiants dans les secrets Cloudflare (GC_BOT_EMAIL, GC_BOT_PASSWORD),
 //   jamais dans le code ni dans la base. Seule la session (jetons renouvelables
 //   du compte lecteur) est gardée côté serveur, dans db_meta, jamais renvoyée.
+// - Priorité aux demandes du site (fiches de joueurs, effectifs « Mon effectif »
+//   et clubs des utilisateurs : /v1/assign), puis la base complète.
 // - Même chemin que les extensions : le compte lecteur réserve des pages
 //   (/v1/db/assign) puis les envoie (/v1/db/players), avec les mêmes contrôles.
 // - Prudence : 4 pages par minute au plus (READER_PAGES), 1,5 s entre deux ; pause automatique sur 401 répétés
@@ -63,9 +65,45 @@ export function sessionCookie(projectRef, s) {
   for (let i = 0, k = 0; i < value.length; i += COOKIE_CHUNK, k++) parts.push(`${name}.${k}=${value.slice(i, i + COOKIE_CHUNK)}`);
   return parts.join('; ');
 }
-async function gameGet(env, path, s) {
-  return fetch(GAME + path, { headers: { Accept: 'application/json', Cookie: sessionCookie(ref(env), s), 'User-Agent': 'Mozilla/5.0 (GMC Player Info reader)' } });
+async function gameGet(env, path, s, rsc) {
+  const headers = { Accept: rsc ? '*/*' : 'application/json', Cookie: sessionCookie(ref(env), s), 'User-Agent': 'Mozilla/5.0 (GMC Player Info reader)' };
+  if (rsc) headers.RSC = '1';
+  return fetch(GAME + path, { headers, redirect: 'manual' });
 }
+
+// Pages du jeu (réponse RSC de Next.js) : même lecture que l'extension.
+function scanJson(text, key, open, close) {
+  let from = 0;
+  for (;;) {
+    const i = text.indexOf(key, from);
+    if (i < 0) return [];
+    const start = i + key.length - 1;
+    let depth = 0, inStr = false, esc = false, end = -1;
+    for (let k = start; k < text.length; k++) {
+      const ch = text[k];
+      if (inStr) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') inStr = false; continue; }
+      if (ch === '"') inStr = true; else if (ch === open) depth++; else if (ch === close && --depth === 0) { end = k; break; }
+    }
+    if (end < 0) return [];
+    try { const v = JSON.parse(text.slice(start, end + 1)); return [v, end]; } catch (_) { from = end + 1; }
+  }
+}
+export function clubPlayers(text) {
+  let from = 0;
+  while (from < text.length) {
+    const [arr, end] = scanJson(text.slice(from), '"players":[', '[', ']');
+    if (end == null) return null;
+    if (Array.isArray(arr) && arr.length && arr[0] && 'overall' in arr[0] && 'id' in arr[0]) return arr;
+    from += end + 1;
+  }
+  return null;
+}
+export const initialPlayer = (text) => scanJson(text, '"initialPlayer":{', '{', '}')[0] || null;
+const crestOf = (text, teamId) => {
+  const crests = text.match(/https:\/\/[a-z0-9]+\.public\.blob\.vercel-storage\.com\/[^"\\\s]*crest[^"\\\s]*/gi) || [];
+  const c = crests.find(u => u.includes(teamId)) || crests[0] || null;
+  return c && c.length <= 300 ? c : undefined;
+};
 
 function light(p) {
   const o = {};
@@ -93,10 +131,30 @@ export async function botStep(env, call) {
   const save = (patch) => setMeta(env, 'bot:status', { ...st, ...patch, t: Date.now() });
   let s = await session(env);
   if (!s) { await save({ ok: false, error: 'connexion du compte lecteur refusée (e-mail, mot de passe ?)', pausedUntil: now + PAUSE.login }); return { error: 'login' }; }
-  const limit = Math.max(1, Math.min(20, parseInt(env.READER_PAGES || '', 10) || PAGES_PER_RUN));
-  const assign = await call('/v1/db/assign', { limit, full: true });
+  let limit = Math.max(1, Math.min(20, parseInt(env.READER_PAGES || '', 10) || PAGES_PER_RUN));
+  let retried = false;
+  // 1. D'abord les demandes du site : fiches de joueurs et effectifs (« Mon
+  //    effectif », clubs des utilisateurs), avant toute page de la base.
+  const asked = await call('/v1/assign', { limit: 2, players: true, requestsOnly: true });
+  let served = 0;
+  for (const id of (asked && asked.players) || []) {
+    const r = await gameGet(env, '/gamev2/players/' + encodeURIComponent(id), s, true);
+    const p = r.ok ? initialPlayer(await r.text()) : null;
+    if (p && p.id === id && p.attributes) { await call('/v1/players', { players: [{ fetchedAt: Date.now(), player: p }] }); served++; }
+    else if ([401, 403, 429].includes(r.status) || (r.status >= 300 && r.status < 400)) break;
+  }
+  for (const teamId of (asked && asked.assigned) || []) {
+    const r = await gameGet(env, '/gamev2/club/' + encodeURIComponent(teamId), s, true);
+    const text = r.ok ? await r.text() : '';
+    const players = text ? clubPlayers(text) : null;
+    if (players) { await call('/v1/clubs', { clubs: [{ teamId, fetchedAt: Date.now(), players, crest: crestOf(text, teamId) }] }); served++; }
+    else if ([401, 403, 429].includes(r.status) || (r.status >= 300 && r.status < 400)) break;
+  }
+  limit = Math.max(0, limit - served);
+  // 2. Puis la base complète (marché et prêts d'abord, côté serveur).
+  const assign = limit ? await call('/v1/db/assign', { limit, full: true }) : null;
   const tasks = (assign && assign.tasks) || [];
-  let done = 0, retried = false;
+  let done = 0;
   for (const t of tasks) {
     if (done) await new Promise(r => setTimeout(r, env.READER_GAP_MS != null ? +env.READER_GAP_MS : GAP_MS));
     let res = await gameGet(env, '/api/players/database?' + pageParams(t.a, t.p), s);
@@ -114,13 +172,14 @@ export async function botStep(env, call) {
   }
   const day = new Date().toISOString().slice(0, 10);
   const pagesToday = (st.day === day ? st.pagesToday || 0 : 0) + done;
-  await save({ ok: true, error: '', pausedUntil: 0, day, pagesToday, lastPages: done, budget: assign && assign.budget || null });
-  return { done, tasks: tasks.length };
+  const requestsToday = (st.day === day ? st.requestsToday || 0 : 0) + served;
+  await save({ ok: true, error: '', pausedUntil: 0, day, pagesToday, requestsToday, lastPages: done, budget: assign && assign.budget || null });
+  return { done, tasks: tasks.length, requests: served };
 }
 
 /** État pour les statistiques (jamais la session). */
 export async function botPublicStatus(env) {
   if (!botConfigured(env)) return null;
   const st = (await meta(env, 'bot:status')) || {};
-  return { t: st.t || null, ok: !!st.ok, error: st.error || '', pausedUntil: st.pausedUntil || 0, pagesToday: st.pagesToday || 0 };
+  return { t: st.t || null, ok: !!st.ok, error: st.error || '', pausedUntil: st.pausedUntil || 0, pagesToday: st.pagesToday || 0, requestsToday: st.requestsToday || 0 };
 }

@@ -110,3 +110,42 @@ it("splits long sessions into cookie chunks like @supabase/ssr", () => {
   expect(c).toContain("; sb-abc-auth-token.1=");
   expect(sessionCookie("abc", { access_token: "a" })).toMatch(/^sb-abc-auth-token=base64-/);
 });
+
+it("serves site requests (player sheets) before database pages", async () => {
+  const { env, mock } = setup();
+  const order: string[] = [];
+  let wanted = "";
+  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url.startsWith(SUPA)) return Response.json({ access_token: "AT", refresh_token: "RT", expires_in: 3600, user: { id: "u" } });
+    if (url.startsWith("https://gamechase.io/gamev2/players/")) {
+      order.push("fiche");
+      expect(new Headers(init.headers).get("RSC")).toBe("1");
+      expect(url).toContain("/gamev2/players/" + wanted);
+      const full = { ...player(wanted, wanted.split("-")[0], +wanted.split("-")[1]), attributes: { pac: 70, sho: 70, pas: 70, dri: 70, def: 40, phy: 60, finishing: 72 },
+        contract_pending: true, contract_deadline: "2026-11-12T23:00:00Z", last_age_up_date: "2026-10-20T07:15:00Z" };
+      return new Response(`0:["$","div",null]\n1:{"initialPlayer":${JSON.stringify(full)},"x":1}`, { headers: { "content-type": "text/x-component" } });
+    }
+    if (url.startsWith("https://gamechase.io/api/players/database")) {
+      order.push("base");
+      const q = new URL(url).searchParams, pos = q.get("position") || "ST", min = +(q.get("minOvr") || 60);
+      const players = q.get("availability") === "all" ? [player(`${pos}-${min}`, pos, min)] : [];
+      return Response.json({ page: 1, total: players.length, pageSize: 24, players });
+    }
+    throw new Error("unexpected " + url);
+  }));
+  const at = Date.parse("2026-11-09T15:01:00Z");
+  await tick(env, at); // la base fait connaître le joueur ST-60 (fiche légère)
+  const site = (path: string, method = "GET") => worker.fetch(new Request(`https://index.test${path}`, { method, headers: { Authorization: "Bearer tok" } }), env).then(r => r.json());
+  const known = (await (mock as any).DB.prepare("SELECT id FROM site_players LIMIT 1").all()).results[0].id as string;
+  wanted = known;
+  const ask = await site(`/v1/site/request/${known}`, "POST");
+  expect(ask.status).toBe("demande");
+  order.length = 0;
+  await tick(env, at + 60e3);
+  expect(order[0]).toBe("fiche"); // la demande passe avant les pages de la base
+  const st = await site(`/v1/site/status/${known}`);
+  expect(st.light).toBe(false);
+  const stats = await (await worker.fetch(new Request("https://index.test/v1/db/stats"), env)).json();
+  expect(stats.reader.requestsToday).toBe(1);
+});
