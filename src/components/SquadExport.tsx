@@ -1,12 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import { get, set, del } from "idb-keyval";
-import { useRouter } from "next/navigation";
-import { refreshSyncedClub, requestClubUpdate } from "@/app/squad/actions";
-import {
-  CompanionUnavailableError,
-  requestCompanionSquad,
-} from "@/lib/companion-sync";
 import type { Player } from "@/types";
 import {
   parseSquadExport,
@@ -28,8 +22,6 @@ export default function SquadExport({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState("");
-  const [syncing, setSyncing] = useState(false);
-  const router = useRouter();
   const storageKey = `gmc-tactical-export:${scope}`;
   useEffect(() => {
     let active = true;
@@ -61,77 +53,6 @@ export default function SquadExport({
       setMessage(`${success} Enregistré dans ce navigateur.`);
     } catch {
       setMessage(`${success} Conservation indisponible après rechargement.`);
-    }
-  }
-  async function refreshFromCompanion() {
-    setBusy(true);
-    setSyncing(true);
-    setError("");
-    setMessage("");
-    try {
-      const expectedTeamId =
-        scope !== "site" && scope !== "local" ? scope : undefined;
-      const snapshot = parseSquadExport(
-        await requestCompanionSquad(expectedTeamId),
-      );
-      if (
-        expectedTeamId &&
-        snapshot.clubSync &&
-        snapshot.clubSync.teamId !== expectedTeamId
-      )
-        throw new Error("Le club reçu ne correspond pas au club affiché.");
-      await saveSnapshot(
-        snapshot,
-        "Effectif actualisé depuis GameChase : tous les joueurs, XI, banc et attributs chargés.",
-      );
-      if (snapshot.clubSync) {
-        await refreshSyncedClub(
-          snapshot.clubSync.teamId,
-          snapshot.clubSync.fetchedAt,
-        );
-        setMessage(
-          "Effectif complet et fiches joueurs du site actualisés. XI et banc enregistrés dans ce navigateur.",
-        );
-        if (!expectedTeamId) {
-          await set(
-            `gmc-tactical-export:${snapshot.clubSync.teamId}`,
-            snapshot,
-          );
-          router.replace(
-            `/squad?club=${encodeURIComponent(snapshot.clubSync.teamId)}`,
-          );
-        } else router.refresh();
-      } else
-        setMessage(
-          "Export tactique actualisé. Pour actualiser aussi le tableau et les fiches du site, installe GMC Companion 2.38.9.",
-        );
-    } catch (e) {
-      if (
-        e instanceof CompanionUnavailableError &&
-        scope !== "site" &&
-        scope !== "local"
-      ) {
-        try {
-          const result = await requestClubUpdate(scope);
-          if (result.ok) {
-            setMessage(
-              "Extension absente sur cet appareil : mise à jour de tout l’effectif demandée aux GMC Companion actifs. Le XI et le banc nécessitent une lecture depuis ton compte GameChase.",
-            );
-            router.refresh();
-          } else setError(result.error);
-        } catch {
-          setError("Demande impossible pour l’instant. Réessaie plus tard.");
-        }
-        return;
-      }
-      setError(
-        e instanceof Error && !e.message.startsWith("[")
-          ? e.message
-          : "Les données reçues sont incomplètes. Termine ta composition dans le jeu puis réessaie.",
-      );
-    } finally {
-      setBusy(false);
-      setSyncing(false);
     }
   }
   async function readFile(file: File) {
@@ -193,23 +114,7 @@ export default function SquadExport({
       <p>
         {imported
           ? `${imported.players.length} joueurs chargés · ${imported.collectedAt ? "données lues le " + new Date(imported.collectedAt).toLocaleString("fr-FR") : "date de lecture inconnue"}.`
-          : `${players.length} joueurs de ${clubName || "cet effectif"}. Actualise depuis l’extension pour récupérer ton XI, ton banc et tes consignes.`}
-      </p>
-      <button
-        className="button primary"
-        disabled={busy}
-        onClick={() => void refreshFromCompanion()}
-      >
-        {syncing
-          ? "Actualisation en cours…"
-          : "Actualiser depuis GMC Companion"}
-      </button>
-      <p className="muted">
-        Garde GameChase ouvert et connecté dans ce navigateur. Chaque clic relit
-        tout ton effectif et ta composition actuels, avec GMC Companion 2.38.9
-        et son module Explorateur activé. Il met aussi à jour le tableau et les
-        fiches complètes du site, avec les sous-attributs disponibles dans le
-        jeu.
+          : `${players.length} joueurs de ${clubName || "cet effectif"}. Pour les relire, utilise « Demander la mise à jour de l’effectif » en haut de la page.`}
       </p>
       <p className="muted">
         Attributs et sous-attributs, matchs joués, buts et passes décisives
@@ -273,18 +178,13 @@ export default function SquadExport({
         />
       </label>
       <small className="muted" style={{ display: "block" }}>
-        Import de fichier en secours : dans le jeu, Explorateur → Export
-        tactique JSON. Les données sont conservées dans ce navigateur. Pour
-        prendre en compte tes derniers changements dans le jeu, clique sur
-        Actualiser.
+        XI, banc et consignes : dans le jeu, Explorateur → Export tactique JSON,
+        puis ajoute le fichier ici. Les données sont conservées dans ce
+        navigateur.
       </small>
       {(busy || message) && (
         <p role="status" className="notice">
-          {busy
-            ? syncing
-              ? "Lecture de ton effectif et de ta composition dans GameChase…"
-              : "Lecture de l’export tactique…"
-            : message}
+          {busy ? "Lecture de l’export tactique…" : message}
         </p>
       )}
       {imported && (
