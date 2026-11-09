@@ -85,7 +85,16 @@ export function sessionCookie(projectRef, s) {
 async function gameGet(env, path, s, rsc) {
   const headers = { Accept: rsc ? '*/*' : 'application/json', Cookie: sessionCookie(ref(env), s), 'User-Agent': 'Mozilla/5.0 (GMC Player Info reader)' };
   if (rsc) headers.RSC = '1';
-  return fetch(GAME + path, { headers, redirect: 'manual' });
+  const res = await fetch(GAME + path, { headers, redirect: 'manual' });
+  // Pages : le jeu envoie certains comptes de /gamev2/… vers /gamev3/… ; on
+  // suit cette seule redirection (jamais vers la connexion ni un autre site).
+  if (rsc && res.status >= 300 && res.status < 400) {
+    let to = null;
+    try { to = new URL(res.headers.get('location') || '', GAME); } catch (_) {}
+    if (to && to.origin === GAME && /^\/gamev[23]\/(club|players)\//.test(to.pathname) && to.pathname !== path)
+      return fetch(GAME + to.pathname + to.search, { headers, redirect: 'manual' });
+  }
+  return res;
 }
 
 // Pages du jeu (réponse RSC de Next.js) : même lecture que l'extension.
@@ -162,7 +171,9 @@ function whyFailed(r, text, what) {
     return `redirigé vers ${to || '?'} (HTTP ${r.status})`;
   }
   if (!r.ok) return `HTTP ${r.status}`;
-  return `${what} introuvable dans la page (${(r.headers.get('content-type') || '?').split(';')[0]}, ${text.length} octets)`;
+  const n = (k) => text.split(k).length - 1;
+  return `${what} introuvable dans la page ${new URL(r.url || GAME).pathname} (${(r.headers.get('content-type') || '?').split(';')[0]}, ${text.length} octets, ` +
+    `"players":[ ×${n('"players":[')}, "overall" ×${n('"overall"')}, "pac" ×${n('"pac"')}, "initialPlayer" ×${n('"initialPlayer"')})`;
 }
 async function serveRequests(env, call, s) {
   const asked = await call('/v1/assign', { limit: 2, players: true, requestsOnly: true });

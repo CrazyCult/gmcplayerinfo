@@ -235,3 +235,34 @@ it("takes over a site request left by an extension for more than 90 s", async ()
   expect((await call("/v1/assign", { limit: 2, players: true, requestsOnly: true })).assigned).toEqual(["c9"]);
   vi.useRealTimers();
 });
+
+it("follows the game's redirect from /gamev2/club to /gamev3/club", async () => {
+  const { env } = setup();
+  const seen: string[] = [];
+  const at = Date.parse("2026-11-09T15:01:00Z");
+  vi.setSystemTime(at);
+  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url.startsWith(SUPA)) return Response.json({ access_token: "AT", refresh_token: "RT", expires_in: 3600, user: { id: "u" } });
+    if (url.includes("/gamev2/club/")) { seen.push("v2"); return new Response(null, { status: 307, headers: { location: "/gamev3/club/c1" } }); }
+    if (url.includes("/gamev3/club/")) {
+      seen.push("v3");
+      return new Response(`1:{"players":${JSON.stringify([player("A-70", "ST", 70)])}}`, { headers: { "content-type": "text/x-component" } });
+    }
+    if (url.startsWith("https://gamechase.io/api/players/database")) {
+      const q = new URL(url).searchParams, pos = q.get("position") || "ST", min = +(q.get("minOvr") || 60);
+      const players = q.get("availability") === "all" ? [player(`${pos}-${min}`, pos, min)] : [];
+      return Response.json({ page: 1, total: players.length, pageSize: 24, players });
+    }
+    throw new Error("unexpected " + url);
+  }));
+  await tick(env, at);
+  const res = await worker.fetch(new Request("https://index.test/v1/site/club/c1", { method: "POST", headers: { Authorization: "Bearer tok" } }), env);
+  expect((await res.json()).status).toBe("demande");
+  vi.setSystemTime(at + 60e3);
+  await tick(env, at + 60e3);
+  expect(seen).toEqual(["v2", "v3"]);
+  const club = await (await worker.fetch(new Request("https://index.test/v1/site/club/c1", { headers: { Authorization: "Bearer tok" } }), env)).json();
+  expect(club.fetchedAt).toBeGreaterThan(at);
+  vi.useRealTimers();
+});
