@@ -171,3 +171,41 @@ it("serves site requests (player sheets) before database pages", async () => {
   expect(done.fetchedAt).toBeGreaterThanOrEqual(again.requestedAt);
   vi.useRealTimers();
 });
+
+it("rereads a whole squad on request (« Mon effectif ») before database pages", async () => {
+  const { env } = setup();
+  const order: string[] = [];
+  const at = Date.parse("2026-11-09T15:01:00Z");
+  vi.setSystemTime(at);
+  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url.startsWith(SUPA)) return Response.json({ access_token: "AT", refresh_token: "RT", expires_in: 3600, user: { id: "u" } });
+    if (url.startsWith("https://gamechase.io/gamev2/club/")) {
+      order.push("club");
+      expect(url).toContain("/gamev2/club/c1");
+      expect(new Headers(init.headers).get("RSC")).toBe("1");
+      const squad = [player("A-70", "ST", 70), player("B-71", "CM", 71)].map(p => ({ ...p, attributes: { ...p.attributes, finishing: 75 } }));
+      return new Response(`0:["$"]\n1:{"club":{"id":"c1"},"players":${JSON.stringify(squad)}}`, { headers: { "content-type": "text/x-component" } });
+    }
+    if (url.startsWith("https://gamechase.io/api/players/database")) {
+      order.push("base");
+      const q = new URL(url).searchParams, pos = q.get("position") || "ST", min = +(q.get("minOvr") || 60);
+      const players = q.get("availability") === "all" ? [player(`${pos}-${min}`, pos, min)] : [];
+      return Response.json({ page: 1, total: players.length, pageSize: 24, players });
+    }
+    throw new Error("unexpected " + url);
+  }));
+  await tick(env, at); // la base fait connaître le club c1
+  const site = (path: string, method = "GET") => worker.fetch(new Request(`https://index.test${path}`, { method, headers: { Authorization: "Bearer tok" } }), env).then(r => r.json());
+  const ask = await site("/v1/site/club/c1", "POST");
+  expect(ask.status).toBe("demande");
+  order.length = 0;
+  vi.setSystemTime(at + 60e3);
+  await tick(env, at + 60e3);
+  expect(order[0]).toBe("club");
+  const club = await site("/v1/site/club/c1");
+  expect(club.fetchedAt).toBeGreaterThanOrEqual(ask.requestedAt);
+  expect(club.requestedAt).toBe(null);
+  expect(club.players.map((p: { player: { id: string } }) => p.player.id).sort()).toEqual(["A-70", "B-71"]);
+  vi.useRealTimers();
+});
