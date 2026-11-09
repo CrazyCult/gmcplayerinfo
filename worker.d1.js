@@ -388,6 +388,8 @@ const PUBLIC_PLAYER_FIELDS = [
   'matches_played', 'matchesPlayed', 'goals', 'assists', 'clean_sheets',
   'cleanSheets', 'injured', 'onLoan', 'is_youth_product', 'youthProduct',
   'portrait_url', 'portraitUrl', 'card_url', 'cardUrl',
+  // Date du dernier anniversaire (+1 an) : colonne « Âge +1 » de l'effectif.
+  'last_age_up_date', 'lastAgeUp',
 ];
 const PUBLIC_ATTRIBUTES = new Set(('pac sho pas dri def phy div han kic ref pos spe ' +
   'acceleration sprintSpeed attackingPositioning finishing shotPower longShots volleys penalties ' +
