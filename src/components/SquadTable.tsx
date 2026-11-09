@@ -276,7 +276,7 @@ export default function SquadTable({
           </select>
         </div>
         <div className="table-wrap">
-          <table>
+          <table className="squad-table">
             <thead>
               <tr>
                 {headers.map(([key, label]) => (
@@ -304,7 +304,7 @@ export default function SquadTable({
                   <td>
                     <span className="pill">{player.position}</span>
                   </td>
-                  <td>
+                  <td className="name">
                     <Link href={`${hrefPrefix}${player.id}`} prefetch={false}>
                       {player.name}
                     </Link>
@@ -368,7 +368,7 @@ export default function SquadTable({
                   <td>{player.fitness ?? "—"}</td>
                   {premium && (
                     <>
-                      <td>
+                      <td className="wrap">
                         {player.posGain && player.posGain > 0 ? (
                           <span title={player.posPath}>
                             <strong style={{ color: "var(--attr-good)" }}>
@@ -386,6 +386,7 @@ export default function SquadTable({
                         )}
                       </td>
                       <td
+                        className="wrap"
                         title={
                           player.plusOneCost === undefined
                             ? undefined

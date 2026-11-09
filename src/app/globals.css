@@ -232,7 +232,7 @@ small {
   color: var(--muted);
 }
 .shell {
-  max-width: 1200px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 0 24px;
 }
@@ -573,6 +573,37 @@ small {
 .table-wrap {
   overflow: auto;
   max-width: 100%;
+}
+/* Tableau d'effectif : beaucoup de colonnes, on resserre pour éviter le
+   défilement horizontal (en-têtes sur deux lignes, cellules plus étroites). */
+.squad-table td,
+.squad-table th {
+  padding: 10px 7px;
+}
+.squad-table th {
+  white-space: normal;
+  line-height: 1.25;
+  vertical-align: bottom;
+  min-width: 52px;
+}
+.squad-table th button {
+  text-align: left;
+  min-height: 32px;
+}
+.squad-table td.name {
+  white-space: normal;
+  min-width: 140px;
+  max-width: 220px;
+}
+.squad-table td.wrap {
+  white-space: normal;
+  min-width: 96px;
+}
+.squad-table .rating {
+  min-width: 34px;
+  min-height: 30px;
+  font-size: 15px;
+  padding: 3px 6px;
 }
 table {
   width: 100%;
