@@ -343,3 +343,10 @@ it("keeps a 71-player squad and trims heavy fields to fit the server limit", asy
   expect(club.players[0].player.attributes.finishing).toBe(72);
   vi.useRealTimers();
 });
+
+it("keeps the last birthday date in the public squad (colonne « Âge +1 »)", async () => {
+  const { publicPlayer } = await import("../worker.d1.js");
+  const p = publicPlayer({ data: { ...player("A-1", "ST", 70), last_age_up_date: "2026-10-20T07:15:40Z", mint_address: "x" }, team_id: "c1" });
+  expect(p.last_age_up_date).toBe("2026-10-20T07:15:40Z");
+  expect(p.mint_address).toBeUndefined();
+});
