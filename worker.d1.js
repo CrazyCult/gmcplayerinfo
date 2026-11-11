@@ -60,6 +60,7 @@ const DB_LEASE_MS = 10 * 60e3;
 const CREST_RE = /^https:\/\/[a-z0-9]+\.public\.blob\.vercel-storage\.com\/[^\s"'<>]{1,250}$/;
 const HISTORY_MAX = 150000; // historique d'OVR brut (caractères JSON)
 const REQUEST_TTL = 24 * 3600e3, REQUEST_MAX_PENDING = 300;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 // Fiche complète relue sur demande au plus toutes les 10 min.
 const REFRESH_MIN_MS = 10 * 60e3, TAKEOVER_MS = 90e3;
 const STATS_TTL = 10 * 60e3;
@@ -525,9 +526,23 @@ async function siteRequest(req, env, url, json) {
     const id = idFrom(isRequest ? requestPrefix : statusPrefix);
     if (!id) return json({ error: 'Identifiant invalide' }, 400);
     const s = await env.DB.prepare('SELECT team_id, light, free_agent FROM site_players WHERE id = ?1').bind(id).first();
-    if (!s) return json({ error: 'Joueur introuvable' }, 404);
-    const full = !s.light;
     const now = Date.now();
+    // Joueur encore inconnu de l'index (tout juste packé…) : le site peut le
+    // demander par son identifiant du jeu ; le compte lecteur lit sa fiche.
+    if (!s) {
+      if (!UUID_RE.test(id)) return json({ error: 'Joueur introuvable' }, 404);
+      const r = await env.DB.prepare('SELECT requested_at FROM player_requests WHERE player_id = ?1').bind(id).first();
+      const pending = !!r && now - r.requested_at < REQUEST_TTL;
+      if (!isRequest) return pending ? json({ light: true, unknown: true, fetchedAt: null, requestedAt: r.requested_at }) : json({ error: 'Joueur introuvable' }, 404);
+      if (pending) return json({ light: true, unknown: true, status: 'deja-demande', requestedAt: r.requested_at, fetchedAt: null });
+      const n = (await env.DB.prepare(`SELECT COUNT(*) AS n FROM (SELECT 1 FROM player_requests WHERE requested_at > ?1 LIMIT ${REQUEST_MAX_PENDING})`)
+        .bind(now - REQUEST_TTL).first()).n;
+      if (n >= REQUEST_MAX_PENDING) return json({ error: 'Trop de demandes en attente, réessaie plus tard.' }, 429);
+      await env.DB.prepare(`INSERT INTO player_requests (player_id, requested_at) VALUES (?1, ?2)
+        ON CONFLICT(player_id) DO UPDATE SET requested_at = excluded.requested_at`).bind(id, now).run();
+      return json({ light: true, unknown: true, status: 'demande', requestedAt: now, fetchedAt: null });
+    }
+    const full = !s.light;
     const [r, f, c] = await readBatch(env, [
       env.DB.prepare('SELECT requested_at FROM player_requests WHERE player_id = ?1').bind(id),
       env.DB.prepare('SELECT fetched_at FROM full_players WHERE id = ?1').bind(id),
@@ -975,6 +990,10 @@ async function extensionRequest(req, env, url, json, internal = false) {
         ON CONFLICT(player_id) DO UPDATE SET fetched_at = excluded.fetched_at, data = excluded.data
         WHERE excluded.fetched_at > player_history.fetched_at AND excluded.data IS NOT player_history.data`).bind(p.id, fetchedAt, text));
     }
+    // Compte lecteur : identifiants que le jeu ne connaît pas (demande du site
+    // par identifiant) → la demande est retirée, le site l'affiche.
+    if (internal && Array.isArray(body.missing))
+      for (const id of body.missing.slice(0, 20)) if (isStr(id, 64)) stmts.push(env.DB.prepare('DELETE FROM player_requests WHERE player_id = ?1').bind(id));
     if (stmts.length) await runBatch(env, stmts);
     return json({ accepted: items.length, rejected: (Array.isArray(body.players) ? Math.min(20, body.players.length) : 0) - items.length });
   }

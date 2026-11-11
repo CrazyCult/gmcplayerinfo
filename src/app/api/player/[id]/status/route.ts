@@ -1,5 +1,5 @@
 import { revalidateTag } from "next/cache";
-import { getFullStatus, playerTag } from "@/data/gmc-index";
+import { getFullStatus, IndexError, playerTag } from "@/data/gmc-index";
 
 export async function GET(
   _request: Request,
@@ -11,10 +11,16 @@ export async function GET(
     // Fiche complète arrivée : la prochaine visite ne sert plus la version légère.
     if (!status.light) revalidateTag(playerTag(id), { expire: 0 });
     return Response.json(status, { headers: { "Cache-Control": "no-store" } });
-  } catch {
+  } catch (error) {
+    // 404 : joueur inconnu de l’index et aucune demande en cours.
+    const missing = error instanceof IndexError && error.status === 404;
     return Response.json(
-      { error: "Index momentanément indisponible." },
-      { status: 503 },
+      {
+        error: missing
+          ? "Joueur introuvable."
+          : "Index momentanément indisponible.",
+      },
+      { status: missing ? 404 : 503 },
     );
   }
 }

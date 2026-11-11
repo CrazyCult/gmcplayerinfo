@@ -7,6 +7,7 @@ import { useSquad } from "@/lib/local-squad";
 import { text } from "@/lib/i18n";
 import Rating from "./UI/Rating";
 import { playerSummarySchema, type PlayerSummary } from "@/schemas/index";
+import { parseGameId } from "@/lib/game-id";
 
 export default function Search({
   remote = false,
@@ -25,8 +26,11 @@ export default function Search({
     const timer = setTimeout(() => setDebounced(query.trim()), 300);
     return () => clearTimeout(timer);
   }, [query]);
+  // Identifiant du jeu (seul ou dans une adresse) : accès direct, même si le
+  // joueur n’est pas encore dans l’index.
+  const gameId = remote ? parseGameId(debounced) : null;
   useEffect(() => {
-    if (!remote || debounced.length < 3) return;
+    if (!remote || debounced.length < 3 || parseGameId(debounced)) return;
     const controller = new AbortController();
     fetch(`/api/search?q=${encodeURIComponent(debounced)}`, {
       signal: controller.signal,
@@ -93,7 +97,40 @@ export default function Search({
       </span>
       {debounced.length >= 3 && (
         <div className="search-results" aria-live="polite">
-          {combined.length ? (
+          {gameId ? (
+            <>
+              {gameId.kind !== "club" && (
+                <Link
+                  prefetch={false}
+                  href={`/player/${gameId.id}`}
+                  onClick={(event) => {
+                    if (onSelect) {
+                      event.preventDefault();
+                      onSelect(gameId.id);
+                    }
+                    setQuery("");
+                  }}
+                >
+                  <span>
+                    <strong>Ouvrir ou ajouter ce joueur</strong>
+                    <small>Identifiant du jeu · {gameId.id}</small>
+                  </span>
+                </Link>
+              )}
+              {gameId.kind !== "player" && !onSelect && (
+                <Link
+                  prefetch={false}
+                  href={`/squad?club=${gameId.id}`}
+                  onClick={() => setQuery("")}
+                >
+                  <span>
+                    <strong>Ouvrir ce club</strong>
+                    <small>Identifiant du jeu · {gameId.id}</small>
+                  </span>
+                </Link>
+              )}
+            </>
+          ) : combined.length ? (
             combined.map(({ player, remote: online }) => (
               <Link
                 prefetch={false}

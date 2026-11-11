@@ -16,9 +16,11 @@ type State = "checking" | "idle" | "sending" | "waiting" | "error";
 export default function LoadFullButton({
   playerId,
   requestedAt,
+  label = "Charger la fiche complète",
 }: {
   playerId: string;
   requestedAt?: number | null;
+  label?: string;
 }) {
   const router = useRouter();
   const [state, setState] = useState<State>(
@@ -82,6 +84,13 @@ export default function LoadFullButton({
         if (response.ok && data.light === false) {
           clearInterval(timer);
           router.refresh();
+        } else if (response.status === 404) {
+          // Demande retirée : le jeu ne connaît pas cet identifiant.
+          clearInterval(timer);
+          setState("error");
+          setMessage(
+            "Le jeu ne connaît pas ce joueur : vérifie l’identifiant (celui de la fiche du joueur, pas celui du club).",
+          );
         }
       } catch {
         /* nouvel essai au prochain intervalle */
@@ -130,7 +139,7 @@ export default function LoadFullButton({
             ? "Demande…"
             : state === "waiting"
               ? "Lecture demandée"
-              : "Charger la fiche complète"}
+              : label}
       </button>
       <a
         className="button"
