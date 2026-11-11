@@ -350,3 +350,48 @@ it("keeps the last birthday date in the public squad (colonne « Âge +1 »)", a
   expect(p.last_age_up_date).toBe("2026-10-20T07:15:40Z");
   expect(p.mint_address).toBeUndefined();
 });
+
+it("relays the game's own market alert (reader account) to Discord", async () => {
+  const { env, mock } = setup();
+  env.ALERT_DISCORD_WEBHOOK = "https://discord.com/api/webhooks/123456/abc-DEF_1";
+  const at = Date.parse("2026-11-11T09:00:00Z");
+  vi.setSystemTime(at);
+  const PID = "ba03ce3b-ddb0-49b0-96e9-aa819be374c6", PID2 = "42218ecd-54d2-4c98-b0fd-369c0039f81b";
+  const N = (id: number, playerId: string, listingId: string, t: number) => ({ id, activity_type: "transfer_search_match", created_at: new Date(t).toISOString(), metadata: { playerId, listingId } });
+  let notifs: unknown[] = [{ id: 9, activity_type: "scouting", created_at: new Date(at).toISOString(), metadata: {} }, N(8, PID, "L1", at - 5 * 60e3), N(3, PID2, "L0", at - 2 * 3600e3)];
+  const posts: { embeds: { title: string; url: string; fields: { name: string; value: string }[] }[] }[] = [];
+  let discordStatus = 204;
+  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url.startsWith(SUPA)) return Response.json({ access_token: "AT", refresh_token: "RT", expires_in: 3600, user: { id: "u" } });
+    if (url === "https://gamechase.io/api/notifications") { expect(init.method ?? "GET").toBe("GET"); expect(new Headers(init.headers).get("Cookie")).toContain("sb-"); return Response.json({ notifications: notifs }); }
+    if (url.startsWith("https://gamechase.io/api/transfers/listings")) return Response.json({ listings: [{ id: "L1", price_gmc2: 250000, seller_club_name: "FC Test", player: { id: PID, name: "Jean Test", position: "CF", age: 17, overall: 70, potential: 101, value: 300000 } }] });
+    if (url.startsWith("https://discord.com/api/webhooks/")) { if (discordStatus < 300) posts.push(JSON.parse(String(init.body))); return new Response(null, { status: discordStatus }); }
+    if (url.startsWith("https://gamechase.io/api/players/database")) return Response.json({ page: 1, total: 0, pageSize: 24, players: [] });
+    throw new Error("unexpected " + url);
+  }));
+  await tick(env, at);
+  expect(posts).toHaveLength(1);
+  expect(posts[0].embeds).toHaveLength(1); // l'alerte de 2 h n'est pas relayée au premier passage
+  expect(posts[0].embeds[0].title).toContain("Jean Test");
+  expect(posts[0].embeds[0].url).toBe("https://gamechase.io/gamev2/transfers?playerId=" + PID);
+  expect(posts[0].embeds[0].fields.find(f => f.name === "Prix")!.value).toContain("250 000");
+  vi.setSystemTime(at + 60e3);
+  await tick(env, at + 60e3);
+  expect(posts).toHaveLength(1); // pas de doublon
+  // Discord en panne : l'alerte est gardée et repart au passage suivant.
+  await (mock as any).DB.prepare("INSERT INTO db_players (id, name, name_norm, position, age, overall, potential, value, club_id, club_name, attrs, seen_at) VALUES (?1, 'Paul Base', 'paul base', 'GK', 16, 66, 105, 1000, 'c2', 'Club 2', '{}', ?2)").bind(PID2, at).run();
+  notifs = [N(12, PID2, "L9", at + 100e3), ...notifs];
+  discordStatus = 500;
+  vi.setSystemTime(at + 120e3);
+  await tick(env, at + 120e3);
+  expect(posts).toHaveLength(1);
+  discordStatus = 204;
+  vi.setSystemTime(at + 180e3);
+  await tick(env, at + 180e3);
+  expect(posts).toHaveLength(2);
+  expect(posts[1].embeds[0].title).toContain("Paul Base"); // absent du marché : fiche prise dans la base
+  const stats = await (await worker.fetch(new Request("https://index.test/v1/db/stats"), env)).json();
+  expect(stats.reader.alerts).toMatchObject({ sentToday: 2, error: "" });
+  vi.useRealTimers();
+});

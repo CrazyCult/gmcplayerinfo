@@ -33,6 +33,8 @@ Depuis le 09/11/2026, `/api/players/database?availability=all` renvoie tous les 
 
 Priorité : à chaque passage, il sert d'abord les demandes du site (fiche joueur demandée, « Mon effectif » d'un utilisateur, jusqu'à 2 par minute), puis consacre le reste de ses pages à la base. `reader.requestsToday` compte les demandes servies dans la journée. Les journaux du Worker (Observabilité) affichent une ligne `compte lecteur : {…}` à chaque passage.
 
+Alerte du jeu vers Discord (facultatif) : connecte-toi au jeu avec le compte lecteur, arme une recherche dans Transferts, puis ajoute au Worker le secret `ALERT_DISCORD_WEBHOOK` (adresse d'un webhook de salon) ou les secrets `ALERT_DISCORD_BOT_TOKEN` + `ALERT_DISCORD_USER_ID` (message privé). Chaque minute, le compte lecteur relit `/api/notifications` et envoie sur Discord les nouveaux joueurs signalés (`transfer_search_match`), avec leur lien. `/v1/db/stats` → `reader.alerts` donne l'heure de la dernière lecture, le nombre envoyé dans la journée et l'erreur éventuelle.
+
 Le compte lecteur ne fait que des lectures (GET). Il se met en pause tout seul : 6 h si la session est refusée, 1 h si le jeu demande de ralentir (429), 24 h sur 403 (compte bloqué ?), 1 h si la connexion échoue. Sans les secrets, il reste désactivé et seules les extensions alimentent la base.
 
 ## Projet Vercel
