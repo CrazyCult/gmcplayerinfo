@@ -335,6 +335,77 @@ export async function botRequests(env, call) {
   }
   return { requests: served, ...(progress.length ? { progress } : {}), ...(failed.length ? { failed } : {}) };
 }
+// --- Alerte intégrée du jeu -------------------------------------------------
+// Le jeu surveille le marché avec la recherche armée sur le compte lecteur et
+// range ses trouvailles dans /api/notifications (transfer_search_match). On
+// relit cette liste (lecture seule) et on envoie chaque nouveau joueur sur
+// Discord, avec son lien. Rien n'est marqué comme lu ni réarmé.
+const ALERT_FRESH_MS = 15 * 60e3;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const alertTarget = (env) => /^https:\/\/(discord|discordapp)\.com\/api\/webhooks\/\d+\/[\w-]+$/.test(env.ALERT_DISCORD_WEBHOOK || '') ? 'webhook'
+  : env.ALERT_DISCORD_BOT_TOKEN && /^\d{15,22}$/.test(env.ALERT_DISCORD_USER_ID || '') ? 'dm' : null;
+const fmtGmc = (n) => (Number.isFinite(+n) ? Math.round(+n).toLocaleString('fr-FR').replace(/\u202f|\u00a0/g, ' ') : '?');
+async function discordPost(env, payload) {
+  const body = JSON.stringify(payload);
+  if (alertTarget(env) === 'webhook') {
+    const r = await fetch(env.ALERT_DISCORD_WEBHOOK.replace('discordapp.com', 'discord.com'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+    return r.ok ? '' : `Discord : HTTP ${r.status}`;
+  }
+  const auth = { Authorization: 'Bot ' + env.ALERT_DISCORD_BOT_TOKEN, 'Content-Type': 'application/json' };
+  let channel = (await meta(env, 'bot:alertDm'))?.id;
+  if (!channel) {
+    const r = await fetch('https://discord.com/api/v10/users/@me/channels', { method: 'POST', headers: auth, body: JSON.stringify({ recipient_id: env.ALERT_DISCORD_USER_ID }) });
+    const j = r.ok ? await r.json() : null;
+    if (!j || !j.id) return `Discord : message privé impossible (HTTP ${r.status})`;
+    channel = j.id; await setMeta(env, 'bot:alertDm', { id: channel });
+  }
+  const r = await fetch(`https://discord.com/api/v10/channels/${channel}/messages`, { method: 'POST', headers: auth, body });
+  if (r.status === 404) await setMeta(env, 'bot:alertDm', {});
+  return r.ok ? '' : `Discord : HTTP ${r.status}`;
+}
+async function gameAlerts(env, s) {
+  if (!alertTarget(env)) return null;
+  const r = await gameGet(env, '/api/notifications', s);
+  if (!r.ok || !/json/.test(r.headers.get('content-type') || '')) return { error: `notifications : HTTP ${r.status}` };
+  const j = await r.json();
+  const list = (Array.isArray(j) ? j : j.notifications || []).filter(n => n && n.activity_type === 'transfer_search_match' && Number.isFinite(+n.id));
+  const st = (await meta(env, 'bot:alerts')) || {};
+  const now = Date.now();
+  const fresh = list.filter(n => +n.id > (+st.lastId || 0) && (st.lastId || now - Date.parse(n.created_at || 0) < ALERT_FRESH_MS)).sort((a, b) => +a.id - +b.id).slice(0, 10);
+  const lastId = list.reduce((mx, n) => Math.max(mx, +n.id), +st.lastId || 0);
+  if (!fresh.length) { if (lastId !== st.lastId) await setMeta(env, 'bot:alerts', { ...st, lastId }); return { sent: 0 }; }
+  // Fiche du joueur : l'annonce du marché (lisible sans session), sinon la base.
+  let listings = [];
+  try { const m = await fetch(GAME + '/api/transfers/listings?sort=overall&order=desc&status=active&view=market', { headers: { Accept: 'application/json' } }); if (m.ok) { const d = await m.json(); listings = Array.isArray(d) ? d : d.listings || d.data || []; } } catch (_) {}
+  const embeds = [];
+  for (const n of fresh) {
+    const md = n.metadata || {}, id = UUID.test(md.playerId || '') ? md.playerId : null;
+    const l = listings.find(x => x && ((md.listingId && String(x.id) === String(md.listingId)) || (id && x.player && x.player.id === id))) || null;
+    let p = l && l.player;
+    if (!p && id) p = await env.DB.prepare('SELECT name, position, age, overall, potential, value, club_name FROM db_players WHERE id = ?1').bind(id).first();
+    const fields = p ? [
+      { name: 'Poste', value: String(p.position || '?'), inline: true },
+      { name: 'Âge', value: `${p.age} ans`, inline: true },
+      { name: 'OVR / POT', value: `${p.overall} / ${p.potential}`, inline: true },
+      ...(l && l.price_gmc2 != null ? [{ name: 'Prix', value: `**${fmtGmc(l.price_gmc2)}** GMC2`, inline: true }] : []),
+      ...(p.value != null ? [{ name: 'Valeur', value: `${fmtGmc(p.value)} GMC2`, inline: true }] : []),
+      ...(l && l.seller_club_name || p.club_name ? [{ name: 'Club', value: String(l && l.seller_club_name || p.club_name).slice(0, 200), inline: true }] : []),
+    ] : [];
+    embeds.push({
+      title: ('🆕 ' + (p && p.name ? p.name : 'Un joueur correspond à ta recherche')).slice(0, 250),
+      url: GAME + (id ? '/gamev2/transfers?playerId=' + id : '/gamev2/transfers'),
+      description: 'Alerte du jeu (recherche armée sur le compte lecteur)',
+      color: 0xff9142, fields,
+      footer: { text: 'GMC Player Info · Alerte du jeu' },
+      timestamp: n.created_at || new Date().toISOString(),
+    });
+  }
+  const error = await discordPost(env, { content: `**${embeds.length} joueur${embeds.length > 1 ? 's' : ''}** signalé${embeds.length > 1 ? 's' : ''} par l’alerte du jeu`, embeds });
+  // En cas d'échec Discord, on ne retient pas ces alertes : elles repartiront au prochain passage.
+  if (!error) await setMeta(env, 'bot:alerts', { lastId: Math.max(...fresh.map(n => +n.id), +st.lastId || 0), t: now });
+  return error ? { error } : { sent: embeds.length };
+}
+
 export async function botStep(env, call) {
   const b = await begin(env);
   if (b.result) return b.result;
@@ -346,6 +417,9 @@ export async function botStep(env, call) {
   //    effectif », clubs des utilisateurs), avant toute page de la base.
   const { served, failed, progress } = await serveRequests(env, call, s);
   limit = Math.max(0, limit - served);
+  // 1 bis. L'alerte du jeu, relayée vers Discord (si une cible Discord est réglée).
+  let alerts = null;
+  try { alerts = await gameAlerts(env, s); } catch (e) { alerts = { error: 'alerte du jeu : ' + (e && e.message || e) }; }
   // 2. Puis la base complète (marché et prêts d'abord, côté serveur).
   const assign = limit ? await call('/v1/db/assign', { limit, full: true }) : null;
   const tasks = (assign && assign.tasks) || [];
@@ -368,14 +442,17 @@ export async function botStep(env, call) {
   const day = today();
   const pagesToday = (st.day === day ? st.pagesToday || 0 : 0) + done;
   const requestsToday = (st.day === day ? st.requestsToday || 0 : 0) + served;
-  await save({ ok: true, error: '', pausedUntil: 0, day, pagesToday, requestsToday, lastPages: done, budget: assign && assign.budget || null,
+  const alertsToday = (st.day === day ? st.alertsToday || 0 : 0) + (alerts && alerts.sent || 0);
+  await save({ ok: true, error: '', pausedUntil: 0, day, pagesToday, requestsToday, alertsToday, lastPages: done, budget: assign && assign.budget || null,
+    ...(alerts ? { alertError: alerts.error || '', alertT: Date.now() } : {}),
     ...(served || failed.length ? { requestError: failed.join(' ; ').slice(0, 1500) } : {}) });
-  return { done, tasks: tasks.length, requests: served, ...(progress.length ? { progress } : {}), ...(failed.length ? { failed } : {}) };
+  return { done, tasks: tasks.length, requests: served, ...(alerts ? { alerts: alerts.error || alerts.sent } : {}), ...(progress.length ? { progress } : {}), ...(failed.length ? { failed } : {}) };
 }
 
 /** État pour les statistiques (jamais la session). */
 export async function botPublicStatus(env) {
   if (!botConfigured(env)) return null;
   const st = (await meta(env, 'bot:status')) || {};
-  return { t: st.t || null, ok: !!st.ok, error: st.error || '', pausedUntil: st.pausedUntil || 0, pagesToday: st.pagesToday || 0, requestsToday: st.requestsToday || 0, requestError: st.requestError || '' };
+  return { t: st.t || null, ok: !!st.ok, error: st.error || '', pausedUntil: st.pausedUntil || 0, pagesToday: st.pagesToday || 0, requestsToday: st.requestsToday || 0, requestError: st.requestError || '',
+    alerts: alertTarget(env) ? { t: st.alertT || null, sentToday: st.alertsToday || 0, error: st.alertError || '' } : null };
 }
