@@ -353,7 +353,7 @@ it("keeps the last birthday date in the public squad (colonne « Âge +1 »)", a
 
 it("relays the game's own market alert (reader account) to Discord", async () => {
   const { env, mock } = setup();
-  env.ALERT_DISCORD_WEBHOOK = "https://discord.com/api/webhooks/123456/abc-DEF_1";
+  (env as Record<string, unknown>).ALERT_DISCORD_WEBHOOK = "https://discord.com/api/webhooks/123456/abc-DEF_1";
   const at = Date.parse("2026-11-11T09:00:00Z");
   vi.setSystemTime(at);
   const PID = "ba03ce3b-ddb0-49b0-96e9-aa819be374c6", PID2 = "42218ecd-54d2-4c98-b0fd-369c0039f81b";
