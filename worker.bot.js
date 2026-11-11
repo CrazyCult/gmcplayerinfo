@@ -294,6 +294,8 @@ async function serveRequests(env, call, s) {
     } else if (!p) why = `API ${a.r.status}`;
     if (p) { await call('/v1/players', { players: [{ fetchedAt: Date.now(), player: p }] }); served++; continue; }
     failed.push(`joueur ${id} : ${why}`);
+    // Identifiant inconnu du jeu : la demande est retirée (pas de relecture en boucle).
+    if (a.r.status === 404) await call('/v1/players', { players: [], missing: [id] });
     if (stop(a.r)) return { served, failed, progress };
   }
   for (const teamId of (asked && asked.assigned) || []) {

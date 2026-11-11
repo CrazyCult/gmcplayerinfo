@@ -395,3 +395,35 @@ it("relays the game's own market alert (reader account) to Discord", async () =>
   expect(stats.reader.alerts).toMatchObject({ sentToday: 2, error: "" });
   vi.useRealTimers();
 });
+
+it("adds a player unknown to the index from its game id (just packed)", async () => {
+  const { env } = setup();
+  const NEW = "9fd0410e-2ff6-450e-85f1-de0b358592c7", GHOST = "11111111-2222-4333-8444-555555555555";
+  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url.startsWith(SUPA)) return Response.json({ access_token: "AT", refresh_token: "RT", expires_in: 3600, user: { id: "u" } });
+    if (url === `https://gamechase.io/api/players/${NEW}`)
+      return Response.json({ ...player(NEW, "ST", 66), name: "Nouveau Packé", attributes: { pac: 70, sho: 70, pas: 70, dri: 70, def: 40, phy: 60, finishing: 72 } });
+    if (url.startsWith("https://gamechase.io/api/players/database")) return Response.json({ page: 1, total: 0, pageSize: 24, players: [] });
+    if (url.includes(GHOST)) return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
+    throw new Error("unexpected " + url);
+  }));
+  const at = Date.parse("2026-11-11T20:00:00Z");
+  vi.setSystemTime(at);
+  const site = (path: string, method = "GET") => worker.fetch(new Request(`https://index.test${path}`, { method, headers: { Authorization: "Bearer tok" } }), env);
+  expect((await site(`/v1/site/status/${NEW}`)).status).toBe(404);
+  expect((await site(`/v1/site/request/pas-un-identifiant`, "POST")).status).toBe(404);
+  const ask = await (await site(`/v1/site/request/${NEW}`, "POST")).json();
+  expect(ask).toMatchObject({ light: true, unknown: true, status: "demande" });
+  expect((await (await site(`/v1/site/request/${NEW}`, "POST")).json()).status).toBe("deja-demande");
+  await tick(env, at + 60e3);
+  expect((await (await site(`/v1/site/status/${NEW}`)).json()).light).toBe(false);
+  const sheet = await (await site(`/v1/site/player/${NEW}`)).json();
+  expect(sheet.player.name).toBe("Nouveau Packé");
+  // Identifiant que le jeu ne connaît pas : demande retirée, le site voit 404.
+  await site(`/v1/site/request/${GHOST}`, "POST");
+  expect((await site(`/v1/site/status/${GHOST}`)).status).toBe(200);
+  await tick(env, at + 120e3);
+  expect((await site(`/v1/site/status/${GHOST}`)).status).toBe(404);
+  vi.useRealTimers();
+});

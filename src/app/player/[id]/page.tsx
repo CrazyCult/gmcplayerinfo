@@ -3,6 +3,8 @@ import LocalPlayer from "@/components/LocalPlayer";
 import Search from "@/components/Search";
 import PlayerView from "@/components/PlayerView";
 import RefreshPlayerButton from "@/components/RefreshPlayerButton";
+import LoadFullButton from "@/components/LoadFullButton";
+import { isGameId } from "@/lib/game-id";
 import MarketPanel from "@/components/MarketPanel";
 import OvrHistory from "@/components/OvrHistory";
 import Fold from "@/components/UI/Fold";
@@ -49,13 +51,34 @@ export default async function PlayerPage({
   }
   if (!id.startsWith("local:")) {
     let snapshot,
+      unknown = false,
       code = "?";
     try {
       snapshot = await getPlayer(id);
     } catch (error) {
-      if (error instanceof IndexError && error.status === 404) notFound();
+      if (error instanceof IndexError && error.status === 404) {
+        if (!isGameId(id)) notFound();
+        unknown = true;
+      }
       code = error instanceof IndexError ? String(error.status) : "app";
     }
+    // Joueur encore inconnu de l’index (tout juste packé…) : ajout par son
+    // identifiant du jeu, lu par le compte lecteur du serveur.
+    if (unknown)
+      return (
+        <>
+          <Search remote={indexEnabled()} />
+          <section className="notice" style={{ marginTop: 24 }}>
+            <h1 style={{ marginTop: 0 }}>Joueur pas encore dans l’index</h1>
+            <p>
+              Aucun joueur connu avec l’identifiant <code>{id}</code>. S’il
+              vient d’être packé ou recruté, demande sa lecture : sa fiche
+              complète s’affichera ici.
+            </p>
+            <LoadFullButton playerId={id} label="Ajouter ce joueur" />
+          </section>
+        </>
+      );
     if (!snapshot)
       return (
         <div className="notice">
