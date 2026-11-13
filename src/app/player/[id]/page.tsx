@@ -75,7 +75,7 @@ export default async function PlayerPage({
               vient d’être packé ou recruté, demande sa lecture : sa fiche
               complète s’affichera ici.
             </p>
-            <LoadFullButton playerId={id} label="Ajouter ce joueur" />
+            <LoadFullButton playerId={id} label="Ajouter ce joueur" bare />
           </section>
         </>
       );
@@ -90,27 +90,25 @@ export default async function PlayerPage({
     return (
       <>
         <Search remote={indexEnabled()} />
-        <p className="notice">
-          {snapshot.light ? "Vu dans la base du jeu le" : "Collecté le"}{" "}
-          {new Date(snapshot.fetchedAt).toLocaleString("fr-CH", {
-            timeZone: "Europe/Zurich",
-          })}{" "}
-          par GMC Companion.{" "}
-          {!snapshot.light && (
+        {snapshot.light ? (
+          <LoadFullButton
+            playerId={snapshot.player.id}
+            title={`Fiche légère : 6 stats seulement · vue dans la base du jeu le ${new Date(
+              snapshot.fetchedAt,
+            ).toLocaleString("fr-CH", { timeZone: "Europe/Zurich" })}`}
+          />
+        ) : (
+          <p className="notice">
+            Collecté le{" "}
+            {new Date(snapshot.fetchedAt).toLocaleString("fr-CH", {
+              timeZone: "Europe/Zurich",
+            })}{" "}
+            par GMC Companion.{" "}
             <RefreshPlayerButton
               playerId={snapshot.player.id}
               fetchedAt={snapshot.fetchedAt}
             />
-          )}
-        </p>
-        {snapshot.light && (
-          <section className="notice" style={{ marginBottom: 16 }}>
-            <strong>Fiche légère : 6 stats seulement.</strong> Sous-attributs,
-            leviers et simulateur d’entraînement demandent la fiche complète.
-            <div style={{ marginTop: 10 }}>
-              <LoadFullButton playerId={snapshot.player.id} />
-            </div>
-          </section>
+          </p>
         )}
         <PlayerView player={snapshot.player} remote club={snapshot.club} />
         <div className="stack" style={{ marginTop: 24 }}>

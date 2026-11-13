@@ -1817,3 +1817,63 @@ details.fold[open] > summary .fold-chevron {
   justify-content: space-between;
   gap: 4px 12px;
 }
+
+/* Barre d'action : texte et état à gauche, boutons à droite (fiche légère, effectif). */
+.action-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 24px;
+  padding: 14px 18px;
+  margin: 18px 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--secondary);
+}
+.action-bar.bare {
+  padding: 0;
+  margin: 12px 0 0;
+  border: 0;
+  background: none;
+}
+.action-bar-title {
+  grid-column: 1;
+  align-self: end;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.action-bar-status {
+  grid-column: 1;
+  align-self: start;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.action-bar-actions {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.action-bar-actions form {
+  display: contents;
+}
+@media (max-width: 760px) {
+  .action-bar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .action-bar-actions {
+    grid-column: 1;
+    grid-row: auto;
+    justify-content: flex-start;
+    margin-top: 8px;
+  }
+  .action-bar-actions .button {
+    flex: 1 1 auto;
+  }
+}

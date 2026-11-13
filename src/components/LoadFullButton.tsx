@@ -17,10 +17,16 @@ export default function LoadFullButton({
   playerId,
   requestedAt,
   label = "Charger la fiche complète",
+  title,
+  bare = false,
 }: {
   playerId: string;
   requestedAt?: number | null;
   label?: string;
+  /** Titre de la barre (à gauche, au-dessus de l’état). */
+  title?: React.ReactNode;
+  /** Sans cadre : la barre est déjà dans un encadré. */
+  bare?: boolean;
 }) {
   const router = useRouter();
   const [state, setState] = useState<State>(
@@ -124,43 +130,46 @@ export default function LoadFullButton({
     }
   }
   return (
-    <div className="hero-actions" style={{ alignItems: "center" }}>
-      <button
-        className="button primary"
-        type="button"
-        onClick={ask}
-        disabled={
-          state === "checking" || state === "sending" || state === "waiting"
-        }
-      >
-        {state === "checking"
-          ? "Vérification de la demande…"
-          : state === "sending"
-            ? "Demande…"
-            : state === "waiting"
-              ? "Lecture demandée"
-              : label}
-      </button>
-      <a
-        className="button"
-        href={`https://gamechase.io/gamev2/players/${encodeURIComponent(playerId)}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={() => {
-          if (state !== "waiting") {
-            setSince(Date.now());
-            setState("waiting");
-          }
-        }}
-      >
-        Ouvrir sa fiche dans GameChase ↗
-      </a>
-      <small className="muted" style={{ flexBasis: "100%" }}>
+    <div className={bare ? "action-bar bare" : "action-bar"}>
+      {title && <div className="action-bar-title">{title}</div>}
+      <small className="action-bar-status" role="status">
         {state === "waiting"
           ? `Demandé à ${new Date(since).toLocaleTimeString("fr-CH", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Zurich" })} : le serveur lit la fiche de ce joueur en priorité (en général dans la minute). Si tu as l’extension, ouvrir sa fiche dans le jeu suffit aussi. Cette page se met à jour toute seule.`
           : message ||
-            "Demande la lecture de la fiche complète de ce joueur : elle passe avant tout le reste, en général dans la minute."}
+            "Sous-attributs, leviers et simulateur d’entraînement arrivent avec la fiche complète : la lecture passe avant tout le reste, en général dans la minute."}
       </small>
+      <div className="action-bar-actions">
+        <button
+          className="button primary"
+          type="button"
+          onClick={ask}
+          disabled={
+            state === "checking" || state === "sending" || state === "waiting"
+          }
+        >
+          {state === "checking"
+            ? "Vérification de la demande…"
+            : state === "sending"
+              ? "Demande…"
+              : state === "waiting"
+                ? "Lecture demandée"
+                : label}
+        </button>
+        <a
+          className="button"
+          href={`https://gamechase.io/gamev2/players/${encodeURIComponent(playerId)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => {
+            if (state !== "waiting") {
+              setSince(Date.now());
+              setState("waiting");
+            }
+          }}
+        >
+          Ouvrir sa fiche dans GameChase ↗
+        </a>
+      </div>
     </div>
   );
 }

@@ -122,58 +122,58 @@ export default async function SquadPage({
       {problem && <div className="notice warning">{problem}</div>}
 
       {club && (
-        <div
-          className="notice"
-          style={{
-            display: "flex",
-            gap: 12,
-            flexWrap: "wrap",
-            alignItems: "center",
-          }}
+        <SquadUpdateButton
+          key={`${club.teamId}:${club.requestedAt}:${club.fetchedAt}`}
+          teamId={club.teamId}
+          requestedAt={club.requestedAt}
+          primary={isLinked || !session}
+          title={
+            isLinked
+              ? "C’est le club rattaché à ton compte."
+              : session
+                ? "Est-ce ton club ?"
+                : authEnabled()
+                  ? "Connecte-toi pour retrouver ce club sur tous tes appareils."
+                  : "Effectif de ce club"
+          }
         >
           {isLinked ? (
-            <>
-              <span>C’est le club rattaché à ton compte.</span>
-              <form action={unlinkClub}>
-                <button className="button subtle">Changer de club</button>
-              </form>
-            </>
+            <form action={unlinkClub}>
+              <button className="button subtle">Changer de club</button>
+            </form>
           ) : session ? (
             <>
-              <span>Est-ce ton club ?</span>
+              <Link
+                className="button subtle"
+                href="/squad?changer=1"
+                prefetch={false}
+              >
+                Chercher un autre club
+              </Link>
               <form action={linkClub}>
                 <input type="hidden" name="teamId" value={club.teamId} />
                 <button className="button primary">
                   Rattacher à mon compte
                 </button>
               </form>
-              <Link href="/squad?changer=1" prefetch={false}>
-                Chercher un autre club
-              </Link>
             </>
           ) : authEnabled() ? (
-            <>
-              <span>
-                Connecte-toi pour retrouver ce club sur tous tes appareils.
-              </span>
-              <a
-                className="button primary"
-                href={`/api/auth/google?next=${encodeURIComponent(here)}`}
-              >
-                Se connecter avec Google
-              </a>
-            </>
+            <a
+              className="button"
+              href={`/api/auth/google?next=${encodeURIComponent(here)}`}
+            >
+              Se connecter avec Google
+            </a>
           ) : (
-            <Link href="/squad?changer=1" prefetch={false}>
+            <Link
+              className="button subtle"
+              href="/squad?changer=1"
+              prefetch={false}
+            >
               Chercher un autre club
             </Link>
           )}
-          <SquadUpdateButton
-            key={`${club.teamId}:${club.requestedAt}:${club.fetchedAt}`}
-            teamId={club.teamId}
-            requestedAt={club.requestedAt}
-          />
-        </div>
+        </SquadUpdateButton>
       )}
 
       {club ? (
