@@ -120,6 +120,9 @@ const SCHEMA = [
   'CREATE TABLE IF NOT EXISTS site_users (k TEXT PRIMARY KEY, team_id TEXT, updated_at INTEGER NOT NULL)',
   // Site appearance, independent of the club link (unlinking must preserve it).
   'CREATE TABLE IF NOT EXISTS site_preferences (k TEXT PRIMARY KEY, appearance TEXT NOT NULL, updated_at INTEGER NOT NULL)',
+  // Ce que seul le manager du club voit dans le jeu, envoyé par son extension :
+  // niveaux des coachs et du centre, joueurs en prêt (avec date de fin).
+  'CREATE TABLE IF NOT EXISTS club_extras (team_id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at INTEGER NOT NULL, contributor TEXT)',
   // Table des confrontations de styles de jeu, reconstituée à partir des
   // phrases « X a l'avantage sur Y » de l'analyse de match du jeu.
   // Une ligne par (match, gagnant, perdant) : un même match compte une fois.
@@ -129,7 +132,7 @@ const PLAYSTYLES = ['Balanced', 'Possession', 'Tiki-Taka', 'Direct', 'Counter-at
   'High Tempo', 'Wing Play', 'Long Ball', 'Park the Bus', 'Catenaccio', 'Fluid'];
 const dbReady = new WeakSet();
 const dbInitializing = new WeakMap();
-const SCHEMA_VERSION = 'schema:site-perf:v2';
+const SCHEMA_VERSION = 'schema:site-perf:v3';
 // D1 batches and Turso pipelines both return SELECT results in order.
 async function readBatch(env, statements) {
   return (await env.DB.batch(statements)).map(r => r.results || []);
@@ -708,11 +711,12 @@ async function siteClubRequest(req, env, url, json) {
        WHERE f.fetched_at > c.fetched_at AND f.id IN (
          SELECT json_extract(CASE WHEN p.type = 'object' THEN p.value ELSE '{}' END, '$.id')
          FROM json_each(CASE WHEN json_valid(c.players) THEN c.players ELSE '[]' END) p
-       )) AS newer
+       )) AS newer, x.data AS extras_data, x.updated_at AS extras_at
     FROM (SELECT ?1 AS team_id) wanted
     LEFT JOIN clubs c ON c.team_id = wanted.team_id
     LEFT JOIN site_clubs n ON n.team_id = wanted.team_id
-    LEFT JOIN site_requests r ON r.team_id = wanted.team_id`).bind(teamId).first();
+    LEFT JOIN site_requests r ON r.team_id = wanted.team_id
+    LEFT JOIN club_extras x ON x.team_id = wanted.team_id`).bind(teamId).first();
   const c = row?.fetched_at != null ? row : null;
   const n = row?.name != null ? row : null;
   let players = [];
@@ -754,7 +758,35 @@ async function siteClubRequest(req, env, url, json) {
         ON CONFLICT(team_id) DO UPDATE SET player_id = NULL, requested_at = excluded.requested_at`).bind(teamId, now).run();
       requestedAt = now;
   }
-  return json({ teamId, name: (n && n.name) || null, crest: (n && n.crest) || null, fetchedAt: c ? c.fetched_at : null, requestedAt, players });
+  return json({ teamId, name: (n && n.name) || null, crest: (n && n.crest) || null, fetchedAt: c ? c.fetched_at : null, requestedAt, players,
+    extras: readExtras(row && row.extras_data, row && row.extras_at) });
+}
+
+// Réglages et prêts d'un club : uniquement des niveaux 1 à 5, des identifiants et des dates.
+const EXTRA_COACHES = ['att', 'mid', 'def', 'gk', 'physio'];
+function cleanExtras(body, now) {
+  if (!body || typeof body !== 'object') return null;
+  const out = {};
+  const lvl = v => Number.isInteger(v) && v >= 1 && v <= 5;
+  if (body.coaches && typeof body.coaches === 'object' && EXTRA_COACHES.every(k => lvl(body.coaches[k])) && lvl(body.center)) {
+    out.coaches = Object.fromEntries(EXTRA_COACHES.map(k => [k, body.coaches[k]]));
+    out.center = body.center;
+  }
+  if (Array.isArray(body.loans)) {
+    out.loans = [];
+    for (const l of body.loans.slice(0, 60)) {
+      const until = typeof l?.until === 'string' ? Date.parse(l.until) : l?.until;
+      if (!isStr(l?.id, 64) || !Number.isFinite(until) || until < now - 86400e3 || until > now + 400 * 86400e3) continue;
+      out.loans.push({ id: l.id, until, lender: isStr(l.lender, 80) ? l.lender : null });
+    }
+  }
+  return out.coaches || out.loans ? out : null;
+}
+function readExtras(data, updatedAt, now = Date.now()) {
+  if (!data) return null;
+  let d; try { d = JSON.parse(data); } catch (_) { return null; }
+  return { updatedAt, coaches: d.coaches || null, center: d.center ?? null,
+    loans: (d.loans || []).filter(l => l.until > now) };
 }
 
 // --- Licence -------------------------------------------------------------------
@@ -888,6 +920,19 @@ async function extensionRequest(req, env, url, json, internal = false) {
   if (!internal && !(await licenceOk(env, installId, req.headers.get('X-GMC-Licence')))) return json({ error: 'licence invalide ou expirée' }, 401);
   await ensureDb(env);
   const now = Date.now();
+
+  // Réglages du club et prêts, lus par l'extension du manager dans son propre effectif.
+  if (req.method === 'POST' && url.pathname === '/v1/club-extras') {
+    let body; try { body = await req.json(); } catch (_) { return json({ error: 'JSON invalide' }, 400); }
+    const data = cleanExtras(body, now);
+    if (!isStr(body.teamId, 64) || !data) return json({ error: 'Données invalides' }, 400);
+    const text = JSON.stringify(data);
+    // N'écrit que si quelque chose a changé (ou une fois par jour).
+    const res = await env.DB.prepare(`INSERT INTO club_extras (team_id, data, updated_at, contributor) VALUES (?1, ?2, ?3, ?4)
+      ON CONFLICT(team_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at, contributor = excluded.contributor
+      WHERE club_extras.data IS NOT excluded.data OR club_extras.updated_at < ?5`).bind(body.teamId, text, now, installId || null, now - 86400e3).run();
+    return json({ ok: true, changed: !!(res.meta && res.meta.changes) });
+  }
 
   // Envoi d'effectifs : on ne garde que la version la plus récente de chaque club,
   // et le catalogue (site_players) n'est réécrit que pour ce qui a changé.

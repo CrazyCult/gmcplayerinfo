@@ -3,6 +3,7 @@ import SquadImport from "@/components/SquadImport";
 import SquadTable from "@/components/SquadTable";
 import SquadExport from "@/components/SquadExport";
 import SquadUpdateButton from "@/components/SquadUpdateButton";
+import GameSettingsSync from "@/components/GameSettingsSync";
 import {
   IndexError,
   getAccountClub,
@@ -212,6 +213,17 @@ export default async function SquadPage({
               .filter((p) => p.light)
               .map((p) => p.player.id)}
             premium={premium}
+            loans={club.extras?.loans}
+            clubName={club.name}
+            settingsNote={
+              isLinked && club.extras?.coaches && club.extras.center ? (
+                <GameSettingsSync
+                  coaches={club.extras.coaches}
+                  center={club.extras.center}
+                  updatedAt={club.extras.updatedAt}
+                />
+              ) : undefined
+            }
           />
         ) : (
           <div className="empty">

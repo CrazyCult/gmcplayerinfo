@@ -954,3 +954,55 @@ describe("table des confrontations", () => {
     expect(f.body).toEqual({ accepted: 1, rejected: 1 });
   });
 });
+
+describe("réglages du club et prêts envoyés par l’extension", () => {
+  it("garde les niveaux et les prêts en cours, et les rend avec le club", async () => {
+    vi.useFakeTimers();
+    const now = Date.parse("2026-11-13T09:00:00Z");
+    vi.setSystemTime(now);
+    const { call } = setup();
+    await call("POST", "/v1/clubs", {
+      clubs: [{ teamId: "T1", fetchedAt: now - 1000, players: [full("p1")] }],
+    });
+    expect(
+      (await call("POST", "/v1/club-extras", { teamId: "T1", center: 9 }))
+        .status,
+    ).toBe(400);
+    const sent = await call("POST", "/v1/club-extras", {
+      teamId: "T1",
+      coaches: { att: 5, mid: 5, def: 4, gk: 3, physio: 5, lawyer: 5 },
+      center: 5,
+      loans: [
+        {
+          id: "p1",
+          until: "2026-11-17T09:45:11.221293+00:00",
+          lender: "Massilia Juniors",
+        },
+        { id: "old", until: "2026-11-01T00:00:00Z", lender: "X" },
+        { id: "bad", until: "demain" },
+      ],
+    });
+    expect(sent.body).toEqual({ ok: true, changed: true });
+    const club = (await call("GET", "/v1/site/club/T1", undefined, true)).body;
+    expect(club.extras.coaches).toEqual({
+      att: 5,
+      mid: 5,
+      def: 4,
+      gk: 3,
+      physio: 5,
+    });
+    expect(club.extras.center).toBe(5);
+    expect(club.extras.loans).toEqual([
+      {
+        id: "p1",
+        until: Date.parse("2026-11-17T09:45:11.221Z"),
+        lender: "Massilia Juniors",
+      },
+    ]);
+    // Prêt terminé : il disparaît tout seul.
+    vi.setSystemTime(Date.parse("2026-11-18T00:00:00Z"));
+    const later = (await call("GET", "/v1/site/club/T1", undefined, true)).body;
+    expect(later.extras.loans).toEqual([]);
+    vi.useRealTimers();
+  });
+});
