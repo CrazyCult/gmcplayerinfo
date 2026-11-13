@@ -1,5 +1,6 @@
 "use client";
 
+import { signatureLabel } from "@/lib/nationSignature";
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -275,7 +276,18 @@ export default function PlayerView({
           </div>
           <div>
             <dt>Pays</dt>
-            <dd>{countryFr(player.nationality, player.flagCode) ?? "—"}</dd>
+            <dd>
+              {countryFr(player.nationality, player.flagCode) ?? "—"}
+              {signatureLabel(player.nationality) && (
+                <small
+                  className="muted"
+                  title="Esprit national : avec au moins 3 titulaires de ce pays, ils gagnent +0,5 % sur cette stat par point de chimie de nationalité (+4 % au plus)."
+                  style={{ display: "block", fontWeight: 400 }}
+                >
+                  bonus de pays : {signatureLabel(player.nationality)}
+                </small>
+              )}
+            </dd>
           </div>
           <div>
             <dt>Pied</dt>
