@@ -103,12 +103,16 @@ export default async function PlayerPage({
             />
           )}
         </p>
-        <PlayerView
-          player={snapshot.player}
-          remote
-          club={snapshot.club}
-          full={snapshot.light ? {} : undefined}
-        />
+        {snapshot.light && (
+          <section className="notice" style={{ marginBottom: 16 }}>
+            <strong>Fiche légère : 6 stats seulement.</strong> Sous-attributs,
+            leviers et simulateur d’entraînement demandent la fiche complète.
+            <div style={{ marginTop: 10 }}>
+              <LoadFullButton playerId={snapshot.player.id} />
+            </div>
+          </section>
+        )}
+        <PlayerView player={snapshot.player} remote club={snapshot.club} />
         <div className="stack" style={{ marginTop: 24 }}>
           <Fold title="Progression réelle" summary={historySummary(history)}>
             <OvrHistory
