@@ -98,13 +98,40 @@ export default async function SquadPage({
     }
   }
   const isLinked = Boolean(club && linked === club.teamId);
+  // Logo du club : seulement une image hébergée par le jeu (stockage Vercel).
+  const crest =
+    club?.crest &&
+    /^https:\/\/[a-z0-9]+\.public\.blob\.vercel-storage\.com\//.test(club.crest)
+      ? club.crest
+      : null;
   const here = club
     ? `/squad?club=${encodeURIComponent(club.teamId)}`
     : "/squad";
 
   return (
     <>
-      <div className="section-head">
+      <div className={crest ? "section-head club-hero" : "section-head"}>
+        {crest && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              className="club-hero-glow"
+              src={crest}
+              alt=""
+              aria-hidden="true"
+              referrerPolicy="no-referrer"
+            />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              className="club-hero-crest"
+              src={crest}
+              alt={`Logo de ${club?.name ?? "ce club"}`}
+              width={104}
+              height={104}
+              referrerPolicy="no-referrer"
+            />
+          </>
+        )}
         <div>
           <div className="eyebrow">Votre vestiaire</div>
           <h1>{club?.name ?? "Mon effectif"}</h1>
