@@ -9,8 +9,6 @@ import { routeCards, routeLabel } from "@/engine/positionCards";
 import { projectValue } from "@/engine/value";
 import { MAX_COACHES } from "@/engine/tables";
 import { coachSummary, useClubSettings } from "@/lib/trainingSettings";
-import ClubSettingsForm from "./ClubSettingsForm";
-import Fold from "./UI/Fold";
 import { POSITIONS, type Player } from "@/types";
 import Rating from "./UI/Rating";
 import { nextBirthday } from "@/lib/birthday";
@@ -36,6 +34,34 @@ type SortKey =
   | "plusOneNet";
 
 /** Tableau d’effectif : notes, écart au potentiel et plan d’entraînement. */
+const POSITION_GROUPS: Record<string, string[]> = {
+  Gardiens: ["GK"],
+  Défenseurs: ["CB", "LB", "RB", "LWB", "RWB"],
+  Milieux: ["CDM", "CM", "CAM", "LM", "RM"],
+  Attaquants: ["LW", "RW", "ST", "CF"],
+};
+const RARITY_ORDER = [
+  "common",
+  "uncommon",
+  "rare",
+  "epic",
+  "legendary",
+  "galactico",
+] as const;
+const RARITY_LABELS: Record<string, string> = {
+  common: "Commun",
+  uncommon: "Peu commun",
+  rare: "Rare",
+  epic: "Épique",
+  legendary: "Légendaire",
+  galactico: "Galactico",
+};
+/** Tranche « min-max » (bornes incluses), celles du bonus d’entraînement. */
+function inAgeBand(age: number, band: string) {
+  const [min, max] = band.split("-").map(Number);
+  return age >= min && age <= max;
+}
+
 /** « emprunté à X · jusqu’au 17/11 », ou « prêté » quand le prêteur est ce club. */
 function loanLabel(
   loan: { until: number; lender: string | null } | undefined,
@@ -96,7 +122,39 @@ export default function SquadTable({
     : "tous les coachs et le centre au niveau 5";
   const [filter, setFilter] = useState(""),
     [position, setPosition] = useState(""),
-    [age, setAge] = useState("");
+    [age, setAge] = useState(""),
+    [rarity, setRarity] = useState(""),
+    [nation, setNation] = useState(""),
+    [status, setStatus] = useState(""),
+    [ovrMin, setOvrMin] = useState(""),
+    [potMin, setPotMin] = useState("");
+  const rarities = useMemo(
+    () =>
+      RARITY_ORDER.filter((value) =>
+        players.some((player) => player.rarity === value),
+      ),
+    [players],
+  );
+  const nations = useMemo(
+    () =>
+      [
+        ...new Set(players.map((player) => player.nationality).filter(Boolean)),
+      ].sort((a, b) => a!.localeCompare(b!)) as string[],
+    [players],
+  );
+  const filtersOn = Boolean(
+    filter || position || age || rarity || nation || status || ovrMin || potMin,
+  );
+  function resetFilters() {
+    setFilter("");
+    setPosition("");
+    setAge("");
+    setRarity("");
+    setNation("");
+    setStatus("");
+    setOvrMin("");
+    setPotMin("");
+  }
   const [sort, setSort] = useState<SortKey>("potential"),
     [direction, setDirection] = useState(-1);
   const rows = useMemo(
@@ -169,8 +227,24 @@ export default function SquadTable({
     .filter(
       (player) =>
         player.name.toLowerCase().includes(filter.toLowerCase()) &&
-        (!position || player.position === position) &&
-        (!age || player.age <= Number(age)),
+        (!position ||
+          (POSITION_GROUPS[position]
+            ? POSITION_GROUPS[position].includes(player.position)
+            : player.position === position)) &&
+        (!age || inAgeBand(player.age, age)) &&
+        (!rarity || player.rarity === rarity) &&
+        (!nation || player.nationality === nation) &&
+        (!ovrMin || player.overall >= Number(ovrMin)) &&
+        (!potMin || player.potential >= Number(potMin)) &&
+        (!status ||
+          (status === "progress" && player.overall < player.potential) ||
+          (status === "max" && player.overall >= player.potential) ||
+          (status === "loan" && (player.onLoan || loanOf.has(player.id))) ||
+          (status === "own" && !(player.onLoan || loanOf.has(player.id))) ||
+          (status === "birthday" &&
+            player.birthday !== undefined &&
+            player.birthday <= 7) ||
+          (status === "light" && light.has(player.id))),
     )
     .sort((a, b) => {
       const av = a[sort],
@@ -250,27 +324,21 @@ export default function SquadTable({
             <h2 style={{ margin: 0 }}>
               Les joueurs <small>({filtered.length})</small>
             </h2>
-            <p>{subtitle ?? `Plans calculés avec ${settingsLabel}.`}</p>
+            <p>
+              {subtitle ?? (
+                <>
+                  Plans calculés avec {settingsLabel}.{" "}
+                  <Link href="/compte#reglages" prefetch={false}>
+                    {club.saved ? "Modifier" : "Renseigner mes réglages"}
+                  </Link>
+                </>
+              )}
+            </p>
+            {settingsNote}
           </div>
           {action}
         </div>
-        <Fold
-          title="Réglages de mon club"
-          summary={
-            club.saved
-              ? settingsLabel
-              : "À renseigner pour des coûts identiques au jeu"
-          }
-        >
-          <p className="muted" style={{ marginTop: 0 }}>
-            Niveaux de tes coachs et de ton centre d’entraînement (menu
-            Entraînement du jeu). Mémorisés dans ce navigateur, repris par le
-            simulateur et les leviers d’OVR.
-          </p>
-          <ClubSettingsForm />
-          {settingsNote}
-        </Fold>
-        <div className="filters">
+        <div className="filters squad-filters">
           <input
             placeholder="Filtrer par nom…"
             aria-label="Filtrer par nom"
@@ -283,20 +351,98 @@ export default function SquadTable({
             onChange={(event) => setPosition(event.target.value)}
           >
             <option value="">Tous les postes</option>
-            {POSITIONS.map((post) => (
-              <option key={post}>{post}</option>
-            ))}
+            <optgroup label="Lignes">
+              {Object.keys(POSITION_GROUPS).map((group) => (
+                <option key={group}>{group}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Postes">
+              {POSITIONS.map((post) => (
+                <option key={post}>{post}</option>
+              ))}
+            </optgroup>
           </select>
           <select
-            aria-label="Âge maximum"
+            aria-label="Tranche d’âge"
             value={age}
             onChange={(event) => setAge(event.target.value)}
           >
             <option value="">Tous les âges</option>
-            <option value="17">17 ans et moins</option>
-            <option value="24">24 ans et moins</option>
-            <option value="30">30 ans et moins</option>
+            <option value="0-17">17 ans et moins (entraînement ×3)</option>
+            <option value="18-24">18 à 24 ans (×2)</option>
+            <option value="25-30">25 à 30 ans (×1)</option>
+            <option value="31-99">31 ans et plus (ne progresse plus)</option>
           </select>
+          <select
+            aria-label="Situation"
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
+            <option value="">Toute situation</option>
+            <option value="progress">Peut encore progresser</option>
+            <option value="max">Au potentiel maximum</option>
+            <option value="birthday">Âge +1 dans 7 jours</option>
+            <option value="own">Hors prêt</option>
+            <option value="loan">En prêt</option>
+            {light.size > 0 && <option value="light">Fiches légères</option>}
+          </select>
+          {rarities.length > 1 && (
+            <select
+              aria-label="Rareté"
+              value={rarity}
+              onChange={(event) => setRarity(event.target.value)}
+            >
+              <option value="">Toute rareté</option>
+              {rarities.map((value) => (
+                <option key={value} value={value}>
+                  {RARITY_LABELS[value]}
+                </option>
+              ))}
+            </select>
+          )}
+          {nations.length > 1 && (
+            <select
+              aria-label="Nationalité"
+              value={nation}
+              onChange={(event) => setNation(event.target.value)}
+            >
+              <option value="">Tout pays</option>
+              {nations.map((value) => (
+                <option key={value}>{value}</option>
+              ))}
+            </select>
+          )}
+          <input
+            className="filter-number"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={130}
+            placeholder="OVR min"
+            aria-label="OVR minimum"
+            value={ovrMin}
+            onChange={(event) => setOvrMin(event.target.value)}
+          />
+          <input
+            className="filter-number"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={130}
+            placeholder="POT min"
+            aria-label="Potentiel minimum"
+            value={potMin}
+            onChange={(event) => setPotMin(event.target.value)}
+          />
+          {filtersOn && (
+            <button
+              type="button"
+              className="button subtle"
+              onClick={resetFilters}
+            >
+              Effacer les filtres
+            </button>
+          )}
         </div>
         <div className="table-wrap">
           <table className="squad-table">

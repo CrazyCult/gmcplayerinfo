@@ -21,10 +21,10 @@ export default function ClubSettingsForm() {
       toast.error("Impossible de mémoriser les réglages."),
     );
   return (
-    <div className="settings club-settings">
+    <div className="club-settings">
       {(Object.keys(LABELS) as Coach[]).map((coach) => (
         <label key={coach}>
-          {LABELS[coach]}
+          <span>Coach {LABELS[coach].toLowerCase()}</span>
           <select
             value={club.coaches[coach]}
             onChange={(event) =>
@@ -32,19 +32,23 @@ export default function ClubSettingsForm() {
             }
           >
             {LEVELS.map((level) => (
-              <option key={level}>{level}</option>
+              <option key={level} value={level}>
+                Niveau {level}
+              </option>
             ))}
           </select>
         </label>
       ))}
-      <label>
-        Centre
+      <label className="club-settings-center">
+        <span>Centre d’entraînement</span>
         <select
           value={club.center}
           onChange={(event) => save(club.coaches, Number(event.target.value))}
         >
           {LEVELS.map((level) => (
-            <option key={level}>{level}</option>
+            <option key={level} value={level}>
+              Niveau {level}
+            </option>
           ))}
         </select>
       </label>
