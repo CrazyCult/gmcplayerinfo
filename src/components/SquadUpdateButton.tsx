@@ -6,9 +6,18 @@ import { requestClubUpdate } from "@/app/squad/actions";
 export default function SquadUpdateButton({
   teamId,
   requestedAt,
+  title,
+  primary = false,
+  children,
 }: {
   teamId: string;
   requestedAt: number | null;
+  /** Texte de gauche (à qui est ce club). */
+  title: React.ReactNode;
+  /** Bouton principal de la barre. */
+  primary?: boolean;
+  /** Autres actions, placées avant le bouton de mise à jour. */
+  children?: React.ReactNode;
 }) {
   const router = useRouter();
   const [since, setSince] = useState(requestedAt);
@@ -89,25 +98,9 @@ export default function SquadUpdateButton({
     }
   }
   return (
-    <div>
-      <button
-        className="button"
-        disabled={sending || (Boolean(since) && !stale)}
-        onClick={() => void ask()}
-      >
-        {sending
-          ? "Demande en cours…"
-          : since
-            ? stale
-              ? "Relancer la mise à jour"
-              : "Mise à jour demandée"
-            : "Demander la mise à jour de l’effectif"}
-      </button>
-      <small
-        className="muted"
-        style={{ display: "block", marginTop: 8 }}
-        role="status"
-      >
+    <div className="action-bar">
+      <div className="action-bar-title">{title}</div>
+      <small className="action-bar-status" role="status">
         {message ||
           (since && stale
             ? "Toujours en attente : tu peux relancer la demande."
@@ -115,6 +108,22 @@ export default function SquadUpdateButton({
               ? "Demande envoyée : l’effectif est relu en priorité (en général dans la minute) et s’affichera ici tout seul."
               : "Relit tout l’effectif du club en priorité, même sans extension.")}
       </small>
+      <div className="action-bar-actions">
+        {children}
+        <button
+          className={primary ? "button primary" : "button"}
+          disabled={sending || (Boolean(since) && !stale)}
+          onClick={() => void ask()}
+        >
+          {sending
+            ? "Demande en cours…"
+            : since
+              ? stale
+                ? "Relancer la mise à jour"
+                : "Mise à jour demandée"
+              : "Demander la mise à jour de l’effectif"}
+        </button>
+      </div>
     </div>
   );
 }
