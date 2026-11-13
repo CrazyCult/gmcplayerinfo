@@ -427,3 +427,27 @@ it("adds a player unknown to the index from its game id (just packed)", async ()
   expect((await site(`/v1/site/status/${GHOST}`)).status).toBe(404);
   vi.useRealTimers();
 });
+
+it("filters the catalogue by nationality and lists the known nationalities", async () => {
+  const { env } = setup();
+  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url.startsWith(SUPA)) return Response.json({ access_token: "AT", refresh_token: "RT", expires_in: 3600, user: { id: "u" } });
+    if (url.startsWith("https://gamechase.io/api/players/database")) {
+      const q = new URL(url).searchParams, pos = q.get("position") || "ST", min = +(q.get("minOvr") || 60);
+      const players = q.get("availability") === "all" ? [{ ...player(`${pos}-${min}`, pos, min), nationality: pos === "GK" ? "Norway" : "France" }] : [];
+      return Response.json({ page: 1, total: players.length, pageSize: 24, players });
+    }
+    throw new Error("unexpected " + url);
+  }));
+  const at = Date.parse("2026-11-09T15:01:00Z");
+  for (let i = 0; i < 6; i++) await tick(env, at + i * 60e3);
+  const site = (path: string) => worker.fetch(new Request(`https://index.test${path}`, { headers: { Authorization: "Bearer tok" } }), env).then(r => r.json());
+  const all = await site("/v1/site/players");
+  const { nationalities } = await site("/v1/site/nationalities");
+  expect(nationalities.reduce((s: number, n: { n: number }) => s + n.n, 0)).toBe(all.total);
+  const first = nationalities[0];
+  const some = await site(`/v1/site/players?nat=${encodeURIComponent(first.name)}`);
+  expect(some.total).toBe(first.n);
+  expect((await site("/v1/site/players?nat=Atlantide")).total).toBe(0);
+});

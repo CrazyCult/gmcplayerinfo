@@ -190,6 +190,19 @@ export default function PlayerView({
                   ) : (
                     club.name
                   )}
+                  {!club.freeAgent && club.id && (
+                    <>
+                      {" · "}
+                      <a
+                        href={`https://gamechase.io/gamev2/club/${encodeURIComponent(club.id)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Ouvrir ce club dans GameChase, pour contacter son manager"
+                      >
+                        club dans le jeu ↗
+                      </a>
+                    </>
+                  )}
                   {light && " · "}
                 </>
               )}

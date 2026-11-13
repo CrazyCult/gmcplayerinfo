@@ -189,6 +189,7 @@ export async function getCatalog({
   search = false,
   avail = "",
   sort = "overall",
+  nat = "",
 }: {
   q?: string;
   position?: string;
@@ -196,6 +197,7 @@ export async function getCatalog({
   search?: boolean;
   avail?: (typeof CATALOG_AVAIL)[number];
   sort?: (typeof CATALOG_SORTS)[number];
+  nat?: string;
 } = {}) {
   const params = new URLSearchParams({
     q: q.slice(0, 100),
@@ -204,9 +206,26 @@ export async function getCatalog({
     avail,
     sort,
   });
+  if (nat) params.set("nat", nat.slice(0, 60));
   return catalogSchema.parse(
     await request(`/v1/site/${search ? "search" : "players"}?${params}`),
   );
+}
+
+const nationalitiesSchema = z.object({
+  nationalities: z.array(
+    z.object({
+      name: z.string(),
+      flag: z.string().nullable().optional(),
+      n: z.number().int().nonnegative(),
+    }),
+  ),
+});
+/** Nationalités présentes dans la base du jeu (liste du filtre, mise en cache 1 h). */
+export async function getNationalities() {
+  return nationalitiesSchema.parse(
+    await request("/v1/site/nationalities", { revalidate: 3600 }),
+  ).nationalities;
 }
 
 // --- « Mon effectif » -------------------------------------------------------
