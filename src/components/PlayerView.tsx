@@ -433,9 +433,8 @@ export default function PlayerView({
               <div className="notice">
                 Fiche légère : la base du jeu ne donne que les 6 stats. OVR et
                 notes par poste sont exacts ; sous-attributs, leviers et
-                simulateur d’entraînement apparaîtront quand un utilisateur de
-                GMC Companion aura ouvert la fiche de ce joueur ou la page de
-                son club.
+                simulateur d’entraînement apparaîtront avec la fiche complète
+                (bouton « Charger la fiche complète » en haut de la page).
               </div>
             )}
             {light && remote && full && (
