@@ -11,6 +11,7 @@ import { MAX_COACHES } from "@/engine/tables";
 import { coachSummary, useClubSettings } from "@/lib/trainingSettings";
 import { POSITIONS, type Player } from "@/types";
 import Rating from "./UI/Rating";
+import { signatureLabel } from "@/lib/nationSignature";
 import { nextBirthday } from "@/lib/birthday";
 
 const birthdayDate = (t: number) =>
@@ -408,7 +409,10 @@ export default function SquadTable({
             >
               <option value="">Tout pays</option>
               {nations.map((value) => (
-                <option key={value}>{value}</option>
+                <option key={value} value={value}>
+                  {value}
+                  {signatureLabel(value) ? ` · ${signatureLabel(value)}` : ""}
+                </option>
               ))}
             </select>
           )}

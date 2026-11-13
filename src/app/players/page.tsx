@@ -1,3 +1,4 @@
+import { signatureLabel } from "@/lib/nationSignature";
 import Link from "next/link";
 import {
   CATALOG_AVAIL,
@@ -88,7 +89,11 @@ export default async function PlayersPage({
               <option value="">Toutes les nationalités</option>
               {nationalities.map((n) => (
                 <option key={n.name} value={n.name}>
-                  {n.name} ({n.n.toLocaleString("fr-CH")})
+                  {n.name}
+                  {signatureLabel(n.name)
+                    ? ` · ${signatureLabel(n.name)}`
+                    : ""}{" "}
+                  ({n.n.toLocaleString("fr-CH")})
                 </option>
               ))}
             </select>
