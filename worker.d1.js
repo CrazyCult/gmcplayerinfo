@@ -407,6 +407,10 @@ export function publicPlayer(row) {
   const filterAttributes = attrs => Object.fromEntries(Object.entries(attrs || {}).filter(([key, value]) => PUBLIC_ATTRIBUTES.has(key) && typeof value === 'number' && Number.isFinite(value)));
   player.attributes = filterAttributes(raw.attributes);
   if (raw.attributes?.subs) player.attributes.subs = filterAttributes(raw.attributes.subs);
+  // Prêté à un autre club : le jeu le donne sous plusieurs formes selon la source.
+  const loan = raw.active_loan ?? raw.activeLoan;
+  if (raw.onLoan === true || raw.on_loan === true || raw.is_on_loan === true || raw.loaned_out === true
+    || (loan && (typeof loan !== 'object' || Object.keys(loan).length > 0))) player.onLoan = true;
   player.club_id = row.team_id;
   return player;
 }

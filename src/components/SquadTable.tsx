@@ -294,7 +294,15 @@ export default function SquadTable({
             </thead>
             <tbody>
               {filtered.map((player) => (
-                <tr key={player.id}>
+                <tr
+                  key={player.id}
+                  className={player.onLoan ? "on-loan" : undefined}
+                  title={
+                    player.onLoan
+                      ? "Prêté à un autre club : indisponible jusqu’à son retour"
+                      : undefined
+                  }
+                >
                   <td>
                     <span className="pill">{player.position}</span>
                   </td>
@@ -302,6 +310,7 @@ export default function SquadTable({
                     <Link href={`${hrefPrefix}${player.id}`} prefetch={false}>
                       {player.name}
                     </Link>
+                    {player.onLoan && <span className="loan-tag">prêté</span>}
                     {light.has(player.id) && (
                       <small
                         className="muted"
