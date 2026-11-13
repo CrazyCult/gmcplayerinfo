@@ -246,7 +246,7 @@ describe("Worker sur Turso (API HTTP)", () => {
     ).toBe(500);
     expect(
       t.db
-        .prepare("SELECT v FROM db_meta WHERE k = 'schema:site-perf:v1'")
+        .prepare("SELECT v FROM db_meta WHERE k = 'schema:site-perf:v2'")
         .get(),
     ).toBeUndefined();
     expect(
@@ -254,7 +254,7 @@ describe("Worker sur Turso (API HTTP)", () => {
     ).toBe(200);
     expect(
       t.db
-        .prepare("SELECT v FROM db_meta WHERE k = 'schema:site-perf:v1'")
+        .prepare("SELECT v FROM db_meta WHERE k = 'schema:site-perf:v2'")
         .get()?.v,
     ).toBe("1");
   });

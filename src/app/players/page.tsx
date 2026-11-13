@@ -4,6 +4,7 @@ import {
   CATALOG_SORTS,
   PREMIUM_SORTS,
   getCatalog,
+  getNationalities,
   indexEnabled,
 } from "@/data/gmc-index";
 import { compact, money } from "@/lib/format";
@@ -22,6 +23,7 @@ export default async function PlayersPage({
     page?: string;
     avail?: string;
     sort?: string;
+    nat?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -41,15 +43,21 @@ export default async function PlayersPage({
     1,
     Math.min(20, Number.parseInt(params.page || "1", 10) || 1),
   );
+  const nat = params.nat?.slice(0, 60) || "";
   let catalog;
-  try {
-    if (indexEnabled())
-      catalog = await getCatalog({ q, position, page, avail, sort });
-  } catch {
+  let nationalities: Awaited<ReturnType<typeof getNationalities>> = [];
+  if (indexEnabled()) {
+    // La liste des nationalités est facultative : sans elle, le filtre disparaît.
+    const [c, n] = await Promise.allSettled([
+      getCatalog({ q, position, page, avail, sort, nat }),
+      getNationalities(),
+    ]);
     /* Render a recoverable state without exposing upstream credentials. */
+    if (c.status === "fulfilled") catalog = c.value;
+    if (n.status === "fulfilled") nationalities = n.value;
   }
   const pageUrl = (nextPage: number) =>
-    `/players?${new URLSearchParams({ q, position, avail, sort, page: String(nextPage) })}`;
+    `/players?${new URLSearchParams({ q, position, avail, sort, ...(nat ? { nat } : {}), page: String(nextPage) })}`;
   return (
     <div className="stack">
       <section className="card">
@@ -75,6 +83,16 @@ export default async function PlayersPage({
               <option key={p}>{p}</option>
             ))}
           </select>
+          {nationalities.length > 0 && (
+            <select name="nat" aria-label="Nationalité" defaultValue={nat}>
+              <option value="">Toutes les nationalités</option>
+              {nationalities.map((n) => (
+                <option key={n.name} value={n.name}>
+                  {n.name} ({n.n.toLocaleString("fr-CH")})
+                </option>
+              ))}
+            </select>
+          )}
           <select name="avail" aria-label="Disponibilité" defaultValue={avail}>
             <option value="">Tous les joueurs</option>
             <option value="transfer">En vente</option>
@@ -114,7 +132,7 @@ export default async function PlayersPage({
               <small className="muted">
                 {" "}
                 · affiche les 1 000 premiers : affine la recherche (nom, poste,
-                disponibilité) pour aller plus loin
+                nationalité, disponibilité) pour aller plus loin
               </small>
             )}
           </p>

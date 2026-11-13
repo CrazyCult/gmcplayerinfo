@@ -88,6 +88,8 @@ const SCHEMA = [
   'DROP INDEX IF EXISTS db_players_name',
   'DROP INDEX IF EXISTS db_players_ovr',
   'DROP INDEX IF EXISTS db_players_pos',
+  // Filtre par nationalité du catalogue.
+  'CREATE INDEX IF NOT EXISTS db_players_nat ON db_players(nationality)',
   `CREATE TABLE IF NOT EXISTS db_prices (player_id TEXT NOT NULL, kind TEXT NOT NULL, price INTEGER NOT NULL,
     overall INTEGER, potential INTEGER, age INTEGER, position TEXT, first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL,
     PRIMARY KEY (player_id, kind, price))`,
@@ -127,7 +129,7 @@ const PLAYSTYLES = ['Balanced', 'Possession', 'Tiki-Taka', 'Direct', 'Counter-at
   'High Tempo', 'Wing Play', 'Long Ball', 'Park the Bus', 'Catenaccio', 'Fluid'];
 const dbReady = new WeakSet();
 const dbInitializing = new WeakMap();
-const SCHEMA_VERSION = 'schema:site-perf:v1';
+const SCHEMA_VERSION = 'schema:site-perf:v2';
 // D1 batches and Turso pipelines both return SELECT results in order.
 async function readBatch(env, statements) {
   return (await env.DB.batch(statements)).map(r => r.results || []);
@@ -469,6 +471,8 @@ function catalogWhere(params) {
     add('((name_norm >= ? AND name_norm < ?) OR (last_norm >= ? AND last_norm < ?) OR id = ?)', q, hi, q, hi, String(params.q).trim());
   }
   if (/^[A-Z]{2,3}$/.test(params.position || '')) add('position = ?', params.position);
+  // Nationalité : connue par la base du jeu (db_players).
+  if (isStr(params.nat, 60)) add('id IN (SELECT id FROM db_players WHERE nationality = ?)', params.nat);
   const num = (k) => { const v = parseInt(params[k] ?? '', 10); return Number.isFinite(v) ? v : null; };
   for (const [k, sql] of [['ageMin', 'age >= ?'], ['ageMax', 'age <= ?'], ['ovrMin', 'overall >= ?'], ['ovrMax', 'overall <= ?'],
     ['potMin', 'potential >= ?'], ['potMax', 'potential <= ?'], ['gapMin', '(potential - overall) >= ?'], ['priceMax', 'transfer_price <= ?']])
@@ -598,6 +602,12 @@ async function siteRequest(req, env, url, json) {
       market: marketOf(s || found.d), prices, comparables, history, historyAt: h ? h.fetched_at : null });
   }
 
+  // Nationalités connues (liste du filtre du catalogue).
+  if (url.pathname === '/v1/site/nationalities') {
+    const { results } = await env.DB.prepare(`SELECT nationality AS name, MAX(flag_code) AS flag, COUNT(*) AS n FROM db_players
+      WHERE nationality IS NOT NULL AND nationality != '' GROUP BY nationality ORDER BY nationality LIMIT 400`).all();
+    return json({ nationalities: results.map(r => ({ name: r.name, flag: r.flag || null, n: r.n })) });
+  }
   if (!['/v1/site/players', '/v1/site/search'].includes(url.pathname)) return json({ error: 'Introuvable' }, 404);
   const params = Object.fromEntries(url.searchParams);
   const search = url.pathname.endsWith('/search');
