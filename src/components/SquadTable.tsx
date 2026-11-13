@@ -62,7 +62,7 @@ function inAgeBand(age: number, band: string) {
   return age >= min && age <= max;
 }
 
-/** « emprunté à X · jusqu’au 17/11 », ou « prêté » quand le prêteur est ce club. */
+/** « emprunté · X · 17.11 » (date de retour), ou « prêté » quand le prêteur est ce club. */
 function loanLabel(
   loan: { until: number; lender: string | null } | undefined,
   clubName?: string | null,
@@ -74,7 +74,7 @@ function loanLabel(
     timeZone: "Europe/Zurich",
   });
   const borrowed = loan.lender && loan.lender !== clubName;
-  return `${borrowed ? `emprunté à ${loan.lender}` : "prêté"} · jusqu’au ${until}`;
+  return `${borrowed ? `emprunté · ${loan.lender}` : "prêté"} · ${until}`;
 }
 
 export default function SquadTable({
