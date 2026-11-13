@@ -1952,3 +1952,51 @@ details.fold[open] > summary .fold-chevron {
   color: var(--muted);
   white-space: nowrap;
 }
+
+/* Réglages du club : six listes sur une ligne, trois puis deux sur petit écran. */
+.club-settings {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+.club-settings label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.club-settings select {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+}
+@media (max-width: 900px) {
+  .club-settings {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 520px) {
+  .club-settings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* Filtres de l'effectif : le nom prend la place libre, le reste se range en ligne. */
+.squad-filters {
+  gap: 10px;
+  margin-top: 16px;
+}
+.squad-filters input:not(.filter-number) {
+  flex: 2 1 220px;
+}
+.squad-filters select {
+  flex: 1 1 150px;
+  min-width: 0;
+  max-width: 100%;
+}
+.squad-filters .filter-number {
+  flex: 0 1 104px;
+  min-width: 88px;
+  min-height: 44px;
+}
