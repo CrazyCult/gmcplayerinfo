@@ -36,6 +36,21 @@ type SortKey =
   | "plusOneNet";
 
 /** Tableau d’effectif : notes, écart au potentiel et plan d’entraînement. */
+/** « emprunté à X · jusqu’au 17/11 », ou « prêté » quand le prêteur est ce club. */
+function loanLabel(
+  loan: { until: number; lender: string | null } | undefined,
+  clubName?: string | null,
+) {
+  if (!loan) return "en prêt";
+  const until = new Date(loan.until).toLocaleDateString("fr-CH", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Europe/Zurich",
+  });
+  const borrowed = loan.lender && loan.lender !== clubName;
+  return `${borrowed ? `emprunté à ${loan.lender}` : "prêté"} · jusqu’au ${until}`;
+}
+
 export default function SquadTable({
   players,
   hrefPrefix,
@@ -43,6 +58,9 @@ export default function SquadTable({
   subtitle,
   action,
   premium = false,
+  loans,
+  clubName,
+  settingsNote,
 }: {
   players: Player[];
   /** Début du lien vers la fiche (« /player/ » ou « /player/local: »). */
@@ -52,7 +70,17 @@ export default function SquadTable({
   action?: ReactNode;
   /** Modules réservés : meilleur poste, +1 OVR le moins cher, revente. */
   premium?: boolean;
+  /** Prêts en cours lus dans le jeu par l’extension du manager. */
+  loans?: { id: string; until: number; lender: string | null }[];
+  /** Nom du club affiché : distingue « emprunté à » de « prêté ». */
+  clubName?: string | null;
+  /** Sous les réglages du club (origine des niveaux). */
+  settingsNote?: ReactNode;
 }) {
+  const loanOf = useMemo(
+    () => new Map((loans ?? []).map((loan) => [loan.id, loan])),
+    [loans],
+  );
   const light = useMemo(() => new Set(lightIds), [lightIds]);
   // Réglages du club s’ils sont enregistrés, sinon tout au niveau 5.
   const club = useClubSettings();
@@ -240,6 +268,7 @@ export default function SquadTable({
             simulateur et les leviers d’OVR.
           </p>
           <ClubSettingsForm />
+          {settingsNote}
         </Fold>
         <div className="filters">
           <input
@@ -296,10 +325,9 @@ export default function SquadTable({
               {filtered.map((player) => (
                 <tr
                   key={player.id}
-                  className={player.onLoan ? "on-loan" : undefined}
-                  title={
-                    player.onLoan
-                      ? "Prêté à un autre club : indisponible jusqu’à son retour"
+                  className={
+                    player.onLoan || loanOf.has(player.id)
+                      ? "on-loan"
                       : undefined
                   }
                 >
@@ -310,7 +338,11 @@ export default function SquadTable({
                     <Link href={`${hrefPrefix}${player.id}`} prefetch={false}>
                       {player.name}
                     </Link>
-                    {player.onLoan && <span className="loan-tag">prêté</span>}
+                    {(player.onLoan || loanOf.has(player.id)) && (
+                      <span className="loan-tag">
+                        {loanLabel(loanOf.get(player.id), clubName)}
+                      </span>
+                    )}
                     {light.has(player.id) && (
                       <small
                         className="muted"

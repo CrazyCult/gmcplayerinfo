@@ -252,6 +252,31 @@ const clubSchema = z.object({
   fetchedAt: z.number().nullable(),
   requestedAt: z.number().nullable(),
   players: z.array(z.object({ player: playerSchema, light: z.boolean() })),
+  /** Lu dans le jeu par l’extension du manager : réglages et prêts en cours. */
+  extras: z
+    .object({
+      updatedAt: z.number(),
+      coaches: z
+        .object({
+          att: z.number().int().min(1).max(5),
+          mid: z.number().int().min(1).max(5),
+          def: z.number().int().min(1).max(5),
+          gk: z.number().int().min(1).max(5),
+          physio: z.number().int().min(1).max(5),
+        })
+        .nullable(),
+      center: z.number().int().min(1).max(5).nullable(),
+      loans: z.array(
+        z.object({
+          id: z.string(),
+          until: z.number(),
+          lender: z.string().nullable(),
+        }),
+      ),
+    })
+    .nullable()
+    .optional()
+    .catch(null),
 });
 export type ClubSquad = z.infer<typeof clubSchema>;
 export const clubTag = (teamId: string) => `club:${teamId}`.slice(0, 256);
