@@ -451,3 +451,14 @@ it("filters the catalogue by nationality and lists the known nationalities", asy
   expect(some.total).toBe(first.n);
   expect((await site("/v1/site/players?nat=Atlantide")).total).toBe(0);
 });
+
+it("flags a loaned-out player in the public sheet, whatever form the game uses", async () => {
+  const { publicPlayer } = await import("../worker.d1.js");
+  const row = (extra: object) => ({ team_id: "T", data: { ...player("P", "ST", 70), ...extra } });
+  expect(publicPlayer(row({})).onLoan).toBeUndefined();
+  expect(publicPlayer(row({ active_loan: {} })).onLoan).toBeUndefined();
+  expect(publicPlayer(row({ active_loan: null })).onLoan).toBeUndefined();
+  expect(publicPlayer(row({ active_loan: { id: "L", to_club_id: "X" } })).onLoan).toBe(true);
+  expect(publicPlayer(row({ on_loan: true })).onLoan).toBe(true);
+  expect(publicPlayer(row({ onLoan: true })).onLoan).toBe(true);
+});

@@ -1928,3 +1928,27 @@ details.fold[open] > summary .fold-chevron {
     font-size: 26px;
   }
 }
+
+/* Effectif : joueur prêté à un autre club, en retrait. */
+.squad-table tr.on-loan > td {
+  opacity: 0.45;
+}
+.squad-table tr.on-loan:hover > td {
+  opacity: 0.8;
+}
+.squad-table tr.on-loan > td.name {
+  opacity: 1;
+}
+.squad-table tr.on-loan > td.name a {
+  opacity: 0.6;
+}
+.loan-tag {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
