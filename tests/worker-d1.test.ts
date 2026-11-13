@@ -1006,3 +1006,77 @@ describe("réglages du club et prêts envoyés par l’extension", () => {
     vi.useRealTimers();
   });
 });
+
+describe("retours de match envoyés par l’extension", () => {
+  it("garde les matchs d’un club et les rend du plus récent au plus ancien", async () => {
+    const { call } = setup();
+    const st = { v: 1, xg: [3.46, 1.25], shots: [23, 12] };
+    const m = (id: string, date: number, extra: object = {}) => ({
+      id,
+      date,
+      venue: "domicile",
+      opponent: "No Funking Chance United",
+      gf: 0,
+      ga: 2,
+      ovrGap: 12,
+      st,
+      ins: { verdict: "Dominé mais pas récompensé", plus: [], minus: [] },
+      ...extra,
+    });
+    const sent = await call("POST", "/v1/matches", {
+      teamId: "T1",
+      matches: [
+        m(
+          "e87aa54c-cab5-479b-9472-cc9d7ba1286e",
+          Date.parse("2026-11-12T23:00:00Z"),
+        ),
+        m(
+          "5897240b-0000-4000-8000-000000000001",
+          Date.parse("2026-11-10T20:00:00Z"),
+          { gf: 0, ga: 5 },
+        ),
+        m("pas un identifiant", 1),
+        m(
+          "aaaaaaaa-0000-4000-8000-000000000002",
+          Date.parse("2026-11-09T20:00:00Z"),
+          { st: null },
+        ),
+        m(
+          "bbbbbbbb-0000-4000-8000-000000000003",
+          Date.parse("2026-11-09T20:00:00Z"),
+          { st: { xg: [1, 1], gros: "x".repeat(20000) } },
+        ),
+      ],
+    });
+    expect(sent.body).toEqual({ accepted: 2, rejected: 3 });
+    // Renvoyé une seconde fois : mis à jour, pas dupliqué.
+    await call("POST", "/v1/matches", {
+      teamId: "T1",
+      matches: [
+        m(
+          "e87aa54c-cab5-479b-9472-cc9d7ba1286e",
+          Date.parse("2026-11-12T23:00:00Z"),
+          { ga: 3 },
+        ),
+      ],
+    });
+    const list = (await call("GET", "/v1/site/matches/T1", undefined, true))
+      .body;
+    expect(
+      list.matches.map((x: { id: string; ga: number }) => [
+        x.id.slice(0, 8),
+        x.ga,
+      ]),
+    ).toEqual([
+      ["e87aa54c", 3],
+      ["5897240b", 5],
+    ]);
+    expect(list.matches[0].ins.verdict).toBe("Dominé mais pas récompensé");
+    expect(
+      (await call("GET", "/v1/site/matches/T2", undefined, true)).body.matches,
+    ).toEqual([]);
+    expect((await call("POST", "/v1/matches", { teamId: "T1" })).status).toBe(
+      400,
+    );
+  });
+});

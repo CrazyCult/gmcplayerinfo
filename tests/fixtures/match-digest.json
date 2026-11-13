@@ -1,0 +1,338 @@
+{
+ "id": "e87aa54c-cab5-479b-9472-cc9d7ba1286e",
+ "date": 1794524400000,
+ "venue": "domicile",
+ "opponent": "No Funking Chance United",
+ "gf": 0,
+ "ga": 2,
+ "ovrGap": 12,
+ "formation": "4-2-4",
+ "oppFormation": "4-3-3",
+ "st": {
+  "v": 1,
+  "comp": "Amateur Division 8",
+  "xg": [
+   3.46,
+   1.25
+  ],
+  "shots": [
+   23,
+   12
+  ],
+  "sot": [
+   11,
+   7
+  ],
+  "big": [
+   3,
+   1
+  ],
+  "saves": [
+   4,
+   9
+  ],
+  "wood": [
+   1,
+   1
+  ],
+  "poss": [
+   49,
+   51
+  ],
+  "passPct": [
+   83,
+   84
+  ],
+  "corners": [
+   12,
+   8
+  ],
+  "tackles": [
+   31,
+   37
+  ],
+  "inter": [
+   21,
+   28
+  ],
+  "aerial": [
+   27,
+   24
+  ],
+  "fouls": [
+   14,
+   12
+  ],
+  "yellow": [
+   2,
+   0
+  ],
+  "red": [
+   0,
+   0
+  ],
+  "en": [
+   98,
+   96,
+   93
+  ],
+  "enOpp": [
+   94,
+   91,
+   88
+  ],
+  "f3": [
+   30,
+   16
+  ],
+  "highRegains": [
+   9,
+   2
+  ],
+  "counters": [
+   12,
+   0
+  ],
+  "pressBeaten": [
+   7,
+   0
+  ],
+  "lost": {
+   "d": 2,
+   "m": 18,
+   "f": 18
+  },
+  "shc": {
+   "l": 5,
+   "c": 14,
+   "r": 4
+  },
+  "sh": {
+   "long": 5
+  },
+  "att": {
+   "build": [
+    20,
+    19
+   ],
+   "prog": [
+    65,
+    27
+   ],
+   "long": [
+    14,
+    6
+   ],
+   "thru": [
+    11,
+    2
+   ],
+   "combo": [
+    11,
+    4
+   ],
+   "cross": [
+    9,
+    6
+   ]
+  },
+  "gFor": {},
+  "gAgainst": {
+   "inBehind": 1,
+   "setHeader": 1
+  },
+  "ovr": [
+   99,
+   87
+  ],
+  "chem": [
+   100,
+   94
+  ],
+  "set": {
+   "formation": "4-2-4",
+   "mentality": "Attacking",
+   "playstyle": "Direct Play",
+   "tempo": "Fast",
+   "width": "Normal",
+   "defensiveLine": "Normal",
+   "pressingStyle": "Medium",
+   "aggressivity": "Medium"
+  },
+  "oppSet": {
+   "formation": "4-3-3",
+   "mentality": null,
+   "playstyle": "Possession",
+   "tempo": null,
+   "width": null,
+   "defensiveLine": null,
+   "pressingStyle": null,
+   "aggressivity": null
+  },
+  "players": [
+   {
+    "id": "h1",
+    "n": "Roberts",
+    "p": "CM",
+    "r": "cm_advanced",
+    "o": 97,
+    "nt": 6.7,
+    "g": 0,
+    "a": 0,
+    "f": 34,
+    "w": 8,
+    "l": 5,
+    "b": 0,
+    "sub": ""
+   },
+   {
+    "id": "h2",
+    "n": "Brinkmann",
+    "p": "CM",
+    "r": "cm_mezzala",
+    "o": 108,
+    "nt": 7.4,
+    "g": 0,
+    "a": 0,
+    "f": 34,
+    "w": 11,
+    "l": 8,
+    "b": 0,
+    "sub": ""
+   },
+   {
+    "id": "h3",
+    "n": "Duarte",
+    "p": "ST",
+    "r": "st_poacher",
+    "o": 98,
+    "nt": 5.9,
+    "g": 0,
+    "a": 0,
+    "f": 34,
+    "w": 1,
+    "l": 4,
+    "b": 0,
+    "sub": ""
+   },
+   {
+    "id": "h4",
+    "n": "Younes",
+    "p": "ST",
+    "r": "st_poacher",
+    "o": 96,
+    "nt": 6,
+    "g": 0,
+    "a": 0,
+    "f": 34,
+    "w": 0,
+    "l": 2,
+    "b": 0,
+    "sub": ""
+   },
+   {
+    "id": "h5",
+    "n": "Jimenez",
+    "p": "RW",
+    "r": "w_inside_forward",
+    "o": 109,
+    "nt": 6.2,
+    "g": 0,
+    "a": 0,
+    "f": 34,
+    "w": 2,
+    "l": 6,
+    "b": 0,
+    "sub": ""
+   },
+   {
+    "id": "h6",
+    "n": "Lebedev",
+    "p": "LW",
+    "r": "w_inside_forward",
+    "o": 97,
+    "nt": 6.8,
+    "g": 0,
+    "a": 0,
+    "f": 34,
+    "w": 3,
+    "l": 1,
+    "b": 0,
+    "sub": ""
+   }
+  ],
+  "oppBest": [
+   {
+    "n": "Park",
+    "p": "ST",
+    "nt": 8.1,
+    "g": 1
+   },
+   {
+    "n": "Matondo",
+    "p": "RW",
+    "nt": 7.7,
+    "g": 1
+   },
+   {
+    "n": "Mateos",
+    "p": "CDM",
+    "nt": 7.5,
+    "g": 0
+   }
+  ],
+  "subsUsed": [
+   0,
+   0
+  ]
+ },
+ "ins": {
+  "verdict": "Dominé mais pas récompensé",
+  "plus": [
+   {
+    "t": "Occasions : 3,46 xG contre 1,25 (23 tirs à 12).",
+    "tip": ""
+   },
+   {
+    "t": "Pressing : 9 récupérations hautes contre 2.",
+    "tip": ""
+   },
+   {
+    "t": "Milieu : 19 duels gagnés sur 32.",
+    "tip": ""
+   },
+   {
+    "t": "Physique : 93 % d’énergie à la 90e, contre 88 % en face.",
+    "tip": ""
+   }
+  ],
+  "minus": [
+   {
+    "t": "Finition : 0 but pour 3,46 xG (11 cadrés, 9 arrêts adverses, 1 poteau).",
+    "tip": "Sur un seul match c’est souvent de la malchance ; si ça se répète, regarde la finition et le sang-froid de tes attaquants."
+   },
+   {
+    "t": "Buts encaissés : 1 sur ballon dans le dos de la défense, 1 sur tête sur coup de pied arrêté.",
+    "tip": "Coups de pied arrêtés défensifs : vérifie la taille et le jeu de tête de ta défense."
+   },
+   {
+    "t": "Duels offensifs : 6 gagnés sur 19 (Jimenez 2/8, Duarte 1/5, Younes 0/2).",
+    "tip": "Tes attaquants ont été dominés physiquement : rôle, physique ou soutien plus proche."
+   },
+   {
+    "t": "Passes en profondeur : 2 réussies sur 11.",
+    "tip": "Défense adverse basse ou passeurs imprécis : varie avec des combinaisons courtes."
+   }
+  ],
+  "best": [
+   "Brinkmann 7,4",
+   "Lebedev 6,8",
+   "Roberts 6,7"
+  ],
+  "worst": [
+   "Duarte 5,9",
+   "Younes 6",
+   "Jimenez 6,2"
+  ]
+ }
+}
