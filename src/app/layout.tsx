@@ -71,6 +71,7 @@ export default function RootLayout({
             <nav className="nav" aria-label="Navigation principale">
               <Link href="/players">Tous les joueurs</Link>
               <Link href="/squad">Mon effectif</Link>
+              <Link href="/matches">Mes matchs</Link>
               <Link href="/compare">Comparer</Link>
               <span className="status">
                 <span className="status-dot" />

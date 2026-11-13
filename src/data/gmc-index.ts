@@ -212,6 +212,92 @@ export async function getCatalog({
   );
 }
 
+// --- « Mes matchs » : retours de match envoyés par l’extension du manager ---
+const pairSchema = z.tuple([z.number(), z.number()]).catch([0, 0]);
+const pointSchema = z.object({ t: z.string(), tip: z.string().optional() });
+const matchSchema = z.object({
+  id: z.string(),
+  date: z.number(),
+  venue: z.string().nullable().optional(),
+  opponent: z.string().nullable().optional(),
+  gf: z.number().int(),
+  ga: z.number().int(),
+  ovrGap: z.number().nullable().optional(),
+  formation: z.string().nullable().optional(),
+  oppFormation: z.string().nullable().optional(),
+  st: z
+    .object({
+      comp: z.string().optional(),
+      xg: pairSchema,
+      shots: pairSchema,
+      sot: pairSchema,
+      big: pairSchema,
+      saves: pairSchema,
+      poss: pairSchema,
+      corners: pairSchema,
+      ovr: pairSchema,
+      chem: pairSchema,
+      subsUsed: pairSchema,
+      passPct: z
+        .tuple([z.number().nullable(), z.number().nullable()])
+        .catch([null, null]),
+      en: z.array(z.number()).catch([]),
+      shc: z
+        .object({ l: z.number(), c: z.number(), r: z.number() })
+        .catch({ l: 0, c: 0, r: 0 }),
+      gAgainst: z.record(z.string(), z.number()).catch({}),
+      set: z.record(z.string(), z.string().nullable()).catch({}),
+      oppSet: z.record(z.string(), z.string().nullable()).catch({}),
+      players: z
+        .array(
+          z.object({
+            id: z.string(),
+            n: z.string(),
+            p: z.string(),
+            r: z.string().optional(),
+            o: z.number(),
+            nt: z.number().nullable(),
+            g: z.number(),
+            a: z.number(),
+            f: z.number(),
+            w: z.number(),
+            l: z.number(),
+            sub: z.string().optional(),
+          }),
+        )
+        .catch([]),
+    })
+    .passthrough(),
+  ins: z
+    .object({
+      verdict: z.string(),
+      plus: z.array(pointSchema).catch([]),
+      minus: z.array(pointSchema).catch([]),
+      best: z.array(z.string()).catch([]),
+      worst: z.array(z.string()).catch([]),
+    })
+    .nullable()
+    .catch(null),
+});
+export type ClubMatch = z.infer<typeof matchSchema>;
+const matchesSchema = z.object({
+  // Un match illisible ne doit pas masquer les autres.
+  matches: z.array(z.unknown()).transform((rows) =>
+    rows.flatMap((row) => {
+      const parsed = matchSchema.safeParse(row);
+      return parsed.success ? [parsed.data] : [];
+    }),
+  ),
+});
+export async function getClubMatches(teamId: string) {
+  return matchesSchema.parse(
+    await request(`/v1/site/matches/${encodeURIComponent(teamId)}`, {
+      tags: [`matches:${teamId}`],
+      revalidate: 300,
+    }),
+  ).matches;
+}
+
 const nationalitiesSchema = z.object({
   nationalities: z.array(
     z.object({

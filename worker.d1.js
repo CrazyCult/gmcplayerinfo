@@ -123,6 +123,9 @@ const SCHEMA = [
   // Ce que seul le manager du club voit dans le jeu, envoyé par son extension :
   // niveaux des coachs et du centre, joueurs en prêt (avec date de fin).
   'CREATE TABLE IF NOT EXISTS club_extras (team_id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at INTEGER NOT NULL, contributor TEXT)',
+  // Retours de match envoyés par l'extension du manager (résumé chiffré d'un match).
+  'CREATE TABLE IF NOT EXISTS club_matches (team_id TEXT NOT NULL, match_id TEXT NOT NULL, played_at INTEGER NOT NULL, data TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (team_id, match_id))',
+  'CREATE INDEX IF NOT EXISTS club_matches_recent ON club_matches(team_id, played_at DESC)',
   // Table des confrontations de styles de jeu, reconstituée à partir des
   // phrases « X a l'avantage sur Y » de l'analyse de match du jeu.
   // Une ligne par (match, gagnant, perdant) : un même match compte une fois.
@@ -132,7 +135,7 @@ const PLAYSTYLES = ['Balanced', 'Possession', 'Tiki-Taka', 'Direct', 'Counter-at
   'High Tempo', 'Wing Play', 'Long Ball', 'Park the Bus', 'Catenaccio', 'Fluid'];
 const dbReady = new WeakSet();
 const dbInitializing = new WeakMap();
-const SCHEMA_VERSION = 'schema:site-perf:v3';
+const SCHEMA_VERSION = 'schema:site-perf:v4';
 // D1 batches and Turso pipelines both return SELECT results in order.
 async function readBatch(env, statements) {
   return (await env.DB.batch(statements)).map(r => r.results || []);
@@ -609,6 +612,14 @@ async function siteRequest(req, env, url, json) {
       market: marketOf(s || found.d), prices, comparables, history, historyAt: h ? h.fetched_at : null });
   }
 
+  // Retours de match d'un club (page « Mes matchs »), du plus récent au plus ancien.
+  const mm = url.pathname.match(/^\/v1\/site\/matches\/([A-Za-z0-9_-]{1,64})$/);
+  if (mm) {
+    const { results } = await env.DB.prepare('SELECT data FROM club_matches WHERE team_id = ?1 ORDER BY played_at DESC LIMIT 80').bind(mm[1]).all();
+    const matches = [];
+    for (const r of results) { try { matches.push(JSON.parse(r.data)); } catch (_) { /* ligne illisible ignorée */ } }
+    return json({ teamId: mm[1], matches });
+  }
   // Nationalités connues (liste du filtre du catalogue).
   if (url.pathname === '/v1/site/nationalities') {
     const { results } = await env.DB.prepare(`SELECT nationality AS name, MAX(flag_code) AS flag, COUNT(*) AS n FROM db_players
@@ -760,6 +771,21 @@ async function siteClubRequest(req, env, url, json) {
   }
   return json({ teamId, name: (n && n.name) || null, crest: (n && n.crest) || null, fetchedAt: c ? c.fetched_at : null, requestedAt, players,
     extras: readExtras(row && row.extras_data, row && row.extras_at) });
+}
+
+// Retour de match : un résumé chiffré de taille bornée. Le contenu est affiché
+// comme du texte par le site (jamais interprété), on vérifie donc la forme et la taille.
+const MATCHES_PER_CALL = 20, MATCHES_KEPT = 150, MATCH_MAX_BYTES = 14000;
+function cleanMatch(m, now) {
+  if (!m || typeof m !== 'object' || !isStr(m.id, 64) || !/^[0-9a-f-]{8,64}$/i.test(m.id)) return null;
+  const int = v => Number.isInteger(v) && v >= 0 && v <= 99;
+  if (!int(m.gf) || !int(m.ga) || !m.st || typeof m.st !== 'object' || !Array.isArray(m.st.xg)) return null;
+  const date = Number.isFinite(m.date) && m.date > 1.6e12 && m.date < now + 86400e3 ? Math.round(m.date) : now;
+  const out = { id: m.id, date, venue: isStr(m.venue, 20) ? m.venue : null, opponent: isStr(m.opponent, 80) ? m.opponent : null,
+    gf: m.gf, ga: m.ga, ovrGap: Number.isFinite(m.ovrGap) ? m.ovrGap : null,
+    formation: isStr(m.formation, 30) ? m.formation : null, oppFormation: isStr(m.oppFormation, 30) ? m.oppFormation : null,
+    st: m.st, ins: m.ins && typeof m.ins === 'object' ? m.ins : null };
+  return JSON.stringify(out).length <= MATCH_MAX_BYTES ? out : null;
 }
 
 // Réglages et prêts d'un club : uniquement des niveaux 1 à 5, des identifiants et des dates.
@@ -920,6 +946,27 @@ async function extensionRequest(req, env, url, json, internal = false) {
   if (!internal && !(await licenceOk(env, installId, req.headers.get('X-GMC-Licence')))) return json({ error: 'licence invalide ou expirée' }, 401);
   await ensureDb(env);
   const now = Date.now();
+
+  // Retours de match du manager (journal de matchs de l'extension).
+  if (req.method === 'POST' && url.pathname === '/v1/matches') {
+    let body; try { body = await req.json(); } catch (_) { return json({ error: 'JSON invalide' }, 400); }
+    if (!isStr(body.teamId, 64) || !Array.isArray(body.matches)) return json({ error: 'Données invalides' }, 400);
+    const stmts = []; let rejected = 0;
+    for (const m of body.matches.slice(0, MATCHES_PER_CALL)) {
+      const clean = cleanMatch(m, now);
+      if (!clean) { rejected++; continue; }
+      stmts.push(env.DB.prepare(`INSERT INTO club_matches (team_id, match_id, played_at, data, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)
+        ON CONFLICT(team_id, match_id) DO UPDATE SET played_at = excluded.played_at, data = excluded.data, updated_at = excluded.updated_at`)
+        .bind(body.teamId, clean.id, clean.date, JSON.stringify(clean), now));
+    }
+    // On garde les MATCHES_KEPT matchs les plus récents du club.
+    if (stmts.length) {
+      stmts.push(env.DB.prepare(`DELETE FROM club_matches WHERE team_id = ?1 AND match_id NOT IN
+        (SELECT match_id FROM club_matches WHERE team_id = ?1 ORDER BY played_at DESC LIMIT ${MATCHES_KEPT})`).bind(body.teamId));
+      await runBatch(env, stmts);
+    }
+    return json({ accepted: stmts.length ? stmts.length - 1 : 0, rejected });
+  }
 
   // Réglages du club et prêts, lus par l'extension du manager dans son propre effectif.
   if (req.method === 'POST' && url.pathname === '/v1/club-extras') {

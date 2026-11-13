@@ -1999,3 +1999,161 @@ details.fold[open] > summary .fold-chevron {
   min-width: 88px;
   min-height: 44px;
 }
+
+/* Mes matchs : une ligne par match, dépliable. */
+.match-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+.match-kpis > div {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--secondary);
+}
+.match-kpis strong {
+  font-size: 20px;
+}
+.match-kpis span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.match-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.match-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--secondary);
+}
+.match-card > summary {
+  display: grid;
+  grid-template-columns: 30px 54px minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 8px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+.match-card > summary::-webkit-details-marker {
+  display: none;
+}
+.match-result {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: #6b7280;
+}
+.match-result.result-V {
+  background: #15803d;
+}
+.match-result.result-D {
+  background: #b91c1c;
+}
+.match-score {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.match-opponent {
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.match-opponent small {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+}
+.match-verdict {
+  font-size: 13px;
+}
+.match-xg {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.match-body {
+  display: grid;
+  gap: 14px;
+  padding: 4px 14px 16px;
+}
+.match-points {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.match-points h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+.points {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.points li {
+  margin: 4px 0;
+}
+.points.plus li::marker {
+  color: #22c55e;
+}
+.points.minus li::marker {
+  color: #f59e0b;
+}
+.points small {
+  display: block;
+  color: var(--muted);
+}
+.match-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.match-stats > div {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.match-stats dt {
+  font-size: 11px;
+  color: var(--muted);
+}
+.match-stats dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.match-tactic {
+  margin: 0;
+  font-size: 13px;
+}
+.match-players {
+  width: 100%;
+  font-size: 13px;
+}
+@media (max-width: 760px) {
+  .match-card > summary {
+    grid-template-columns: 30px 50px minmax(0, 1fr);
+  }
+  .match-verdict,
+  .match-xg {
+    grid-column: 2 / -1;
+  }
+}
