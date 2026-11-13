@@ -1877,3 +1877,54 @@ details.fold[open] > summary .fold-chevron {
     flex: 1 1 auto;
   }
 }
+
+/* Mon effectif : en-tête aux couleurs du club (logo net + halo du même logo). */
+.club-hero {
+  position: relative;
+  justify-content: flex-start;
+  gap: 22px;
+  padding: 22px 24px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card);
+  overflow: hidden;
+  isolation: isolate;
+}
+.club-hero-glow {
+  position: absolute;
+  z-index: -1;
+  right: -60px;
+  top: 50%;
+  width: 420px;
+  height: 420px;
+  object-fit: contain;
+  transform: translateY(-50%);
+  filter: blur(48px) saturate(1.6);
+  opacity: 0.38;
+  pointer-events: none;
+}
+.club-hero-crest {
+  flex: none;
+  width: 104px;
+  height: 104px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 14px rgb(0 0 0 / 0.35));
+}
+.club-hero h1 {
+  margin: 4px 0;
+}
+@media (max-width: 760px) {
+  .club-hero {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+  }
+  .club-hero-crest {
+    width: 64px;
+    height: 64px;
+  }
+  .club-hero h1 {
+    font-size: 26px;
+  }
+}
