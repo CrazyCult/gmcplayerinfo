@@ -15,6 +15,7 @@ import {
 } from "@/data/gmc-index";
 import { accountKey, authEnabled, getSession, isPremium } from "@/lib/session";
 import { linkClub, unlinkClub } from "./actions";
+import type { Rarity } from "@/types";
 
 export const metadata = { title: "Mon effectif" };
 
@@ -207,7 +208,16 @@ export default async function SquadPage({
       {club ? (
         club.players.length ? (
           <SquadTable
-            players={club.players.map((p) => p.player)}
+            players={club.players.map((p) =>
+              // Rareté manquante dans la page club du jeu : celle de l’extension.
+              !p.player.rarity && club.extras?.rarities?.[p.player.id]
+                ? {
+                    ...p.player,
+                    rarity: club.extras.rarities[p.player.id] as Rarity,
+                  }
+                : p.player,
+            )}
+            lineup={club.extras?.lineup ?? null}
             hrefPrefix="/player/"
             lightIds={club.players
               .filter((p) => p.light)

@@ -88,6 +88,7 @@ export default function SquadTable({
   loans,
   clubName,
   settingsNote,
+  lineup,
 }: {
   players: Player[];
   /** Début du lien vers la fiche (« /player/ » ou « /player/local: »). */
@@ -103,7 +104,16 @@ export default function SquadTable({
   clubName?: string | null;
   /** Sous les réglages du club (origine des niveaux). */
   settingsNote?: ReactNode;
+  /** Composition du jeu (le 11 et le banc), lue par l’extension du manager. */
+  lineup?: { xi: string[]; bench: string[] } | null;
 }) {
+  const roleOf = useMemo(() => {
+    const map = new Map<string, "xi" | "bench">();
+    (lineup?.xi ?? []).forEach((id) => map.set(id, "xi"));
+    (lineup?.bench ?? []).forEach((id) => map.set(id, "bench"));
+    return map;
+  }, [lineup]);
+  const [group, setGroup] = useState("");
   const loanOf = useMemo(
     () => new Map((loans ?? []).map((loan) => [loan.id, loan])),
     [loans],
@@ -144,7 +154,15 @@ export default function SquadTable({
     [players],
   );
   const filtersOn = Boolean(
-    filter || position || age || rarity || nation || status || ovrMin || potMin,
+    filter ||
+    position ||
+    age ||
+    rarity ||
+    nation ||
+    status ||
+    ovrMin ||
+    potMin ||
+    group,
   );
   function resetFilters() {
     setFilter("");
@@ -155,6 +173,7 @@ export default function SquadTable({
     setStatus("");
     setOvrMin("");
     setPotMin("");
+    setGroup("");
   }
   const [sort, setSort] = useState<SortKey>("potential"),
     [direction, setDirection] = useState(-1);
@@ -228,6 +247,11 @@ export default function SquadTable({
     .filter(
       (player) =>
         player.name.toLowerCase().includes(filter.toLowerCase()) &&
+        (!group ||
+          (group === "squad" && roleOf.has(player.id)) ||
+          (group === "xi" && roleOf.get(player.id) === "xi") ||
+          (group === "bench" && roleOf.get(player.id) === "bench") ||
+          (group === "rest" && !roleOf.has(player.id))) &&
         (!position ||
           (POSITION_GROUPS[position]
             ? POSITION_GROUPS[position].includes(player.position)
@@ -339,6 +363,33 @@ export default function SquadTable({
           </div>
           {action}
         </div>
+        {roleOf.size > 0 && (
+          <div
+            className="segmented"
+            role="group"
+            aria-label="Groupe de joueurs"
+          >
+            {(
+              [
+                ["", `Tout l’effectif`],
+                ["squad", `Le 11 et le banc (${roleOf.size})`],
+                ["xi", `Le 11`],
+                ["bench", `Le banc`],
+                ["rest", `Hors groupe`],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={group === value}
+                className={group === value ? "active" : undefined}
+                onClick={() => setGroup(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="filters squad-filters">
           <input
             placeholder="Filtrer par nom…"
@@ -387,7 +438,7 @@ export default function SquadTable({
             <option value="loan">En prêt</option>
             {light.size > 0 && <option value="light">Fiches légères</option>}
           </select>
-          {rarities.length > 1 && (
+          {rarities.length > 0 && (
             <select
               aria-label="Rareté"
               value={rarity}
@@ -488,6 +539,18 @@ export default function SquadTable({
                     <Link href={`${hrefPrefix}${player.id}`} prefetch={false}>
                       {player.name}
                     </Link>
+                    {roleOf.has(player.id) && (
+                      <span
+                        className={`lineup-tag ${roleOf.get(player.id)}`}
+                        title={
+                          roleOf.get(player.id) === "xi"
+                            ? "Titulaire dans la composition du jeu"
+                            : "Sur le banc dans la composition du jeu"
+                        }
+                      >
+                        {roleOf.get(player.id) === "xi" ? "11" : "banc"}
+                      </span>
+                    )}
                     {(player.onLoan || loanOf.has(player.id)) && (
                       <span className="loan-tag">
                         {loanLabel(loanOf.get(player.id), clubName)}
