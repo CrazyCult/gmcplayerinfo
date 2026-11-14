@@ -359,6 +359,18 @@ const clubSchema = z.object({
           lender: z.string().nullable(),
         }),
       ),
+      /** Composition du jeu : le 11 et le banc. */
+      lineup: z
+        .object({ xi: z.array(z.string()), bench: z.array(z.string()) })
+        .nullable()
+        .optional()
+        .catch(null),
+      /** Rareté de chaque joueur, lue dans l’effectif du manager. */
+      rarities: z
+        .record(z.string(), z.string())
+        .nullable()
+        .optional()
+        .catch(null),
     })
     .nullable()
     .optional()

@@ -806,13 +806,25 @@ function cleanExtras(body, now) {
       out.loans.push({ id: l.id, until, lender: isStr(l.lender, 80) ? l.lender : null });
     }
   }
-  return out.coaches || out.loans ? out : null;
+  // Composition du jeu : le 11 et le banc (identifiants seulement).
+  const ids = (v, max) => Array.isArray(v) ? [...new Set(v.filter(x => isStr(x, 64)))].slice(0, max) : [];
+  if (body.lineup && typeof body.lineup === 'object') {
+    const xi = ids(body.lineup.xi, 11), bench = ids(body.lineup.bench, 12).filter(x => !xi.includes(x));
+    if (xi.length) out.lineup = { xi, bench };
+  }
+  // Rareté de chaque joueur (absente de la page club lue par le compte lecteur).
+  if (body.rarities && typeof body.rarities === 'object' && !Array.isArray(body.rarities)) {
+    const r = Object.entries(body.rarities).filter(([k, v]) => isStr(k, 64) && EXTRA_RARITIES.has(v)).slice(0, 150);
+    if (r.length) out.rarities = Object.fromEntries(r);
+  }
+  return out.coaches || out.loans || out.lineup ? out : null;
 }
+const EXTRA_RARITIES = new Set(['common', 'uncommon', 'rare', 'epic', 'legendary', 'galactico']);
 function readExtras(data, updatedAt, now = Date.now()) {
   if (!data) return null;
   let d; try { d = JSON.parse(data); } catch (_) { return null; }
   return { updatedAt, coaches: d.coaches || null, center: d.center ?? null,
-    loans: (d.loans || []).filter(l => l.until > now) };
+    loans: (d.loans || []).filter(l => l.until > now), lineup: d.lineup || null, rarities: d.rarities || null };
 }
 
 // --- Licence -------------------------------------------------------------------

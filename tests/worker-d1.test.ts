@@ -1080,3 +1080,25 @@ describe("retours de match envoyés par l’extension", () => {
     );
   });
 });
+
+describe("composition et raretés envoyées par l’extension", () => {
+  it("garde le 11, le banc et les raretés valides", async () => {
+    const { call } = setup();
+    await call("POST", "/v1/clubs", {
+      clubs: [
+        { teamId: "T1", fetchedAt: Date.now() - 1000, players: [full("p1")] },
+      ],
+    });
+    const sent = await call("POST", "/v1/club-extras", {
+      teamId: "T1",
+      loans: [],
+      lineup: { xi: ["a", "b", "a", 7], bench: ["b", "c"] },
+      rarities: { a: "epic", b: "mythique", c: "galactico" },
+    });
+    expect(sent.status).toBe(200);
+    const extras = (await call("GET", "/v1/site/club/T1", undefined, true)).body
+      .extras;
+    expect(extras.lineup).toEqual({ xi: ["a", "b"], bench: ["c"] });
+    expect(extras.rarities).toEqual({ a: "epic", c: "galactico" });
+  });
+});
