@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { compact, money } from "@/lib/format";
 import { ovrLevers, planTraining } from "@/engine/planner";
@@ -13,6 +13,17 @@ import { POSITIONS, type Player } from "@/types";
 import Rating from "./UI/Rating";
 import { signatureLabel } from "@/lib/nationSignature";
 import { nextBirthday } from "@/lib/birthday";
+import { statLabels, subLabels } from "@/lib/i18n";
+import {
+  STAT_SHORT,
+  exerciseFor,
+  statKind,
+  statValue,
+  statsOf,
+  subKind,
+  subsOf,
+} from "@/lib/statView";
+import InfoTip from "./UI/InfoTip";
 
 const birthdayDate = (t: number) =>
   new Date(t).toLocaleDateString("fr-FR", {
@@ -32,7 +43,14 @@ type SortKey =
   | "cost"
   | "posGain"
   | "plusOneCost"
-  | "plusOneNet";
+  | "plusOneNet"
+  | "s0"
+  | "s1"
+  | "s2"
+  | "s3"
+  | "s4"
+  | "s5";
+const STAT_COLUMNS = [0, 1, 2, 3, 4, 5] as const;
 
 /** Tableau d’effectif : notes, écart au potentiel et plan d’entraînement. */
 const POSITION_GROUPS: Record<string, string[]> = {
@@ -114,6 +132,16 @@ export default function SquadTable({
     return map;
   }, [lineup]);
   const [group, setGroup] = useState("");
+  // Vue « Entraînement » (plans) ou « Stats » (6 stats, sous-attributs dépliables).
+  const [view, setView] = useState<"plan" | "stats">("plan");
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+  const toggle = (id: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const loanOf = useMemo(
     () => new Map((loans ?? []).map((loan) => [loan.id, loan])),
     [loans],
@@ -224,8 +252,15 @@ export default function SquadTable({
           }
         }
         const next = nextBirthday(player.lastAgeUp, player.age);
+        const own = statsOf(player).map((stat) => statValue(player, stat));
         return {
           ...player,
+          s0: own[0],
+          s1: own[1],
+          s2: own[2],
+          s3: own[3],
+          s4: own[4],
+          s5: own[5],
           birthday: next?.days,
           birthdayAt: next?.at,
           birthdayDrop: next?.drop,
@@ -296,7 +331,20 @@ export default function SquadTable({
       );
     }
   }
-  const headers: [SortKey, string][] = [
+  const statHeaders: [SortKey, string][] = [
+    ["position", "Poste"],
+    ["name", "Joueur"],
+    ["overall", "OVR"],
+    ["potential", "POT"],
+    ...STAT_COLUMNS.map(
+      (i) =>
+        [`s${i}`, ["PAC", "SHO", "PAS", "DRI", "DEF", "PHY"][i]] as [
+          SortKey,
+          string,
+        ],
+    ),
+  ];
+  const planHeaders: [SortKey, string][] = [
     ["position", "Poste"],
     ["name", "Joueur"],
     ["age", "Âge"],
@@ -313,6 +361,8 @@ export default function SquadTable({
         ] as [SortKey, string][])
       : []),
   ];
+  const headers = view === "stats" ? statHeaders : planHeaders;
+  const columns = headers.length + (view === "stats" ? 1 : 0);
   return (
     <>
       <div className="statline">
@@ -389,6 +439,34 @@ export default function SquadTable({
               </button>
             ))}
           </div>
+        )}
+        <div className="segmented" role="group" aria-label="Vue du tableau">
+          {(
+            [
+              ["plan", "Entraînement"],
+              ["stats", "Stats et sous-attributs"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={view === value}
+              className={view === value ? "active" : undefined}
+              onClick={() => setView(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {view === "stats" && (
+          <p className="muted st-legend">
+            <span className="st-key weak">▼ point faible</span>
+            <span className="st-key strong">point fort</span> par rapport à
+            l’OVR du joueur (±6), sur les stats qui comptent pour son poste ;
+            les autres sont en gris. Les gardiens ont leurs propres stats (DIV,
+            HAN, KIC, REF, POS, SPE). Déplie un joueur pour ses sous-attributs ;
+            la bulle « i » donne l’exercice du jeu.
+          </p>
         )}
         <div className="filters squad-filters">
           <input
@@ -500,9 +578,18 @@ export default function SquadTable({
           )}
         </div>
         <div className="table-wrap">
-          <table className="squad-table">
+          <table
+            className={
+              view === "stats" ? "squad-table stats-view" : "squad-table"
+            }
+          >
             <thead>
               <tr>
+                {view === "stats" && (
+                  <th>
+                    <span className="sr-only">Sous-attributs</span>
+                  </th>
+                )}
                 {headers.map(([key, label]) => (
                   <th
                     key={key}
@@ -523,146 +610,302 @@ export default function SquadTable({
               </tr>
             </thead>
             <tbody>
-              {filtered.map((player) => (
-                <tr
-                  key={player.id}
-                  className={
-                    player.onLoan || loanOf.has(player.id)
-                      ? "on-loan"
-                      : undefined
-                  }
-                >
-                  <td>
-                    <span className="pill">{player.position}</span>
-                  </td>
-                  <td className="name">
-                    <Link href={`${hrefPrefix}${player.id}`} prefetch={false}>
-                      {player.name}
-                    </Link>
-                    {roleOf.has(player.id) && (
-                      <span
-                        className={`lineup-tag ${roleOf.get(player.id)}`}
-                        title={
-                          roleOf.get(player.id) === "xi"
-                            ? "Titulaire dans la composition du jeu"
-                            : "Sur le banc dans la composition du jeu"
-                        }
-                      >
-                        {roleOf.get(player.id) === "xi" ? "11" : "banc"}
-                      </span>
+              {filtered.map((player) =>
+                view === "stats" ? (
+                  <Fragment key={player.id}>
+                    <tr
+                      className={
+                        player.onLoan || loanOf.has(player.id)
+                          ? "on-loan"
+                          : undefined
+                      }
+                    >
+                      <td className="st-toggle">
+                        <button
+                          type="button"
+                          aria-expanded={open.has(player.id)}
+                          aria-controls={`subs-${player.id}`}
+                          aria-label={`Sous-attributs de ${player.name}`}
+                          onClick={() => toggle(player.id)}
+                        >
+                          {open.has(player.id) ? "▾" : "▸"}
+                        </button>
+                      </td>
+                      <td>
+                        <span className="pill">{player.position}</span>
+                      </td>
+                      <td className="name">
+                        <Link
+                          href={`${hrefPrefix}${player.id}`}
+                          prefetch={false}
+                        >
+                          {player.name}
+                        </Link>
+                        {roleOf.has(player.id) && (
+                          <span
+                            className={`lineup-tag ${roleOf.get(player.id)}`}
+                          >
+                            {roleOf.get(player.id) === "xi" ? "11" : "banc"}
+                          </span>
+                        )}
+                        {light.has(player.id) && (
+                          <small className="muted"> · légère</small>
+                        )}
+                      </td>
+                      <td>
+                        <Rating value={player.overall} />
+                      </td>
+                      <td>
+                        <Rating value={player.potential} />
+                      </td>
+                      {statsOf(player).map((stat) => {
+                        const kind = statKind(player, stat);
+                        const value = statValue(player, stat);
+                        return (
+                          <td
+                            key={stat}
+                            className={`st-cell ${kind}`}
+                            title={statLabels[stat]}
+                          >
+                            {player.position === "GK" && (
+                              <small>{STAT_SHORT[stat]} </small>
+                            )}
+                            {kind === "weak" ? "▼ " : ""}
+                            {value ?? "—"}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    {open.has(player.id) && (
+                      <tr className="st-detail" id={`subs-${player.id}`}>
+                        <td colSpan={columns}>
+                          {light.has(player.id) ? (
+                            <p className="muted">
+                              Fiche légère : les sous-attributs ne sont pas
+                              encore connus. Ils arrivent quand la fiche
+                              complète est lue.
+                            </p>
+                          ) : (
+                            <div className="st-groups">
+                              {statsOf(player).map((stat) => {
+                                const kind = statKind(player, stat);
+                                return (
+                                  <section
+                                    key={stat}
+                                    className={`st-group ${kind}`}
+                                  >
+                                    <h4>
+                                      {statLabels[stat]}
+                                      <b>
+                                        {kind === "weak" ? "▼ " : ""}
+                                        {statValue(player, stat) ?? "—"}
+                                      </b>
+                                    </h4>
+                                    <ul>
+                                      {subsOf(stat).map((sub) => {
+                                        const v = player.attributes.subs?.[sub];
+                                        const sk = subKind(player, stat, sub);
+                                        const ex = exerciseFor(
+                                          player.position,
+                                          sub,
+                                          club.saved ? club.coaches : null,
+                                        );
+                                        return (
+                                          <li key={sub} className={sk}>
+                                            <span>{subLabels[sub]}</span>
+                                            <b>
+                                              {sk === "weak" ? "▼ " : ""}
+                                              {v ?? "—"}
+                                            </b>
+                                            <InfoTip
+                                              label={`Exercice pour ${subLabels[sub]}`}
+                                            >
+                                              <strong>{ex.name}</strong>
+                                              {ex.coaches.length ? (
+                                                ex.coaches.map((c) => (
+                                                  <span
+                                                    key={c.coach}
+                                                    className="st-coach"
+                                                  >
+                                                    <i
+                                                      style={{
+                                                        background: c.color,
+                                                      }}
+                                                      aria-hidden="true"
+                                                    />
+                                                    {c.label} · niveau {c.level}
+                                                    {c.locked === true
+                                                      ? " · 🔒 ton coach n’a pas ce niveau"
+                                                      : c.locked === false
+                                                        ? " · disponible"
+                                                        : ""}
+                                                  </span>
+                                                ))
+                                              ) : (
+                                                <span className="st-coach">
+                                                  Aucun coach n’entraîne cet
+                                                  exercice pour un{" "}
+                                                  {player.position}.
+                                                </span>
+                                              )}
+                                            </InfoTip>
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
+                                  </section>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
                     )}
-                    {(player.onLoan || loanOf.has(player.id)) && (
-                      <span className="loan-tag">
-                        {loanLabel(loanOf.get(player.id), clubName)}
-                      </span>
-                    )}
-                    {light.has(player.id) && (
-                      <small
-                        className="muted"
-                        title="Fiche légère : 6 stats seulement, plan indisponible"
-                      >
-                        {" "}
-                        · légère
-                      </small>
-                    )}
-                  </td>
-                  <td>{player.age}</td>
-                  <td
-                    title={
-                      player.birthdayAt === undefined
-                        ? "Date du dernier anniversaire inconnue (fiche légère ou ancienne lecture)"
-                        : `${player.age + 1} ans vers le ${new Date(player.birthdayAt).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })} (un +1 tous les 40 jours)`
+                  </Fragment>
+                ) : (
+                  <tr
+                    key={player.id}
+                    className={
+                      player.onLoan || loanOf.has(player.id)
+                        ? "on-loan"
+                        : undefined
                     }
                   >
-                    {player.birthdayAt === undefined ? (
-                      "—"
-                    ) : (
+                    <td>
+                      <span className="pill">{player.position}</span>
+                    </td>
+                    <td className="name">
+                      <Link href={`${hrefPrefix}${player.id}`} prefetch={false}>
+                        {player.name}
+                      </Link>
+                      {roleOf.has(player.id) && (
+                        <span
+                          className={`lineup-tag ${roleOf.get(player.id)}`}
+                          title={
+                            roleOf.get(player.id) === "xi"
+                              ? "Titulaire dans la composition du jeu"
+                              : "Sur le banc dans la composition du jeu"
+                          }
+                        >
+                          {roleOf.get(player.id) === "xi" ? "11" : "banc"}
+                        </span>
+                      )}
+                      {(player.onLoan || loanOf.has(player.id)) && (
+                        <span className="loan-tag">
+                          {loanLabel(loanOf.get(player.id), clubName)}
+                        </span>
+                      )}
+                      {light.has(player.id) && (
+                        <small
+                          className="muted"
+                          title="Fiche légère : 6 stats seulement, plan indisponible"
+                        >
+                          {" "}
+                          · légère
+                        </small>
+                      )}
+                    </td>
+                    <td>{player.age}</td>
+                    <td
+                      title={
+                        player.birthdayAt === undefined
+                          ? "Date du dernier anniversaire inconnue (fiche légère ou ancienne lecture)"
+                          : `${player.age + 1} ans vers le ${new Date(player.birthdayAt).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })} (un +1 tous les 40 jours)`
+                      }
+                    >
+                      {player.birthdayAt === undefined ? (
+                        "—"
+                      ) : (
+                        <>
+                          {birthdayDate(player.birthdayAt)}{" "}
+                          <small className="muted">· {player.birthday} j</small>
+                          {player.birthdayDrop && (
+                            <small
+                              style={{
+                                color: "var(--attr-bad)",
+                                fontWeight: 700,
+                                display: "block",
+                              }}
+                              title="Le bonus d’entraînement baisse à cet anniversaire : entraîner avant."
+                            >
+                              ⚠ ×{player.birthdayDrop[0]} → ×
+                              {player.birthdayDrop[1]}
+                            </small>
+                          )}
+                        </>
+                      )}
+                    </td>
+                    <td>
+                      <Rating value={player.overall} />
+                    </td>
+                    <td>
+                      <Rating value={player.potential} />
+                    </td>
+                    <td>
+                      {player.sessions ?? "—"}{" "}
+                      <small>→ {player.to ?? "—"}</small>
+                    </td>
+                    <td
+                      title={
+                        player.cost === undefined
+                          ? undefined
+                          : money(player.cost)
+                      }
+                    >
+                      {player.cost === undefined ? "—" : compact(player.cost)}
+                    </td>
+                    {premium && (
                       <>
-                        {birthdayDate(player.birthdayAt)}{" "}
-                        <small className="muted">· {player.birthday} j</small>
-                        {player.birthdayDrop && (
-                          <small
-                            style={{
-                              color: "var(--attr-bad)",
-                              fontWeight: 700,
-                              display: "block",
-                            }}
-                            title="Le bonus d’entraînement baisse à cet anniversaire : entraîner avant."
-                          >
-                            ⚠ ×{player.birthdayDrop[0]} → ×
-                            {player.birthdayDrop[1]}
-                          </small>
-                        )}
+                        <td className="wrap">
+                          {player.posGain && player.posGain > 0 ? (
+                            <span title={player.posPath}>
+                              <strong style={{ color: "var(--attr-good)" }}>
+                                {player.posBest} +{player.posGain}
+                              </strong>
+                              {player.posCost !== undefined && (
+                                <small className="muted">
+                                  {" "}
+                                  · {compact(player.posCost)}
+                                </small>
+                              )}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td
+                          className="wrap"
+                          title={
+                            player.plusOneCost === undefined
+                              ? undefined
+                              : money(player.plusOneCost)
+                          }
+                        >
+                          {player.plusOneCost === undefined
+                            ? "—"
+                            : `${compact(player.plusOneCost)} · ${player.plusOneSessions} séance${(player.plusOneSessions ?? 0) > 1 ? "s" : ""}`}
+                        </td>
+                        <td
+                          style={{
+                            color:
+                              player.plusOneNet === undefined
+                                ? undefined
+                                : player.plusOneNet >= 0
+                                  ? "var(--attr-good)"
+                                  : "var(--attr-bad)",
+                            fontWeight: 700,
+                          }}
+                          title="Valeur estimée à +1 OVR − valeur actuelle − coût de l’entraînement"
+                        >
+                          {player.plusOneNet === undefined
+                            ? "—"
+                            : `${player.plusOneNet >= 0 ? "+" : "−"}${compact(Math.abs(player.plusOneNet))}`}
+                        </td>
                       </>
                     )}
-                  </td>
-                  <td>
-                    <Rating value={player.overall} />
-                  </td>
-                  <td>
-                    <Rating value={player.potential} />
-                  </td>
-                  <td>
-                    {player.sessions ?? "—"} <small>→ {player.to ?? "—"}</small>
-                  </td>
-                  <td
-                    title={
-                      player.cost === undefined ? undefined : money(player.cost)
-                    }
-                  >
-                    {player.cost === undefined ? "—" : compact(player.cost)}
-                  </td>
-                  {premium && (
-                    <>
-                      <td className="wrap">
-                        {player.posGain && player.posGain > 0 ? (
-                          <span title={player.posPath}>
-                            <strong style={{ color: "var(--attr-good)" }}>
-                              {player.posBest} +{player.posGain}
-                            </strong>
-                            {player.posCost !== undefined && (
-                              <small className="muted">
-                                {" "}
-                                · {compact(player.posCost)}
-                              </small>
-                            )}
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td
-                        className="wrap"
-                        title={
-                          player.plusOneCost === undefined
-                            ? undefined
-                            : money(player.plusOneCost)
-                        }
-                      >
-                        {player.plusOneCost === undefined
-                          ? "—"
-                          : `${compact(player.plusOneCost)} · ${player.plusOneSessions} séance${(player.plusOneSessions ?? 0) > 1 ? "s" : ""}`}
-                      </td>
-                      <td
-                        style={{
-                          color:
-                            player.plusOneNet === undefined
-                              ? undefined
-                              : player.plusOneNet >= 0
-                                ? "var(--attr-good)"
-                                : "var(--attr-bad)",
-                          fontWeight: 700,
-                        }}
-                        title="Valeur estimée à +1 OVR − valeur actuelle − coût de l’entraînement"
-                      >
-                        {player.plusOneNet === undefined
-                          ? "—"
-                          : `${player.plusOneNet >= 0 ? "+" : "−"}${compact(Math.abs(player.plusOneNet))}`}
-                      </td>
-                    </>
-                  )}
-                </tr>
-              ))}
+                  </tr>
+                ),
+              )}
             </tbody>
           </table>
         </div>
