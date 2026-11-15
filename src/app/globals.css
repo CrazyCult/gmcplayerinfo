@@ -2425,6 +2425,10 @@ details.fold[open] > summary .fold-chevron {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+.ta-exo-name {
+  font-weight: 600;
+  color: #e5e7eb;
+}
 .ta-sub-val {
   text-align: right;
 }
