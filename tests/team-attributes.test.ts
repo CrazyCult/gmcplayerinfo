@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
 import TeamAttributes from "@/components/TeamAttributes";
@@ -40,11 +41,14 @@ test("le 11 : meilleur gardien + 10 joueurs de champ, point faible repéré", ()
     make(i, pos, 100 - i, pos === "CB" && i === 3 ? 60 : 100),
   );
   const html = renderToStaticMarkup(
-    <TeamAttributes players={players} hrefPrefix="/player/" />,
+    createElement(TeamAttributes, { players, hrefPrefix: "/player/" }),
   );
   expect(html).toContain("Équipe complète");
-  expect(html).toContain("Défense · vitesse");
-  expect(html).toContain("Joueur 3 60");
+  expect(html).toContain("À travailler");
+  expect(html).toContain("▼ Vitesse");
   // 11 titulaires seulement : le 12e joueur n'est pas dans le tableau.
   expect(html).not.toContain("Joueur 11");
+  // L'exercice du jeu et son entraîneur sont indiqués pour le point faible.
+  expect(html).toContain("Top Speed Training");
+  expect(html).toContain("Physio");
 });

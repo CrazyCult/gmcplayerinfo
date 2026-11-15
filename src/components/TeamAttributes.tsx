@@ -3,12 +3,21 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { statLabels, subLabels } from "@/lib/i18n";
+import { exerciseAccess } from "@/engine/training";
+import {
+  EXERCISES,
+  FIELD_GROUPS,
+  GK_GROUPS,
+  type Coach,
+  type CoachLevels,
+} from "@/engine/tables";
 import {
   FIELD_SUBS,
   GK_SUBS,
   type FieldStat,
   type GkStat,
   type Player,
+  type SubKey,
 } from "@/types";
 
 /**
@@ -132,21 +141,70 @@ function pick(
   };
 }
 
+/** Un code couleur par entraîneur du jeu (le nom est toujours écrit à côté). */
+const COACH: Record<Coach, { label: string; color: string }> = {
+  att: { label: "Attaque", color: "#ff8a5b" },
+  mid: { label: "Milieu", color: "#4ade80" },
+  def: { label: "Défense", color: "#38bdf8" },
+  gk: { label: "Gardien", color: "#facc15" },
+  physio: { label: "Physio", color: "#c084fc" },
+};
+const EXERCISE_NAME = new Map(EXERCISES.map((e) => [e.key, e.name]));
+const PARENT = new Map<SubKey, string>();
+for (const [stat, subs] of Object.entries({ ...FIELD_GROUPS, ...GK_GROUPS }))
+  for (const sub of subs) PARENT.set(sub, stat);
+const COACH_ORDER: Coach[] = ["att", "mid", "def", "gk", "physio"];
+const FULL: CoachLevels = { att: 5, mid: 5, def: 5, gk: 5, physio: 5 };
+/** Entraîneurs qui font travailler ce sous-attribut (tous postes confondus). */
+const coachesOf = (sub: SubKey) =>
+  COACH_ORDER.filter((coach) =>
+    (["CM", "ST", "CB", "GK"] as const).some((pos) =>
+      exerciseAccess(pos, sub, FULL).some((a) => a.coach === coach),
+    ),
+  );
+
+function CoachChip({
+  coach,
+  level,
+  locked,
+}: {
+  coach: Coach;
+  level: number;
+  locked?: boolean;
+}) {
+  const { label, color } = COACH[coach];
+  return (
+    <span
+      className={locked ? "ta-chip locked" : "ta-chip"}
+      style={{ borderColor: color, color }}
+      title={locked ? "Entraîneur pas encore à ce niveau" : undefined}
+    >
+      <i style={{ background: color }} aria-hidden="true" />
+      {label} · niv. {level}
+      {locked ? " 🔒" : ""}
+    </span>
+  );
+}
+
 export default function TeamAttributes({
   players,
   lineup,
   lightIds,
   hrefPrefix,
+  coaches,
 }: {
   players: Player[];
   lineup?: { xi: string[]; bench: string[] } | null;
   lightIds?: string[];
   hrefPrefix: string;
+  /** Niveaux des entraîneurs du club (connus seulement pour ton club). */
+  coaches?: CoachLevels | null;
 }) {
   const [full, setFull] = useState(false);
   const [subs, setSubs] = useState(false);
   const light = useMemo(() => new Set(lightIds ?? []), [lightIds]);
   const team = useMemo(() => pick(players, lineup), [players, lineup]);
+  if (!team.xi.length) return null;
 
   const xiField = team.xi.filter((p) => p.position !== "GK");
   const level = xiField.length
@@ -154,15 +212,19 @@ export default function TeamAttributes({
     : 0;
   const weakBelow = level - WEAK_GAP;
   const strongFrom = level + STRONG_GAP;
+  const benchIds = new Set(team.bench.map((p) => p.id));
 
-  const kindOf = (player: Player, stat: FieldStat): Kind => {
-    const keys = KEY[player.position];
-    const value = player.attributes[stat];
-    if (!keys?.includes(stat) || value == null) return "minor";
-    return value < weakBelow ? "weak" : value >= strongFrom ? "strong" : "key";
-  };
+  const kindOfValue = (v: number | undefined, isKey: boolean): Kind =>
+    v == null || !isKey
+      ? "minor"
+      : v < weakBelow
+        ? "weak"
+        : v >= strongFrom
+          ? "strong"
+          : "key";
+  const statKind = (p: Player, stat: FieldStat): Kind =>
+    kindOfValue(p.attributes[stat], Boolean(KEY[p.position]?.includes(stat)));
 
-  // Moyennes par ligne (11 titulaires) et points faibles regroupés.
   const lines = LINES.map(({ name, stats }) => {
     const group = xiField.filter((p) => LINE[p.position] === name);
     const avgs = stats.map((stat) => {
@@ -183,63 +245,90 @@ export default function TeamAttributes({
     };
   }).filter((line) => line.count > 0);
 
-  const weak = (() => {
-    const groups = new Map<string, { who: string; gap: number }[]>();
-    for (const p of xiField) {
-      for (const stat of KEY[p.position] ?? []) {
+  // À travailler : pour chaque joueur du 11, ses stats clés faibles, avec les
+  // sous-attributs qui les composent et l’exercice du jeu qui les fait monter.
+  const todo = xiField
+    .map((p) => {
+      const items = (KEY[p.position] ?? []).flatMap((stat) => {
         const value = p.attributes[stat];
-        if (value == null || value >= weakBelow) continue;
-        const key = `${LINE[p.position]} · ${statLabels[stat].toLowerCase()}`;
-        groups.set(key, [
-          ...(groups.get(key) ?? []),
-          { who: `${p.name} ${value}`, gap: weakBelow - value },
-        ]);
-      }
-    }
-    return [...groups.entries()]
-      .map(([what, list]) => ({
-        what,
-        who: list
-          .sort((a, b) => b.gap - a.gap)
-          .map((x) => x.who)
-          .join(" · "),
-        gap: Math.max(...list.map((x) => x.gap)),
-      }))
-      .sort((a, b) => b.gap - a.gap);
-  })();
+        if (value == null || value >= weakBelow) return [];
+        const rows = (FIELD_GROUPS[stat] ?? [])
+          .map((sub) => {
+            const v = p.attributes.subs?.[sub];
+            const access = exerciseAccess(
+              p.position,
+              sub,
+              coaches ?? FULL,
+            ).sort((a, b) => a.level - b.level);
+            return { sub, v, access };
+          })
+          .sort((a, b) => (a.v ?? 999) - (b.v ?? 999));
+        return [{ stat, value, gap: weakBelow - value, rows }];
+      });
+      return { p, items, gap: Math.max(0, ...items.map((i) => i.gap)) };
+    })
+    .filter((x) => x.items.length)
+    .sort((a, b) => b.gap - a.gap);
+  const shownTodo = todo.slice(0, 6);
 
-  const shown = (full ? [...team.xi, ...team.bench] : team.xi).slice();
-  const benchIds = new Set(team.bench.map((p) => p.id));
+  const shown = full ? [...team.xi, ...team.bench] : team.xi;
+  const order = (a: Player, b: Player, fieldOrder: boolean) =>
+    (benchIds.has(a.id) ? 1 : 0) - (benchIds.has(b.id) ? 1 : 0) ||
+    (fieldOrder ? byPosition(a, b) : b.overall - a.overall);
   const field = shown
     .filter((p) => p.position !== "GK")
-    .sort((a, b) => {
-      const ba = benchIds.has(a.id) ? 1 : 0,
-        bb = benchIds.has(b.id) ? 1 : 0;
-      return ba - bb || byPosition(a, b);
-    });
+    .sort((a, b) => order(a, b, true));
   const keepers = shown
     .filter((p) => p.position === "GK")
-    .sort((a, b) => {
-      const ba = benchIds.has(a.id) ? 1 : 0,
-        bb = benchIds.has(b.id) ? 1 : 0;
-      return ba - bb || b.overall - a.overall;
-    });
-  if (!team.xi.length) return null;
+    .sort((a, b) => order(a, b, false));
 
-  const value = (n: number | undefined) => (n == null ? "–" : n);
   const meta = (p: Player) =>
     `${benchIds.has(p.id) ? "Banc" : "Titulaire"} · ${p.age} ans${light.has(p.id) ? " · fiche légère" : ""}`;
+  const link = (p: Player) => (
+    <Link href={`${hrefPrefix}${encodeURIComponent(p.id)}`} prefetch={false}>
+      {p.name}
+    </Link>
+  );
+  const subHeads = (list: readonly SubKey[]) =>
+    list.map((sub) => (
+      <th
+        key={sub}
+        className="ta-sub"
+        title={EXERCISE_NAME.get(sub) ?? subLabels[sub]}
+      >
+        {subLabels[sub]}
+        <span className="ta-dots" aria-hidden="true">
+          {coachesOf(sub).map((c) => (
+            <i key={c} style={{ background: COACH[c].color }} />
+          ))}
+        </span>
+      </th>
+    ));
+  const subCell = (p: Player, sub: SubKey) => {
+    const parent = PARENT.get(sub) as FieldStat | undefined;
+    const isKey =
+      p.position === "GK"
+        ? true
+        : Boolean(parent && KEY[p.position]?.includes(parent));
+    const v = p.attributes.subs?.[sub];
+    const kind = kindOfValue(v, isKey);
+    return (
+      <td key={sub} className={cls(kind === "key" ? "minor" : kind)}>
+        {kind === "weak" ? "▼ " : ""}
+        {v ?? "–"}
+      </td>
+    );
+  };
 
   return (
     <section className="card team-attrs" aria-label="Équipe complète">
-      <div className="section-head" style={{ marginBottom: 12 }}>
+      <div className="ta-head">
         <div>
-          <h2 style={{ margin: 0 }}>Équipe complète · points faibles</h2>
-          <p className="muted" style={{ margin: "4px 0 0" }}>
+          <h2>Équipe complète · points faibles</h2>
+          <p className="muted">
             {team.source === "game"
               ? "Le 11 et le banc de la composition du jeu."
-              : "Les 11 meilleurs (1 gardien et 10 joueurs de champ), composition du jeu inconnue."}{" "}
-            Niveau du 11 : {level}. Stat clé faible : sous {weakBelow}.
+              : "Les 11 meilleurs (1 gardien et 10 joueurs de champ) : la composition du jeu n’est pas connue."}
           </p>
         </div>
         <div className="ta-controls">
@@ -260,57 +349,158 @@ export default function TeamAttributes({
               Le 16
             </button>
           </div>
-          <button
-            type="button"
-            className="button subtle"
-            aria-pressed={subs}
-            onClick={() => setSubs(!subs)}
-          >
-            Sous-attributs : {subs ? "affichés" : "masqués"}
-          </button>
+          <div className="ta-switch" role="group" aria-label="Sous-attributs">
+            <button
+              type="button"
+              aria-pressed={!subs}
+              onClick={() => setSubs(false)}
+            >
+              Stats
+            </button>
+            <button
+              type="button"
+              aria-pressed={subs}
+              onClick={() => setSubs(true)}
+            >
+              + Sous-attributs
+            </button>
+          </div>
         </div>
+      </div>
+
+      <div className="ta-scale">
+        <span>
+          Niveau du 11 : <b>{level}</b>
+        </span>
+        <span className="ta-key weak">▼ faible : sous {weakBelow}</span>
+        <span className="ta-key strong">fort : {strongFrom} et plus</span>
+        <span className="ta-key minor">
+          gris : stat secondaire pour le poste
+        </span>
       </div>
 
       <div className="ta-lines">
         {lines.map((line) => (
           <div className="ta-line" key={line.name}>
-            <div className="ta-line-head">
-              <strong>{line.name}</strong>
-              <small className="muted">{line.count} joueurs</small>
-            </div>
-            <div className="ta-line-stats">
-              {line.stats.map((stat, i) => {
-                const low = line.avgs[i] != null && line.avgs[i] === line.low;
-                return (
-                  <div className={low ? "ta-stat low" : "ta-stat"} key={stat}>
-                    <small>{statLabels[stat]}</small>
-                    <b>{line.avgs[i] ?? "–"}</b>
-                    <small>{low ? "▼ le plus bas" : " "}</small>
-                  </div>
-                );
-              })}
-            </div>
+            <strong>{line.name}</strong>
+            {line.stats.map((stat, i) => {
+              const v = line.avgs[i];
+              const low = v != null && v === line.low;
+              return (
+                <div className={low ? "ta-avg low" : "ta-avg"} key={stat}>
+                  <span>{statLabels[stat]}</span>
+                  <b>{v ?? "–"}</b>
+                  {low && <em>▼ le plus bas</em>}
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>
 
-      <div className="ta-weak">
-        <strong>
-          {weak.length
-            ? `Points faibles repérés (${weak.length})`
-            : "Aucun point faible repéré dans ce 11."}
-        </strong>
-        {weak.map((w) => (
-          <p key={w.what}>
-            <span>▼ {w.what}</span> {w.who}
-          </p>
-        ))}
-      </div>
+      <h3 className="ta-title">
+        À travailler{" "}
+        <small className="muted">
+          {todo.length
+            ? `${todo.length} joueur${todo.length > 1 ? "s" : ""} du 11 · les plus en retard d’abord`
+            : ""}
+        </small>
+      </h3>
+      {shownTodo.length ? (
+        <>
+          <div className="ta-legend-coaches" aria-label="Entraîneurs du jeu">
+            {COACH_ORDER.map((c) => (
+              <span
+                key={c}
+                className="ta-chip"
+                style={{ borderColor: COACH[c].color, color: COACH[c].color }}
+              >
+                <i style={{ background: COACH[c].color }} aria-hidden="true" />
+                {COACH[c].label}
+              </span>
+            ))}
+            <small className="muted">
+              Chaque exercice se fait chez l’entraîneur de cette couleur, au
+              niveau indiqué.
+            </small>
+          </div>
+          <div className="ta-todo">
+            {shownTodo.map(({ p, items }) => (
+              <article className="ta-card" key={p.id}>
+                <header>
+                  <div>
+                    {link(p)} <span className="muted">{p.position}</span>
+                  </div>
+                  <b>{p.overall}</b>
+                </header>
+                {items.map((item) => (
+                  <div className="ta-block" key={item.stat}>
+                    <div className="ta-block-title">
+                      <span>▼ {statLabels[item.stat]}</span>
+                      <b>{item.value}</b>
+                      <small>
+                        il manque {item.gap + 1} pour atteindre {weakBelow}
+                      </small>
+                    </div>
+                    {item.rows.map((row) => (
+                      <div className="ta-sub-row" key={row.sub}>
+                        <span className="ta-sub-name">
+                          {subLabels[row.sub]}
+                        </span>
+                        <span className="ta-bar" aria-hidden="true">
+                          <i
+                            style={{
+                              width: `${Math.min(100, ((row.v ?? 0) / (level + 10)) * 100)}%`,
+                            }}
+                          />
+                        </span>
+                        <b className="ta-sub-val">{row.v ?? "–"}</b>
+                        <span className="ta-exo">
+                          {EXERCISE_NAME.get(row.sub) ?? "—"}
+                          <span className="ta-chips">
+                            {row.access.length ? (
+                              row.access.map((a) => (
+                                <CoachChip
+                                  key={a.coach}
+                                  coach={a.coach}
+                                  level={a.level}
+                                  locked={coaches ? !a.available : false}
+                                />
+                              ))
+                            ) : (
+                              <small className="muted">
+                                pas d’exercice pour ce poste
+                              </small>
+                            )}
+                          </span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+                {light.has(p.id) && (
+                  <small className="muted">
+                    Fiche légère : sous-attributs inconnus tant que la fiche
+                    complète n’est pas lue.
+                  </small>
+                )}
+              </article>
+            ))}
+          </div>
+          {todo.length > shownTodo.length && (
+            <p className="muted ta-more">
+              + {todo.length - shownTodo.length} autre
+              {todo.length - shownTodo.length > 1 ? "s" : ""} joueur
+              {todo.length - shownTodo.length > 1 ? "s" : ""} avec un point
+              faible, visibles dans le tableau.
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="ta-ok">Aucun point faible dans ce 11.</p>
+      )}
 
-      <p className="muted ta-legend">
-        ▼ point faible du poste · bleu : point fort · gris : stat secondaire
-        pour ce poste
-      </p>
+      <h3 className="ta-title">Toutes les stats</h3>
       <div className="table-wrap">
         <table className="ta-table">
           <thead>
@@ -323,45 +513,30 @@ export default function TeamAttributes({
                   {SHORT[stat]}
                 </th>
               ))}
-              {subs &&
-                FIELD_SUBS.map((sub) => (
-                  <th key={sub} className="ta-sub">
-                    {subLabels[sub]}
-                  </th>
-                ))}
+              {subs && subHeads(FIELD_SUBS)}
             </tr>
           </thead>
           <tbody>
             {field.map((p) => (
               <tr key={p.id} className={benchIds.has(p.id) ? "ta-bench" : ""}>
                 <td className="name">
-                  <Link
-                    href={`${hrefPrefix}${encodeURIComponent(p.id)}`}
-                    prefetch={false}
-                  >
-                    {p.name}
-                  </Link>
-                  <small className="muted"> {meta(p)}</small>
+                  {link(p)}
+                  <small className="muted">{meta(p)}</small>
                 </td>
                 <td>{p.position}</td>
                 <td>
                   <b>{p.overall}</b>
                 </td>
                 {FIELD.map((stat) => {
-                  const kind = kindOf(p, stat);
+                  const kind = statKind(p, stat);
                   return (
                     <td key={stat} className={cls(kind)}>
                       {kind === "weak" ? "▼ " : ""}
-                      {value(p.attributes[stat])}
+                      {p.attributes[stat] ?? "–"}
                     </td>
                   );
                 })}
-                {subs &&
-                  FIELD_SUBS.map((sub) => (
-                    <td key={sub} className="ta-cell minor">
-                      {value(p.attributes.subs?.[sub])}
-                    </td>
-                  ))}
+                {subs && FIELD_SUBS.map((sub) => subCell(p, sub))}
               </tr>
             ))}
           </tbody>
@@ -381,53 +556,30 @@ export default function TeamAttributes({
                     {SHORT[stat]}
                   </th>
                 ))}
-                {subs &&
-                  GK_SUBS.map((sub) => (
-                    <th key={sub} className="ta-sub">
-                      {subLabels[sub]}
-                    </th>
-                  ))}
+                {subs && subHeads(GK_SUBS)}
               </tr>
             </thead>
             <tbody>
               {keepers.map((p) => (
                 <tr key={p.id} className={benchIds.has(p.id) ? "ta-bench" : ""}>
                   <td className="name">
-                    <Link
-                      href={`${hrefPrefix}${encodeURIComponent(p.id)}`}
-                      prefetch={false}
-                    >
-                      {p.name}
-                    </Link>
-                    <small className="muted"> {meta(p)}</small>
+                    {link(p)}
+                    <small className="muted">{meta(p)}</small>
                   </td>
                   <td>GK</td>
                   <td>
                     <b>{p.overall}</b>
                   </td>
                   {GK.map((stat) => {
-                    const v = p.attributes[stat];
-                    const kind: Kind =
-                      v == null
-                        ? "minor"
-                        : v < weakBelow
-                          ? "weak"
-                          : v >= strongFrom
-                            ? "strong"
-                            : "key";
+                    const kind = kindOfValue(p.attributes[stat], true);
                     return (
                       <td key={stat} className={cls(kind)}>
                         {kind === "weak" ? "▼ " : ""}
-                        {value(v)}
+                        {p.attributes[stat] ?? "–"}
                       </td>
                     );
                   })}
-                  {subs &&
-                    GK_SUBS.map((sub) => (
-                      <td key={sub} className="ta-cell minor">
-                        {value(p.attributes.subs?.[sub])}
-                      </td>
-                    ))}
+                  {subs && GK_SUBS.map((sub) => subCell(p, sub))}
                 </tr>
               ))}
             </tbody>
@@ -435,9 +587,10 @@ export default function TeamAttributes({
         </div>
       )}
       {subs && (
-        <p className="muted ta-legend">
-          Un « – » veut dire que la fiche complète du joueur n’a pas encore été
-          lue : ses sous-attributs ne sont pas connus.
+        <p className="muted ta-more">
+          Les points de couleur sous chaque sous-attribut montrent les
+          entraîneurs qui le font travailler. Un « – » veut dire que la fiche
+          complète du joueur n’a pas encore été lue.
         </p>
       )}
     </section>
