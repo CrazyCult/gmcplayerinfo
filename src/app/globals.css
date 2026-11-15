@@ -2197,14 +2197,26 @@ details.fold[open] > summary .fold-chevron {
   border-color: color-mix(in srgb, var(--success) 45%, transparent);
 }
 
-/* Équipe complète : le 11 / le 16 avec toutes les stats et les points faibles. */
+/* Équipe complète : le 11 / le 16, points faibles et exercices du jeu. */
 .team-attrs {
   margin-top: 24px;
 }
+.ta-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.ta-head h2 {
+  margin: 0;
+}
+.ta-head p {
+  margin: 4px 0 0;
+}
 .ta-controls {
   display: flex;
-  gap: 12px;
-  align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
 }
 .ta-switch {
@@ -2220,7 +2232,7 @@ details.fold[open] > summary .fold-chevron {
   color: var(--foreground);
   border-radius: 999px;
   min-height: 36px;
-  padding: 0 16px;
+  padding: 0 14px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -2232,64 +2244,192 @@ details.fold[open] > summary .fold-chevron {
   opacity: 0.5;
   cursor: default;
 }
+.ta-scale {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  margin: 16px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.ta-key {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.ta-key.weak {
+  background: rgba(255, 145, 66, 0.2);
+  color: #ffb27a;
+}
+.ta-key.strong {
+  background: rgba(56, 189, 248, 0.16);
+  color: #7dd3fc;
+}
+.ta-key.minor {
+  border: 1px solid var(--border);
+}
 .ta-lines {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 12px;
-  margin: 12px 0;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
 }
 .ta-line {
+  display: grid;
+  grid-template-columns: 1fr repeat(3, auto);
+  align-items: center;
+  gap: 6px 14px;
   background: var(--secondary);
   border-radius: 12px;
-  padding: 14px;
+  padding: 12px 14px;
 }
-.ta-line-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 10px;
-}
-.ta-line-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-.ta-stat {
+.ta-avg {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: var(--background);
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 70px;
+  padding: 4px 8px;
+  border-radius: 8px;
 }
-.ta-stat b {
-  font-size: 22px;
+.ta-avg b {
+  font-size: 20px;
+  color: var(--foreground);
 }
-.ta-stat.low {
+.ta-avg em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+}
+.ta-avg.low {
   background: rgba(255, 145, 66, 0.18);
   color: #ffb27a;
 }
-.ta-weak {
-  border: 1px solid rgba(255, 145, 66, 0.4);
-  background: rgba(255, 145, 66, 0.08);
-  border-radius: 12px;
-  padding: 14px 16px;
+.ta-avg.low b {
+  color: #ffb27a;
+}
+.ta-title {
+  margin: 28px 0 10px;
+  font-size: 17px;
+}
+.ta-title small {
+  font-weight: 400;
+  margin-left: 6px;
+}
+.ta-legend-coaches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
   margin-bottom: 12px;
 }
-.ta-weak strong {
-  color: #ffb27a;
+.ta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
 }
-.ta-weak p {
-  margin: 6px 0 0;
-  font-size: 14px;
+.ta-chip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
 }
-.ta-weak p span {
+.ta-chip.locked {
+  opacity: 0.55;
+  border-style: dashed;
+}
+.ta-todo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 14px;
+}
+.ta-card {
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ta-card > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 16px;
+}
+.ta-card > header a {
+  font-weight: 700;
+}
+.ta-block {
+  border-left: 3px solid #ff9142;
+  padding-left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ta-block-title {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.ta-block-title span {
   font-weight: 700;
   color: #ffb27a;
-  margin-right: 8px;
 }
-.ta-legend {
-  font-size: 12px;
+.ta-block-title b {
+  font-size: 18px;
+  color: #ffb27a;
+}
+.ta-block-title small {
+  color: var(--muted);
+}
+.ta-sub-row {
+  display: grid;
+  grid-template-columns: 130px 70px 32px 1fr;
+  gap: 4px 10px;
+  align-items: center;
+  font-size: 13px;
+}
+.ta-sub-name {
+  font-weight: 600;
+}
+.ta-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--background);
+  overflow: hidden;
+}
+.ta-bar i {
+  display: block;
+  height: 100%;
+  background: #ff9142;
+}
+.ta-sub-val {
+  text-align: right;
+}
+.ta-exo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #c9d3e3;
+}
+.ta-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ta-ok,
+.ta-more {
+  font-size: 13px;
   margin: 8px 0;
 }
 .ta-table td,
@@ -2300,10 +2440,25 @@ details.fold[open] > summary .fold-chevron {
   white-space: normal;
   min-width: 200px;
 }
+.ta-table td.name small {
+  display: block;
+}
 .ta-table th.ta-sub {
   white-space: normal;
-  min-width: 70px;
+  min-width: 72px;
   line-height: 1.2;
+  vertical-align: bottom;
+}
+.ta-dots {
+  display: flex;
+  gap: 3px;
+  margin-top: 4px;
+}
+.ta-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
 }
 .ta-table .ta-cell {
   text-align: center;
@@ -2325,4 +2480,18 @@ details.fold[open] > summary .fold-chevron {
 }
 .ta-table tr.ta-bench td {
   background: rgba(255, 255, 255, 0.02);
+}
+@media (max-width: 640px) {
+  .ta-todo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ta-sub-row {
+    grid-template-columns: 1fr 32px;
+  }
+  .ta-bar {
+    display: none;
+  }
+  .ta-exo {
+    grid-column: 1 / -1;
+  }
 }

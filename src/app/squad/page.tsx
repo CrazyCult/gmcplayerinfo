@@ -244,6 +244,7 @@ export default async function SquadPage({
                 .filter((p) => p.light)
                 .map((p) => p.player.id)}
               hrefPrefix="/player/"
+              coaches={isLinked ? (club.extras?.coaches ?? null) : null}
             />
           </>
         ) : (
