@@ -2196,3 +2196,133 @@ details.fold[open] > summary .fold-chevron {
   color: var(--success);
   border-color: color-mix(in srgb, var(--success) 45%, transparent);
 }
+
+/* Équipe complète : le 11 / le 16 avec toutes les stats et les points faibles. */
+.team-attrs {
+  margin-top: 24px;
+}
+.ta-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.ta-switch {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+  background: var(--card);
+}
+.ta-switch button {
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  border-radius: 999px;
+  min-height: 36px;
+  padding: 0 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ta-switch button[aria-pressed="true"] {
+  background: var(--primary);
+  color: #1a1208;
+}
+.ta-switch button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ta-lines {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+.ta-line {
+  background: var(--secondary);
+  border-radius: 12px;
+  padding: 14px;
+}
+.ta-line-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.ta-line-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.ta-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--background);
+}
+.ta-stat b {
+  font-size: 22px;
+}
+.ta-stat.low {
+  background: rgba(255, 145, 66, 0.18);
+  color: #ffb27a;
+}
+.ta-weak {
+  border: 1px solid rgba(255, 145, 66, 0.4);
+  background: rgba(255, 145, 66, 0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.ta-weak strong {
+  color: #ffb27a;
+}
+.ta-weak p {
+  margin: 6px 0 0;
+  font-size: 14px;
+}
+.ta-weak p span {
+  font-weight: 700;
+  color: #ffb27a;
+  margin-right: 8px;
+}
+.ta-legend {
+  font-size: 12px;
+  margin: 8px 0;
+}
+.ta-table td,
+.ta-table th {
+  padding: 8px 8px;
+}
+.ta-table td.name {
+  white-space: normal;
+  min-width: 200px;
+}
+.ta-table th.ta-sub {
+  white-space: normal;
+  min-width: 70px;
+  line-height: 1.2;
+}
+.ta-table .ta-cell {
+  text-align: center;
+  font-weight: 600;
+}
+.ta-table .ta-cell.minor {
+  color: var(--muted);
+  font-weight: 500;
+}
+.ta-table .ta-cell.weak {
+  background: rgba(255, 145, 66, 0.2);
+  color: #ffb27a;
+  font-weight: 700;
+}
+.ta-table .ta-cell.strong {
+  background: rgba(56, 189, 248, 0.16);
+  color: #7dd3fc;
+  font-weight: 700;
+}
+.ta-table tr.ta-bench td {
+  background: rgba(255, 255, 255, 0.02);
+}
