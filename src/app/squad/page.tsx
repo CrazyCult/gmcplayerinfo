@@ -1,6 +1,7 @@
 import Link from "next/link";
 import SquadImport from "@/components/SquadImport";
 import SquadTable from "@/components/SquadTable";
+import TeamAttributes from "@/components/TeamAttributes";
 import SquadExport from "@/components/SquadExport";
 import SquadUpdateButton from "@/components/SquadUpdateButton";
 import GameSettingsSync from "@/components/GameSettingsSync";
@@ -207,34 +208,44 @@ export default async function SquadPage({
 
       {club ? (
         club.players.length ? (
-          <SquadTable
-            players={club.players.map((p) =>
-              // Rareté manquante dans la page club du jeu : celle de l’extension.
-              !p.player.rarity && club.extras?.rarities?.[p.player.id]
-                ? {
-                    ...p.player,
-                    rarity: club.extras.rarities[p.player.id] as Rarity,
-                  }
-                : p.player,
-            )}
-            lineup={club.extras?.lineup ?? null}
-            hrefPrefix="/player/"
-            lightIds={club.players
-              .filter((p) => p.light)
-              .map((p) => p.player.id)}
-            premium={premium}
-            loans={club.extras?.loans}
-            clubName={club.name}
-            settingsNote={
-              isLinked && club.extras?.coaches && club.extras.center ? (
-                <GameSettingsSync
-                  coaches={club.extras.coaches}
-                  center={club.extras.center}
-                  updatedAt={club.extras.updatedAt}
-                />
-              ) : undefined
-            }
-          />
+          <>
+            <SquadTable
+              players={club.players.map((p) =>
+                // Rareté manquante dans la page club du jeu : celle de l’extension.
+                !p.player.rarity && club.extras?.rarities?.[p.player.id]
+                  ? {
+                      ...p.player,
+                      rarity: club.extras.rarities[p.player.id] as Rarity,
+                    }
+                  : p.player,
+              )}
+              lineup={club.extras?.lineup ?? null}
+              hrefPrefix="/player/"
+              lightIds={club.players
+                .filter((p) => p.light)
+                .map((p) => p.player.id)}
+              premium={premium}
+              loans={club.extras?.loans}
+              clubName={club.name}
+              settingsNote={
+                isLinked && club.extras?.coaches && club.extras.center ? (
+                  <GameSettingsSync
+                    coaches={club.extras.coaches}
+                    center={club.extras.center}
+                    updatedAt={club.extras.updatedAt}
+                  />
+                ) : undefined
+              }
+            />
+            <TeamAttributes
+              players={club.players.map((p) => p.player)}
+              lineup={club.extras?.lineup ?? null}
+              lightIds={club.players
+                .filter((p) => p.light)
+                .map((p) => p.player.id)}
+              hrefPrefix="/player/"
+            />
+          </>
         ) : (
           <div className="empty">
             <h2>Aucun joueur connu pour l’instant.</h2>
