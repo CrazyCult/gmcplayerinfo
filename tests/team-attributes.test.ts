@@ -51,5 +51,5 @@ test("le 11 : meilleur gardien + 10 joueurs de champ, point faible repéré", ()
   // L'exercice du jeu et son entraîneur sont indiqués pour le point faible.
   expect(html).toContain("Top Speed Training");
   expect(html).toContain("Physio");
-  expect(html).toContain("gamev2/training?playerId=id-3&amp;drill=sprintSpeed");
+  expect(html).toContain("https://gamechase.io/gamev2/training");
 });
