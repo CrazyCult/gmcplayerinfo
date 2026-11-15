@@ -13,6 +13,7 @@ import { POSITIONS, type Position } from "@/types";
 import { cardRoute, routeCards, routeLabel } from "@/engine/positionCards";
 import Rating from "@/components/UI/Rating";
 import { isPremium } from "@/lib/session";
+import { parseGameId } from "@/lib/game-id";
 
 export const metadata = { title: "Tous les joueurs GameChase" };
 export default async function PlayersPage({
@@ -29,6 +30,7 @@ export default async function PlayersPage({
 }) {
   const params = await searchParams;
   const q = params.q?.slice(0, 100) || "";
+  const gameId = q ? parseGameId(q) : null;
   const position = POSITIONS.includes(
     params.position as (typeof POSITIONS)[number],
   )
@@ -127,6 +129,38 @@ export default async function PlayersPage({
           </button>
         </form>
       </section>
+      {gameId && gameId.kind !== "club" && (
+        <section className="notice">
+          <p style={{ marginTop: 0 }}>
+            <strong>Identifiant du jeu reconnu</strong> · <code>{gameId.id}</code>
+          </p>
+          <p>
+            Si ce joueur est dans l’index, sa fiche s’ouvre ; sinon tu peux
+            demander sa lecture.
+          </p>
+          <Link
+            className="button"
+            prefetch={false}
+            href={`/player/${gameId.id}`}
+          >
+            Ouvrir ou ajouter ce joueur
+          </Link>
+        </section>
+      )}
+      {gameId && gameId.kind === "club" && (
+        <section className="notice">
+          <p style={{ marginTop: 0 }}>
+            <strong>Identifiant de club reconnu</strong> · <code>{gameId.id}</code>
+          </p>
+          <Link
+            className="button"
+            prefetch={false}
+            href={`/squad?club=${gameId.id}`}
+          >
+            Ouvrir ce club
+          </Link>
+        </section>
+      )}
       {catalog ? (
         <section className="card">
           <p>
