@@ -2413,6 +2413,18 @@ details.fold[open] > summary .fold-chevron {
   height: 100%;
   background: #ff9142;
 }
+.ta-card-right {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+.ta-go {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .ta-sub-val {
   text-align: right;
 }

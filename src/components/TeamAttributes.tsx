@@ -149,6 +149,9 @@ const COACH: Record<Coach, { label: string; color: string }> = {
   gk: { label: "Gardien", color: "#facc15" },
   physio: { label: "Physio", color: "#c084fc" },
 };
+/** Page Entraînement du jeu, avec le joueur et l’exercice en paramètres. */
+const trainingUrl = (playerId: string, sub?: SubKey) =>
+  `https://gamechase.io/gamev2/training?playerId=${encodeURIComponent(playerId)}${sub ? `&drill=${sub}` : ""}`;
 const EXERCISE_NAME = new Map(EXERCISES.map((e) => [e.key, e.name]));
 const PARENT = new Map<SubKey, string>();
 for (const [stat, subs] of Object.entries({ ...FIELD_GROUPS, ...GK_GROUPS }))
@@ -431,7 +434,17 @@ export default function TeamAttributes({
                   <div>
                     {link(p)} <span className="muted">{p.position}</span>
                   </div>
-                  <b>{p.overall}</b>
+                  <span className="ta-card-right">
+                    <a
+                      className="ta-go"
+                      href={trainingUrl(p.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Ouvrir l’entraînement ↗
+                    </a>
+                    <b>{p.overall}</b>
+                  </span>
                 </header>
                 {items.map((item) => (
                   <div className="ta-block" key={item.stat}>
@@ -456,7 +469,19 @@ export default function TeamAttributes({
                         </span>
                         <b className="ta-sub-val">{row.v ?? "–"}</b>
                         <span className="ta-exo">
-                          {EXERCISE_NAME.get(row.sub) ?? "—"}
+                          {row.access.length ? (
+                            <a
+                              className="ta-go"
+                              href={trainingUrl(p.id, row.sub)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Ouvrir cet exercice dans le jeu"
+                            >
+                              {EXERCISE_NAME.get(row.sub) ?? "—"} ↗
+                            </a>
+                          ) : (
+                            (EXERCISE_NAME.get(row.sub) ?? "—")
+                          )}
                           <span className="ta-chips">
                             {row.access.length ? (
                               row.access.map((a) => (
