@@ -396,6 +396,8 @@ const PUBLIC_PLAYER_FIELDS = [
   'contract_demand_gmc2', 'contractDemand', 'fitness', 'morale', 'form',
   'matches_played', 'matchesPlayed', 'goals', 'assists', 'clean_sheets',
   'cleanSheets', 'injured', 'onLoan', 'is_youth_product', 'youthProduct',
+  // Équipe U19 : titulaire du onze U19.
+  'u19_lineup', 'u19Lineup',
   'portrait_url', 'portraitUrl', 'card_url', 'cardUrl',
   // Date du dernier anniversaire (+1 an) : colonne « Âge +1 » de l'effectif.
   'last_age_up_date', 'lastAgeUp',

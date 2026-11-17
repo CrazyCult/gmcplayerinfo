@@ -77,6 +77,8 @@ const RARITY_LABELS: Record<string, string> = {
 };
 /** Tranche « min-max » (bornes incluses), celles du bonus d’entraînement. */
 function inAgeBand(age: number, band: string) {
+  // L’équipe U19 du jeu accepte les joueurs de 19 ans et moins.
+  if (band === "u19") return age <= 19;
   const [min, max] = band.split("-").map(Number);
   return age >= min && age <= max;
 }
@@ -278,6 +280,7 @@ export default function SquadTable({
       }),
     [players, light, premium, options],
   );
+  const hasU19Lineup = players.some((player) => player.u19Lineup);
   const filtered = rows
     .filter(
       (player) =>
@@ -291,7 +294,10 @@ export default function SquadTable({
           (POSITION_GROUPS[position]
             ? POSITION_GROUPS[position].includes(player.position)
             : player.position === position)) &&
-        (!age || inAgeBand(player.age, age)) &&
+        (!age ||
+          (age === "u19xi"
+            ? Boolean(player.u19Lineup)
+            : inAgeBand(player.age, age))) &&
         (!rarity || player.rarity === rarity) &&
         (!nation || player.nationality === nation) &&
         (!ovrMin || player.overall >= Number(ovrMin)) &&
@@ -502,6 +508,10 @@ export default function SquadTable({
             <option value="18-24">18 à 24 ans (×2)</option>
             <option value="25-30">25 à 30 ans (×1)</option>
             <option value="31-99">31 ans et plus (ne progresse plus)</option>
+            <option value="u19">U19 : 19 ans et moins</option>
+            {hasU19Lineup && (
+              <option value="u19xi">U19 : le onze de départ</option>
+            )}
           </select>
           <select
             aria-label="Situation"

@@ -167,6 +167,8 @@ const rawPlayerSchema = calculationPlayerSchema.extend({
     .nullish(),
   youthProduct: optionalBoolean,
   is_youth_product: optionalBoolean,
+  u19Lineup: optionalBoolean,
+  u19_lineup: optionalBoolean,
   portraitUrl: optionalText,
   portrait_url: optionalText,
   cardUrl: optionalText,
@@ -217,6 +219,7 @@ export const playerSchema = rawPlayerSchema.transform((raw): Player => {
       raw.onLoan ??
       (raw.active_loan == null ? undefined : Boolean(raw.active_loan)),
     youthProduct: raw.youthProduct ?? raw.is_youth_product,
+    u19Lineup: raw.u19Lineup ?? raw.u19_lineup,
     portraitUrl: raw.portraitUrl ?? raw.portrait_url,
     cardUrl: raw.cardUrl ?? raw.card_url,
     club: raw.club ?? (raw.club_id ? { teamId: raw.club_id } : undefined),
