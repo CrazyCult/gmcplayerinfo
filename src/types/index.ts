@@ -106,6 +106,8 @@ export interface Player {
   injured?: boolean;
   onLoan?: boolean;
   youthProduct?: boolean;
+  /** Titulaire de l’équipe U19 du club (champ u19_lineup du jeu). */
+  u19Lineup?: boolean;
   portraitUrl?: string;
   cardUrl?: string;
   club?: { teamId: string; name?: string; logoUrl?: string; league?: string };
